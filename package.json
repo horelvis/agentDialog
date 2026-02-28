@@ -1,0 +1,39 @@
+{
+  "name": "messeger-egentic",
+  "version": "0.1.0",
+  "description": "Agent-first messaging platform where AI agents register autonomously, create conversations, and invite humans via API",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run scripts/migrate.ts",
+    "db:seed": "bun run scripts/seed.ts",
+    "db:studio": "drizzle-kit studio",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "typecheck": "tsc --noEmit",
+    "lint": "bunx biome check src/",
+    "format": "bunx biome format --write src/"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.4.1",
+    "bcrypt": "^5.1.1",
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.12",
+    "ioredis": "^5.4.1",
+    "minio": "^8.0.2",
+    "nanoid": "^5.0.9",
+    "nodemailer": "^8.0.1",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/bun": "^1.1.14",
+    "@types/nodemailer": "^7.0.11",
+    "drizzle-kit": "^0.30.1",
+    "typescript": "^5.7.2"
+  }
+}

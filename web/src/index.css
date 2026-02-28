@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand purple (#673ab7) */
+  --color-brand-50: #f3e8ff;
+  --color-brand-100: #e9d5ff;
+  --color-brand-200: #d4b0ff;
+  --color-brand-300: #b880f5;
+  --color-brand-400: #9c5ce0;
+  --color-brand-500: #7e42c4;
+  --color-brand-600: #673ab7;
+  --color-brand-700: #5628a0;
+  --color-brand-800: #452087;
+  --color-brand-900: #361a6e;
+  --color-brand-950: #1e0e3e;
+
+  /* Dark surface palette */
+  --color-surface-primary: #0f0f13;
+  --color-surface-secondary: #16161d;
+  --color-surface-tertiary: #1e1e28;
+  --color-surface-elevated: #252532;
+  --color-surface-border: #2e2e3e;
+  --color-surface-hover: #32324a;
+
+  --color-risk-low: #22c55e;
+  --color-risk-medium: #eab308;
+  --color-risk-high: #f97316;
+  --color-risk-critical: #ef4444;
+
+  --color-severity-info: #818cf8;
+  --color-severity-warning: #eab308;
+  --color-severity-error: #ef4444;
+  --color-severity-success: #22c55e;
+}
+
+body {
+  @apply bg-surface-primary text-gray-100;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out;
+}
