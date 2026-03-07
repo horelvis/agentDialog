@@ -45,7 +45,7 @@ app.get("/health", async (c) => {
 
 app.get("/", (c) => {
   return c.json({
-    name: "LangChannelAgent",
+    name: "AgentDialog",
     version: "0.1.0",
     description: "Agent-first messaging platform",
     docs: "/api/v1",

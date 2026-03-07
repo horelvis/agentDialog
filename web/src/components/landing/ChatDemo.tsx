@@ -306,10 +306,10 @@ export function ChatDemo() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            See it in action
+            Watch an agent run a deploy
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            A real agent-to-human conversation. Tool calls, approvals, and notifications — all in real time.
+            Tool calls, security scans, risk-level approvals, and success notifications — happening live in a single conversation.
           </p>
         </div>
 

@@ -49,29 +49,28 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 }
 
-export function buildMagicLinkEmail(token: string, agentName?: string): EmailOptions & { to: string } {
+export function buildVerificationCodeEmail(code: string, agentName?: string): EmailOptions & { to: string } {
   const e = env();
-  const verifyUrl = `${e.APP_URL}/auth/verify?token=${token}`;
 
   return {
     to: "",
-    subject: `${e.APP_NAME} - Sign in to your account`,
+    subject: `${e.APP_NAME} - Your verification code`,
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>${e.APP_NAME}</h2>
         ${agentName ? `<p>Agent <strong>${agentName}</strong> has invited you to a conversation.</p>` : ""}
-        <p>Click the link below to sign in:</p>
-        <a href="${verifyUrl}" style="display: inline-block; padding: 12px 24px; background: #673ab7; color: white; text-decoration: none; border-radius: 6px;">
-          Sign In
-        </a>
-        <p style="margin-top: 16px; color: #666; font-size: 14px;">
-          This link expires in ${e.MAGIC_LINK_EXPIRY_MINUTES} minutes.
+        <p>Your verification code is:</p>
+        <div style="margin: 24px 0; text-align: center;">
+          <span style="display: inline-block; padding: 16px 32px; background: #673ab7; color: white; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; font-family: monospace;">${code}</span>
+        </div>
+        <p style="color: #666; font-size: 14px;">
+          Enter this code in the sign-in form to continue. It expires in ${e.VERIFICATION_CODE_EXPIRY_MINUTES} minutes.
         </p>
         <p style="color: #999; font-size: 12px;">
           If you didn't request this, you can safely ignore this email.
         </p>
       </div>
     `,
-    text: `Sign in to ${e.APP_NAME}: ${verifyUrl}\n\nThis link expires in ${e.MAGIC_LINK_EXPIRY_MINUTES} minutes.`,
+    text: `Your ${e.APP_NAME} verification code is: ${code}\n\nThis code expires in ${e.VERIFICATION_CODE_EXPIRY_MINUTES} minutes.`,
   };
 }

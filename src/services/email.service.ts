@@ -1,8 +1,8 @@
-import { sendEmail, buildMagicLinkEmail } from "../lib/email";
+import { sendEmail, buildVerificationCodeEmail } from "../lib/email";
 import { env } from "../env";
 
-export async function sendMagicLinkEmail(email: string, token: string, agentName?: string) {
-  const template = buildMagicLinkEmail(token, agentName);
+export async function sendVerificationCodeEmail(email: string, code: string, agentName?: string) {
+  const template = buildVerificationCodeEmail(code, agentName);
   template.to = email;
   return sendEmail(template);
 }

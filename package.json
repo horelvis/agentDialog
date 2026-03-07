@@ -1,5 +1,5 @@
 {
-  "name": "messeger-egentic",
+  "name": "agent-dialog",
   "version": "0.1.0",
   "description": "Agent-first messaging platform where AI agents register autonomously, create conversations, and invite humans via API",
   "type": "module",

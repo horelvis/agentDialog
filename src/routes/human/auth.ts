@@ -1,31 +1,27 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/hono";
-import { createMagicLink, verifyMagicLink, logout } from "../../services/auth.service";
-import { magicLinkSchema } from "../../validators/human.validators";
+import { createVerificationCode, verifyCode, logout } from "../../services/auth.service";
+import { sendCodeSchema, verifyCodeSchema } from "../../validators/human.validators";
 import { validateBody } from "../../middleware/validate";
-import { sendMagicLinkEmail } from "../../services/email.service";
+import { sendVerificationCodeEmail } from "../../services/email.service";
 import { humanAuth } from "../../middleware/human-auth";
 
 const app = new Hono<AppEnv>();
 
-app.post("/auth/magic-link", validateBody(magicLinkSchema), async (c) => {
+app.post("/auth/send-code", validateBody(sendCodeSchema), async (c) => {
   const input = c.get("validatedBody") as { email: string };
-  const { token } = await createMagicLink(input.email);
+  const { code } = await createVerificationCode(input.email);
 
-  await sendMagicLinkEmail(input.email, token);
+  await sendVerificationCodeEmail(input.email, code);
 
   return c.json({
-    data: { message: "Magic link sent to your email" },
+    data: { message: "Verification code sent to your email" },
   });
 });
 
-app.get("/auth/verify", async (c) => {
-  const token = c.req.query("token");
-  if (!token) {
-    return c.json({ error: { code: "VALIDATION_ERROR", message: "Token is required" } }, 422);
-  }
-
-  const { sessionToken, human } = await verifyMagicLink(token);
+app.post("/auth/verify", validateBody(verifyCodeSchema), async (c) => {
+  const input = c.get("validatedBody") as { email: string; code: string };
+  const { sessionToken, human } = await verifyCode(input.email, input.code);
 
   return c.json({
     data: {

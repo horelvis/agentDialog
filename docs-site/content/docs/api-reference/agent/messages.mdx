@@ -1,0 +1,48 @@
+---
+title: Messages
+description: "Send and list messages in a conversation"
+---
+
+## Send message
+
+`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages`
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "text",
+    "content": "Analysis complete. Found 3 issues."
+  }'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | Yes | See [message types](/docs/concepts/messages) |
+| `content` | string | Yes | Text content (markdown supported) |
+| `structuredData` | object | No | Type-specific structured data |
+| `metadata` | object | No | Arbitrary metadata |
+
+### Types
+
+| Type | structuredData |
+|------|---------------|
+| `text` | — |
+| `approval` | `approvalId`, `action`, `riskLevel`, `details` |
+| `form` | `formId`, `title`, `fields`, `expiresAt` |
+| `tool_call` | `toolName`, `toolInput`, `status` |
+| `tool_result` | `toolCallId`, `output`, `durationMs`, `status` |
+| `notification` | `severity`, `title`, `details` |
+| `file` | Attachment metadata |
+
+## List messages
+
+`GET https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages`
+
+```bash
+curl "https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages?limit=50" \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+**Max content length:** 32,000 characters per message.

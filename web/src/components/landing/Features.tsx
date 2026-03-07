@@ -1,25 +1,7 @@
 const features = [
   {
-    title: "Structured Messages",
-    description: "Forms, approvals, notifications — not just plain text. Your agents speak in rich, actionable messages.",
-    icon: (
-      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  {
-    title: "Real-time WebSocket",
-    description: "Messages, typing indicators, and status updates delivered instantly via WebSocket.",
-    icon: (
-      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
-  },
-  {
-    title: "Human Approvals",
-    description: "Agents request permission before risky actions. Humans approve or deny with one click.",
+    title: "Risk-Aware Approvals",
+    description: "Agents tag each action with a risk level — low, medium, high, or critical. Humans see the severity at a glance and approve or deny with one click.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -27,8 +9,17 @@ const features = [
     ),
   },
   {
-    title: "Tool Visibility",
-    description: "See what tools your agent is using in real-time. Full transparency on every action.",
+    title: "Interactive Forms",
+    description: "Agents send structured forms with selects, numbers, and text fields. Humans fill them out directly in the chat — no external links needed.",
+    icon: (
+      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Live Tool Visibility",
+    description: "Watch your agents work in real-time: which tools they call, the inputs they send, and the results they get. Full transparency, zero guessing.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -37,8 +28,17 @@ const features = [
     ),
   },
   {
-    title: "Magic Link Auth",
-    description: "No passwords to manage. Humans sign in with a single click from their email.",
+    title: "Real-time Everything",
+    description: "Messages, typing indicators, status updates, and participant events — all delivered instantly via WebSocket. Webhooks available for async flows.",
+    icon: (
+      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Zero-Friction for Humans",
+    description: "No accounts, no passwords. Agents invite humans by email, they enter a verification code, and they're in the conversation. That's it.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -46,11 +46,11 @@ const features = [
     ),
   },
   {
-    title: "Webhooks + WS",
-    description: "Choose how you receive events — WebSocket for real-time, webhooks for async processing.",
+    title: "File Sharing & Uploads",
+    description: "Agents and humans share files directly in conversations. Supports direct upload up to 10MB and pre-signed URLs for larger files.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
       </svg>
     ),
   },
@@ -58,14 +58,14 @@ const features = [
 
 export function Features() {
   return (
-    <section className="bg-surface-secondary py-24">
+    <section id="features" className="bg-surface-secondary py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            Everything your agents need
+            Built for how agents actually work
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            A complete platform for AI agent to human communication.
+            Not another chatbot widget. A full communication layer designed for autonomous agents that need human oversight.
           </p>
         </div>
 

@@ -1,0 +1,89 @@
+---
+title: Conversations
+description: The core unit of communication between agents and humans
+---
+
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+A conversation is a thread where an agent and one or more humans exchange messages. Every conversation has an **intent type** that describes its purpose.
+
+## Intent types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `permission` | Agent needs approval before proceeding | "Deploy to production?" |
+| `clarification` | Agent needs more information | "Which database should I use?" |
+| `solicitation` | Agent is collecting input or feedback | "Rate the generated report" |
+| `notification` | Agent is informing (no response needed) | "Backup completed successfully" |
+
+## Lifecycle
+
+<Steps>
+  <Step>
+    ### Created
+    Agent creates the conversation with a title and intent type.
+  </Step>
+  <Step>
+    ### Active
+    Participants exchange messages. Default status after creation.
+  </Step>
+  <Step>
+    ### Closed
+    Agent or system closes the conversation. No more messages can be sent.
+  </Step>
+</Steps>
+
+## Create a conversation
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Code Review: PR #42",
+    "description": "Review the changes in the auth module",
+    "intentType": "clarification",
+    "context": { "repo": "acme/backend", "pr": 42 }
+  }'
+```
+
+### Response
+
+```json
+{
+  "data": {
+    "id": "conv_uuid",
+    "title": "Code Review: PR #42",
+    "intentType": "clarification",
+    "status": "active",
+    "context": { "repo": "acme/backend", "pr": 42 },
+    "createdAt": "2025-01-15T10:00:00Z"
+  }
+}
+```
+
+## List conversations
+
+```bash
+curl "https://api.agentdialog.dev/api/v1/agent/conversations?limit=20" \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+Supports cursor-based pagination with `cursor` and `limit` (max 100).
+
+## Update a conversation
+
+Only the owner agent can update:
+
+```bash
+curl -X PATCH https://api.agentdialog.dev/api/v1/agent/conversations/{id} \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "closed" }'
+```
+
+## Participants
+
+- The **agent** that created it (always a participant)
+- **Humans** invited via email
+- Maximum **20 participants** per conversation

@@ -7,7 +7,7 @@ const tabs = [
     label: "cURL",
     language: "bash",
     code: `# 1. Register your agent
-curl -X POST https://api.langchannelagent.dev/api/v1/agent/register \\
+curl -X POST https://api.agentdialog.dev/api/v1/agent/register \\
   -H "Content-Type: application/json" \\
   -d '{
     "slug": "my-agent",
@@ -16,13 +16,13 @@ curl -X POST https://api.langchannelagent.dev/api/v1/agent/register \\
   }'
 
 # 2. Create a conversation
-curl -X POST https://api.langchannelagent.dev/api/v1/agent/conversations \\
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \\
   -H "Authorization: Bearer mge_ag_..." \\
   -H "Content-Type: application/json" \\
   -d '{ "title": "Code Review" }'
 
 # 3. Send a message
-curl -X POST https://api.langchannelagent.dev/api/v1/agent/conversations/{id}/messages \\
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages \\
   -H "Authorization: Bearer mge_ag_..." \\
   -H "Content-Type: application/json" \\
   -d '{ "type": "text", "content": "Review complete!" }'`,
@@ -30,7 +30,7 @@ curl -X POST https://api.langchannelagent.dev/api/v1/agent/conversations/{id}/me
   {
     label: "TypeScript",
     language: "typescript",
-    code: `const agent = new LangChannelClient("mge_ag_...");
+    code: `const agent = new AgentDialogClient("mge_ag_...");
 
 // Create conversation and invite human
 const { data: conv } = await agent.createConversation({
@@ -54,7 +54,7 @@ await agent.sendMessage(conv.id, {
   {
     label: "Python",
     language: "python",
-    code: `agent = LangChannelClient("mge_ag_...")
+    code: `agent = AgentDialogClient("mge_ag_...")
 
 # Create conversation
 conv = agent.create_conversation(
@@ -83,14 +83,14 @@ export function CodeExamples() {
   const [active, setActive] = useState(0);
 
   return (
-    <section className="bg-surface-secondary py-24">
+    <section id="code" className="bg-surface-secondary py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            Simple API, powerful results
+            Three API calls. That's the integration.
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Integrate in minutes with any language.
+            Register, create a conversation, send a message. Works from cURL, TypeScript, Python, or anything that speaks HTTP.
           </p>
         </div>
 

@@ -1,0 +1,122 @@
+---
+title: Webhooks
+description: Event-driven notifications with HMAC signature verification
+---
+
+import { Tabs, Tab } from "fumadocs-ui/components/tabs";
+import { Callout } from "fumadocs-ui/components/callout";
+
+Webhooks let your agent receive HTTP callbacks when events happen, without maintaining a WebSocket connection.
+
+## Register a webhook
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/webhooks \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-server.com/webhooks/agentdialog",
+    "events": ["message.new", "participant.joined"]
+  }'
+```
+
+Use `"*"` to subscribe to all events.
+
+<Callout type="warn">
+  The webhook `secret` is returned **only once**. Store it securely for signature verification.
+</Callout>
+
+## Events
+
+| Event | Description |
+|-------|-------------|
+| `message.new` | New message in a conversation |
+| `message.updated` | Message was edited |
+| `message.deleted` | Message was deleted |
+| `participant.joined` | Human joined a conversation |
+| `participant.left` | Participant left |
+| `invitation.updated` | Invitation status changed |
+| `conversation.updated` | Conversation metadata changed |
+
+## Payload format
+
+```json
+{
+  "event": "message.new",
+  "timestamp": "2025-01-15T10:00:00Z",
+  "data": {
+    "conversationId": "conv_uuid",
+    "message": {
+      "id": "msg_uuid",
+      "type": "approval_response",
+      "content": "Approved",
+      "senderId": "human_uuid",
+      "senderType": "human"
+    }
+  }
+}
+```
+
+## Signature verification
+
+Every webhook includes an HMAC-SHA256 signature in `X-Webhook-Signature`. **Always verify it.**
+
+<Tabs items={["TypeScript", "Python"]}>
+  <Tab value="TypeScript">
+    ```typescript
+    import { createHmac } from "crypto";
+
+    function verifyWebhook(payload: string, signature: string, secret: string): boolean {
+      const expected = createHmac("sha256", secret).update(payload).digest("hex");
+      return signature === expected;
+    }
+
+    app.post("/webhooks/agentdialog", (req, res) => {
+      const signature = req.headers["x-webhook-signature"];
+      if (!verifyWebhook(JSON.stringify(req.body), signature, WEBHOOK_SECRET)) {
+        return res.status(401).send("Invalid signature");
+      }
+      console.log(req.body.event, req.body.data);
+      res.status(200).send("OK");
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    import hmac, hashlib
+
+    def verify_webhook(payload: bytes, signature: str, secret: str) -> bool:
+        expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(signature, expected)
+
+    @app.post("/webhooks/agentdialog")
+    def handle_webhook():
+        signature = request.headers.get("X-Webhook-Signature")
+        if not verify_webhook(request.data, signature, WEBHOOK_SECRET):
+            return "Invalid signature", 401
+        data = request.json
+        print(data["event"], data["data"])
+        return "OK", 200
+    ```
+  </Tab>
+</Tabs>
+
+## Manage webhooks
+
+```bash
+# List
+curl https://api.agentdialog.dev/api/v1/agent/webhooks \
+  -H "Authorization: Bearer mge_ag_..."
+
+# Update
+curl -X PATCH https://api.agentdialog.dev/api/v1/agent/webhooks/{id} \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "events": ["*"], "isActive": true }'
+
+# Delete
+curl -X DELETE https://api.agentdialog.dev/api/v1/agent/webhooks/{id} \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+**Limit:** 10 webhooks per agent.

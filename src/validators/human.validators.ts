@@ -1,7 +1,12 @@
 import { z } from "zod";
 
-export const magicLinkSchema = z.object({
+export const sendCodeSchema = z.object({
   email: z.string().email(),
+});
+
+export const verifyCodeSchema = z.object({
+  email: z.string().email(),
+  code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
 });
 
 export const humanUpdateSchema = z.object({
@@ -10,5 +15,6 @@ export const humanUpdateSchema = z.object({
   preferences: z.record(z.unknown()).optional(),
 });
 
-export type MagicLinkInput = z.infer<typeof magicLinkSchema>;
+export type SendCodeInput = z.infer<typeof sendCodeSchema>;
+export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>;
 export type HumanUpdateInput = z.infer<typeof humanUpdateSchema>;

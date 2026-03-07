@@ -1,0 +1,146 @@
+---
+title: Messages
+description: Structured message types for rich agent-human communication
+---
+
+Messages are the core of AgentDialog. Beyond plain text, agents can send structured messages that humans interact with directly in the chat.
+
+## Agent message types
+
+### text
+
+Plain text or markdown content.
+
+```json
+{
+  "type": "text",
+  "content": "Analysis complete. Here are the results..."
+}
+```
+
+### approval
+
+Request human approval for an action. Includes risk level for at-a-glance severity.
+
+```json
+{
+  "type": "approval",
+  "content": "Ready to deploy v2.0 to production",
+  "structuredData": {
+    "approvalId": "deploy-v2",
+    "action": "deploy-to-production",
+    "riskLevel": "high",
+    "details": { "version": "2.0.0", "tests": "847 passed, 0 failed" }
+  }
+}
+```
+
+**Risk levels:** `low`, `medium`, `high`, `critical`
+
+### form
+
+Interactive form with typed fields. Humans fill it out inline.
+
+```json
+{
+  "type": "form",
+  "content": "Please configure the analysis parameters",
+  "structuredData": {
+    "formId": "config-001",
+    "title": "Analysis Parameters",
+    "fields": [
+      { "name": "dataset", "type": "select", "label": "Dataset", "options": ["production", "staging", "dev"] },
+      { "name": "limit", "type": "number", "label": "Row limit", "defaultValue": 1000 },
+      { "name": "notes", "type": "text", "label": "Additional notes", "required": false }
+    ]
+  }
+}
+```
+
+### tool\_call
+
+Show a tool being executed. Provides transparency into agent actions.
+
+```json
+{
+  "type": "tool_call",
+  "content": "Running integration tests...",
+  "structuredData": {
+    "toolName": "run_tests",
+    "toolInput": { "suite": "integration", "env": "staging" },
+    "status": "running"
+  }
+}
+```
+
+### tool\_result
+
+Result of a tool execution.
+
+```json
+{
+  "type": "tool_result",
+  "content": "847 passed, 0 failed",
+  "structuredData": {
+    "toolCallId": "tc_123",
+    "output": "All tests passed",
+    "durationMs": 192000,
+    "status": "completed"
+  }
+}
+```
+
+### notification
+
+Informational message with severity level.
+
+```json
+{
+  "type": "notification",
+  "content": "Backup completed successfully",
+  "structuredData": {
+    "severity": "success",
+    "title": "Backup Complete",
+    "details": { "size": "2.3GB", "duration": "4m 12s" }
+  }
+}
+```
+
+**Severities:** `info`, `warning`, `error`, `success`
+
+## Human response types
+
+### approval\_response
+
+```json
+{
+  "type": "approval_response",
+  "content": "Approved — go ahead with the deploy",
+  "structuredData": {
+    "approvalId": "deploy-v2",
+    "decision": "approved",
+    "reason": "Tests look good, proceed"
+  }
+}
+```
+
+**Decisions:** `approved`, `rejected`
+
+### form\_response
+
+```json
+{
+  "type": "form_response",
+  "structuredData": {
+    "formId": "config-001",
+    "responses": { "dataset": "production", "limit": 5000 }
+  }
+}
+```
+
+## Limits
+
+| Constraint | Value |
+|-----------|-------|
+| Message content length | 32,000 characters |
+| Pagination max | 100 messages per request |

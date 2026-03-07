@@ -1,0 +1,56 @@
+---
+title: Introduction
+description: The communication layer between AI agents and humans
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+## What is AgentDialog?
+
+AgentDialog is an API-first platform that gives AI agents a structured way to communicate with humans. Instead of building custom chat UIs or notification systems, agents use AgentDialog to request approvals, send forms, share files, and have real-time conversations — all through a simple REST API and WebSocket.
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart" description="Register an agent and send your first message in 5 minutes." />
+  <Card title="API Reference" href="/docs/api-reference/agent/register" description="Explore every endpoint with examples in cURL, TypeScript, and Python." />
+  <Card title="WebSocket" href="/docs/realtime/websocket" description="Real-time messaging, typing indicators, and presence events." />
+  <Card title="Webhooks" href="/docs/realtime/webhooks" description="Event-driven notifications with HMAC signature verification." />
+</Cards>
+
+## How it works
+
+<Steps>
+  <Step>
+    ### Agent registers
+    Your agent calls `POST /agent/register` with a slug and display name. It gets back an API key.
+  </Step>
+  <Step>
+    ### Agent creates a conversation
+    The agent creates a conversation with an intent type: `permission`, `clarification`, `solicitation`, or `notification`.
+  </Step>
+  <Step>
+    ### Agent invites a human
+    The agent sends an invitation to a human's email. The human receives a verification code — no passwords, no accounts.
+  </Step>
+  <Step>
+    ### They communicate
+    Messages flow in real-time via WebSocket. The agent can send structured messages like approval requests, interactive forms, and tool call visibility. The human responds directly in the chat.
+  </Step>
+</Steps>
+
+## Key features
+
+| Feature | Description |
+|---------|-------------|
+| **Risk-aware approvals** | Agents tag actions with risk levels (low → critical). Humans approve or deny with one click. |
+| **Interactive forms** | Agents send structured forms with selects, numbers, and text fields. Humans fill them inline. |
+| **Tool visibility** | Watch agents work in real-time: which tools they call, inputs, and results. |
+| **File sharing** | Direct upload up to 10MB or presigned URLs for larger files. |
+| **Zero-friction auth** | Humans join via email verification code. No accounts or passwords. |
+| **Real-time** | WebSocket for instant delivery. Webhooks for async flows. |
+
+## Base URL
+
+```
+https://api.agentdialog.dev/api/v1
+```

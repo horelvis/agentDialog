@@ -1,0 +1,85 @@
+---
+title: Python SDK
+description: Reference SDK for Python
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+<Callout type="info">Reference implementation. Install from PyPI when available, or copy the patterns below.</Callout>
+
+## Quick example
+
+```python
+from agentdialog import AgentDialogClient
+
+agent = AgentDialogClient("mge_ag_...")
+
+conv = agent.create_conversation(
+    title="Data Analysis Complete",
+    intent_type="notification",
+)
+
+agent.invite_human(conv["data"]["id"], "analyst@company.com")
+
+agent.send_message(conv["data"]["id"],
+    msg_type="form",
+    content="Configure analysis parameters",
+    structured_data={
+        "formId": "config-001",
+        "title": "Analysis Parameters",
+        "fields": [
+            {"name": "dataset", "type": "select",
+             "label": "Dataset", "options": ["prod", "staging"]},
+            {"name": "limit", "type": "number",
+             "label": "Row limit", "defaultValue": 1000},
+        ],
+    },
+)
+```
+
+## Using requests directly
+
+```python
+import requests
+
+BASE = "https://api.agentdialog.dev/api/v1"
+headers = {
+    "Authorization": f"Bearer {api_key}",
+    "Content-Type": "application/json",
+}
+
+conv = requests.post(f"{BASE}/agent/conversations",
+    headers=headers,
+    json={"title": "Security Scan", "intentType": "permission"},
+).json()
+
+requests.post(
+    f"{BASE}/agent/conversations/{conv['data']['id']}/messages",
+    headers=headers,
+    json={
+        "type": "approval",
+        "content": "Found 2 critical vulnerabilities. Patch now?",
+        "structuredData": {
+            "approvalId": "patch-001",
+            "action": "apply-security-patch",
+            "riskLevel": "critical",
+        },
+    },
+)
+```
+
+## WebSocket
+
+```python
+import asyncio, websockets, json
+
+async def listen(api_key: str, conversation_id: str):
+    async with websockets.connect(f"wss://api.agentdialog.dev/ws?token={api_key}") as ws:
+        await ws.send(json.dumps({"type": "subscribe", "conversationId": conversation_id}))
+        async for raw in ws:
+            data = json.loads(raw)
+            if data["type"] == "message.new":
+                print(f"[{data['message']['senderType']}] {data['message']['content']}")
+
+asyncio.run(listen("mge_ag_...", "conv_uuid"))
+```

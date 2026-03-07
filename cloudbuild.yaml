@@ -1,0 +1,70 @@
+# Google Cloud Build CI/CD pipeline
+# Trigger: push to main branch or manual trigger
+#
+# Required substitutions (set in Cloud Build trigger or CLI):
+#   _REGION: Cloud Run region (e.g. us-central1)
+#   _SERVICE_NAME: Cloud Run service name (e.g. agentdialog-api)
+#
+# Required secrets (set in Cloud Run service env vars, NOT here):
+#   DATABASE_URL, REDIS_URL, SESSION_SECRET, SMTP_*, CORS_ORIGINS, etc.
+
+steps:
+  # Build the container image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "Dockerfile.cloudrun"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/agentdialog/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/agentdialog/${_SERVICE_NAME}:latest"
+      - "."
+
+  # Push to Artifact Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/agentdialog/${_SERVICE_NAME}"
+
+  # Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/agentdialog/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8080"
+      - "--cpu"
+      - "1"
+      - "--memory"
+      - "512Mi"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "10"
+      - "--timeout"
+      - "300"
+      - "--concurrency"
+      - "80"
+      - "--session-affinity"
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/agentdialog/${_SERVICE_NAME}:$COMMIT_SHA"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/agentdialog/${_SERVICE_NAME}:latest"
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: agentdialog-api
+
+options:
+  logging: CLOUD_LOGGING_ONLY

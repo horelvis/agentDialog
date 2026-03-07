@@ -13,7 +13,7 @@ async function seed() {
   const { agent, apiKey } = await registerAgent({
     slug: "demo-assistant",
     displayName: "Demo Assistant",
-    description: "A demo agent for testing Messeger Egentic",
+    description: "A demo agent for testing AgentDialog",
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",
     capabilities: ["chat", "tool-use", "forms", "approvals"],
@@ -23,7 +23,7 @@ async function seed() {
 
   // Create a conversation
   const conversation = await createConversation(agent.id, {
-    title: "Welcome to Messeger Egentic",
+    title: "Welcome to AgentDialog",
     description: "A demo conversation",
     intentType: "notification",
   });
@@ -32,7 +32,7 @@ async function seed() {
   // Add some messages
   await createMessage(conversation.id, "agent", agent.id, {
     type: "text",
-    content: "Welcome to Messeger Egentic! I'm a demo agent ready to help.",
+    content: "Welcome to AgentDialog! I'm a demo agent ready to help.",
   });
 
   await createMessage(conversation.id, "agent", agent.id, {

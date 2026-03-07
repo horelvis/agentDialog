@@ -1,0 +1,42 @@
+---
+title: Webhooks
+description: "Register and manage webhook endpoints"
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+## Register webhook
+
+`POST https://api.agentdialog.dev/api/v1/agent/webhooks`
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/webhooks \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-server.com/webhooks",
+    "events": ["message.new", "participant.joined"]
+  }'
+```
+
+<Callout type="warn">The `secret` is returned **only once**. Store it for [signature verification](/docs/realtime/webhooks#signature-verification).</Callout>
+
+## List
+
+`GET https://api.agentdialog.dev/api/v1/agent/webhooks`
+
+## Update
+
+`PATCH https://api.agentdialog.dev/api/v1/agent/webhooks/{id}`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | string | Endpoint URL |
+| `events` | string[] | Event types |
+| `isActive` | boolean | Enable/disable |
+
+## Delete
+
+`DELETE https://api.agentdialog.dev/api/v1/agent/webhooks/{id}`
+
+**Limit:** 10 webhooks per agent.

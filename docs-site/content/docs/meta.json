@@ -1,0 +1,17 @@
+{
+  "root": true,
+  "title": "AgentDialog",
+  "pages": [
+    "index",
+    "quickstart",
+    "authentication",
+    "---Concepts---",
+    "concepts",
+    "---Real-time---",
+    "realtime",
+    "---API Reference---",
+    "api-reference",
+    "---SDKs---",
+    "sdks"
+  ]
+}

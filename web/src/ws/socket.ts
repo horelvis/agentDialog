@@ -2,7 +2,7 @@ import type { WsMessage } from "./types";
 
 type Handler = (msg: WsMessage) => void;
 
-export class LangChannelSocket {
+export class AgentDialogSocket {
   private ws: WebSocket | null = null;
   private url: string;
   private token: string;

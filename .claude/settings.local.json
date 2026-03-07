@@ -6,7 +6,15 @@
       "Bash(git init:*)",
       "Bash(bun install:*)",
       "Bash(npx tsc:*)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "Bash(DATABASE_URL=\"postgresql://agentdialog:agentdialog@localhost:5432/agentdialog\" bun run:*)",
+      "WebFetch(domain:www.danielfullstack.com)",
+      "Bash(npx create-fumadocs-app:*)",
+      "Bash(npx:*)",
+      "Bash(npm install:*)",
+      "Bash(npm view:*)",
+      "Bash(source:*)",
+      "Bash(curl:*)"
     ]
   }
 }

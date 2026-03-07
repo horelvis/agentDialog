@@ -3,6 +3,7 @@ import { ChatDemo } from "@/components/landing/ChatDemo";
 import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { CodeExamples } from "@/components/landing/CodeExamples";
+import { IntegrationGuide } from "@/components/landing/IntegrationGuide";
 import { CTA } from "@/components/landing/CTA";
 
 export function LandingPage() {
@@ -13,6 +14,7 @@ export function LandingPage() {
       <Features />
       <HowItWorks />
       <CodeExamples />
+      <IntegrationGuide />
       <CTA />
     </>
   );

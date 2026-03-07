@@ -33,6 +33,11 @@
   --color-severity-success: #22c55e;
 }
 
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
 body {
   @apply bg-surface-primary text-gray-100;
 }

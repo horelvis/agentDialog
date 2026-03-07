@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { LangChannelSocket } from "@/ws/socket";
+import { AgentDialogSocket } from "@/ws/socket";
 import { useAuthStore } from "@/stores/authStore";
 import { useConversationStore } from "@/stores/conversationStore";
 import { useWsStore } from "@/stores/wsStore";
@@ -19,7 +19,7 @@ export function useWebSocket() {
     if (!token) return;
 
     try {
-      const ws = new LangChannelSocket(WS_URL, token);
+      const ws = new AgentDialogSocket(WS_URL, token);
       setSocket(ws);
 
       ws.on("connected", () => setStatus("connected"));

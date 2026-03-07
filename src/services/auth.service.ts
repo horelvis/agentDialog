@@ -1,70 +1,132 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
 import { humans } from "../db/schema/humans";
+import { invitations } from "../db/schema/invitations";
+import { conversationParticipants } from "../db/schema/participants";
 import {
-  generateMagicLinkToken,
+  generateVerificationCode,
   generateSessionToken,
   hashToken,
   verifyToken,
 } from "../lib/crypto";
-import { UnauthorizedError } from "../lib/errors";
+import { ForbiddenError, UnauthorizedError } from "../lib/errors";
 import { env } from "../env";
 import { getOrCreateHuman } from "./human.service";
 
-export async function createMagicLink(email: string) {
+export async function createVerificationCode(email: string) {
   const db = getDb();
+
+  // Check that the email has at least one pending invitation or is already a participant
+  const [pendingInvitation] = await db
+    .select({ id: invitations.id })
+    .from(invitations)
+    .where(
+      and(
+        eq(invitations.invitedHumanEmail, email),
+        eq(invitations.status, "pending"),
+      ),
+    )
+    .limit(1);
+
+  if (!pendingInvitation) {
+    const [human] = await db
+      .select({ id: humans.id })
+      .from(humans)
+      .where(eq(humans.email, email))
+      .limit(1);
+
+    if (!human) {
+      throw new ForbiddenError("No invitations found. You need an invitation from an agent to sign in.");
+    }
+
+    const [existingParticipation] = await db
+      .select({ id: conversationParticipants.id })
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.humanId, human.id),
+          eq(conversationParticipants.actorType, "human"),
+        ),
+      )
+      .limit(1);
+
+    if (!existingParticipation) {
+      throw new ForbiddenError("No invitations found. You need an invitation from an agent to sign in.");
+    }
+  }
+
   const human = await getOrCreateHuman(email);
-  const token = generateMagicLinkToken();
-  const tokenHash = await hashToken(token);
+  const code = generateVerificationCode();
+  const codeHash = await hashToken(code);
   const e = env();
-  const expiresAt = new Date(Date.now() + e.MAGIC_LINK_EXPIRY_MINUTES * 60 * 1000);
+  const expiresAt = new Date(Date.now() + e.VERIFICATION_CODE_EXPIRY_MINUTES * 60 * 1000);
 
   await db
     .update(humans)
     .set({
-      magicLinkToken: tokenHash,
-      magicLinkExpiresAt: expiresAt,
+      verificationCodeHash: codeHash,
+      verificationCodeExpiresAt: expiresAt,
+      verificationAttempts: 0,
       updatedAt: new Date(),
     })
     .where(eq(humans.id, human.id));
 
-  return { token, human };
+  return { code, human };
 }
 
-export async function verifyMagicLink(token: string) {
+export async function verifyCode(email: string, code: string) {
   const db = getDb();
+  const e = env();
 
-  // Find humans with non-expired magic links
-  const allHumans = await db.select().from(humans);
+  const [human] = await db
+    .select()
+    .from(humans)
+    .where(eq(humans.email, email))
+    .limit(1);
 
-  for (const human of allHumans) {
-    if (!human.magicLinkToken || !human.magicLinkExpiresAt) continue;
-    if (new Date() > human.magicLinkExpiresAt) continue;
-
-    const valid = await verifyToken(token, human.magicLinkToken);
-    if (valid) {
-      // Create session
-      const sessionToken = generateSessionToken();
-      const sessionHash = await hashToken(sessionToken);
-      const e = env();
-      const sessionExpires = new Date(Date.now() + e.SESSION_EXPIRY_HOURS * 3600 * 1000);
-
-      await db
-        .update(humans)
-        .set({
-          magicLinkToken: null,
-          magicLinkExpiresAt: null,
-          sessionTokenHash: sessionHash,
-          sessionExpiresAt: sessionExpires,
-          updatedAt: new Date(),
-        })
-        .where(eq(humans.id, human.id));
-
-      return { sessionToken, human };
-    }
+  if (!human || !human.verificationCodeHash || !human.verificationCodeExpiresAt) {
+    throw new UnauthorizedError("Invalid or expired verification code");
   }
 
-  throw new UnauthorizedError("Invalid or expired magic link");
+  if (new Date() > human.verificationCodeExpiresAt) {
+    throw new UnauthorizedError("Verification code has expired");
+  }
+
+  if (human.verificationAttempts >= e.VERIFICATION_MAX_ATTEMPTS) {
+    throw new UnauthorizedError("Too many failed attempts. Please request a new code.");
+  }
+
+  const valid = await verifyToken(code, human.verificationCodeHash);
+
+  if (!valid) {
+    await db
+      .update(humans)
+      .set({
+        verificationAttempts: human.verificationAttempts + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(humans.id, human.id));
+    throw new UnauthorizedError("Invalid verification code");
+  }
+
+  // Create session
+  const sessionToken = generateSessionToken();
+  const sessionHash = await hashToken(sessionToken);
+  const sessionExpires = new Date(Date.now() + e.SESSION_EXPIRY_HOURS * 3600 * 1000);
+
+  await db
+    .update(humans)
+    .set({
+      verificationCodeHash: null,
+      verificationCodeExpiresAt: null,
+      verificationAttempts: 0,
+      sessionTokenHash: sessionHash,
+      sessionExpiresAt: sessionExpires,
+      updatedAt: new Date(),
+    })
+    .where(eq(humans.id, human.id));
+
+  return { sessionToken, human };
 }
 
 export async function logout(humanId: string) {

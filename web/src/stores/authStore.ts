@@ -12,8 +12,8 @@ interface AuthState {
   hydrate: () => Promise<void>;
   login: (sessionToken: string, human: Human) => void;
   logout: () => Promise<void>;
-  requestMagicLink: (email: string) => Promise<void>;
-  verifyToken: (token: string) => Promise<void>;
+  sendCode: (email: string) => Promise<void>;
+  verifyCode: (email: string, code: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -52,12 +52,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ token: null, human: null, isAuthenticated: false });
   },
 
-  requestMagicLink: async (email) => {
-    await authApi.requestMagicLink(email);
+  sendCode: async (email) => {
+    await authApi.sendCode(email);
   },
 
-  verifyToken: async (token) => {
-    const { data } = await authApi.verifyToken(token);
+  verifyCode: async (email, code) => {
+    const { data } = await authApi.verifyCode(email, code);
     get().login(data.sessionToken, data.human);
   },
 }));

@@ -1,0 +1,39 @@
+---
+title: File Upload
+description: "Upload files directly or get presigned URLs for large files"
+---
+
+## Direct upload
+
+`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload`
+
+Upload a file up to 10MB as multipart form data.
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload \
+  -H "Authorization: Bearer mge_ag_..." \
+  -F "file=@report.pdf"
+```
+
+## Presigned URL
+
+`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload/presigned`
+
+For files larger than 10MB:
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload/presigned \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "fileName": "dataset.csv" }'
+```
+
+Then upload directly to S3:
+
+```bash
+curl -X PUT "${presignedUrl}" \
+  -H "Content-Type: text/csv" \
+  --data-binary @dataset.csv
+```
+
+**Max direct upload:** 10MB. Presigned URLs expire in 1 hour.

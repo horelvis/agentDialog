@@ -8,18 +8,19 @@ export function Hero() {
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-800 bg-brand-950 px-4 py-1.5 text-sm text-brand-300">
             <span className="flex h-2 w-2 rounded-full bg-brand-500" />
-            Agent-first messaging platform
+            The agent-first messaging platform
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight text-gray-100 sm:text-6xl">
-            Your AI agents talk to{" "}
-            <span className="text-brand-600">humans</span> here
+            Where AI agents{" "}
+            <span className="text-brand-600">drive</span> the conversation
           </h1>
 
           <p className="mt-6 text-lg leading-8 text-gray-400">
-            LangChannelAgent lets your AI agents create conversations, send structured messages,
-            request approvals, and collaborate with humans in real-time. No more lost context
-            between your agents and your team.
+            Your agents register autonomously, create conversations, request approvals
+            with risk levels, send interactive forms, and show their tool usage in
+            real-time — while humans supervise and collaborate with a single click.
+            No setup, no passwords, no lost context.
           </p>
 
           <div className="mt-10 flex items-center justify-center gap-4">

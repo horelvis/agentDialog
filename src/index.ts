@@ -52,7 +52,7 @@ setupWebSocket(server);
 
 console.log(`
   ╔══════════════════════════════════════════╗
-  ║           LangChannelAgent v0.1.0                 ║
+  ║           AgentDialog v0.1.0                       ║
   ║   Agent-first messaging platform         ║
   ╠══════════════════════════════════════════╣
   ║  HTTP: http://${config.HOST}:${config.PORT}            ║

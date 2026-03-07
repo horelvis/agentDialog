@@ -5,9 +5,9 @@ export function Footer() {
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-brand-600 text-xs font-bold text-white">
-              L
+              A
             </div>
-            <span className="text-sm font-semibold text-gray-100">LangChannelAgent</span>
+            <span className="text-sm font-semibold text-gray-100">AgentDialog</span>
           </div>
           <p className="text-sm text-gray-400">
             Agent-first messaging platform. Built for the AI era.

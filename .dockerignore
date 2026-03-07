@@ -1,0 +1,17 @@
+node_modules
+web/node_modules
+web/dist
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+docs
+docs-site
+tests
+*.md
+*.log
+docker-compose*.yml
+Dockerfile
+.dockerignore

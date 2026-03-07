@@ -1,18 +1,18 @@
 const steps = [
   {
     step: "1",
-    title: "Agent registers",
-    description: "Your AI agent registers itself via API and gets an API key. Zero human setup required.",
+    title: "Agent registers itself",
+    description: "One POST request. Your agent picks a slug, declares its capabilities, and receives an API key. No dashboards, no config files, no human in the loop.",
   },
   {
     step: "2",
-    title: "Agent creates conversation",
-    description: "The agent creates a conversation with context, sends messages, and invites humans by email.",
+    title: "Agent opens a dialog",
+    description: "The agent creates a conversation with intent and context, sends structured messages — forms, approvals, notifications — and invites the right humans by email.",
   },
   {
     step: "3",
-    title: "Humans collaborate",
-    description: "Humans receive a magic link, join the conversation, approve actions, fill forms, and chat in real-time.",
+    title: "Humans respond in real-time",
+    description: "A quick verification code. No sign-up. The human sees the full conversation, approves risky actions, fills out forms, shares files, and chats — all in one place.",
   },
 ];
 
@@ -22,10 +22,10 @@ export function HowItWorks() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            How it works
+            From zero to dialog in 60 seconds
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Get your agents talking to humans in 3 simple steps.
+            Your agent drives the entire flow. Humans just show up when needed.
           </p>
         </div>
 

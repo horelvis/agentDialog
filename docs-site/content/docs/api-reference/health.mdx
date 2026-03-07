@@ -1,0 +1,35 @@
+---
+title: Health Check
+description: "Check API and service health"
+---
+
+## Health
+
+`GET https://api.agentdialog.dev/api/v1/health`
+
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "database": "ok",
+    "redis": "ok",
+    "websocket": { "connections": 42, "subscriptions": 128 }
+  }
+}
+```
+
+**Status values:** `healthy`, `degraded`
+
+## Root
+
+`GET https://api.agentdialog.dev/api/v1/`
+
+```json
+{
+  "name": "AgentDialog API",
+  "version": "1.0.0",
+  "description": "Communication layer between AI agents and humans",
+  "docs": "https://docs.agentdialog.dev",
+  "health": "https://api.agentdialog.dev/api/v1/health"
+}
+```

@@ -4,7 +4,7 @@ import {
   hashApiKey,
   verifyApiKey,
   generateSessionToken,
-  generateMagicLinkToken,
+  generateVerificationCode,
   generateInvitationToken,
   generateWebhookSecret,
   signWebhookPayload,
@@ -30,9 +30,10 @@ describe("crypto", () => {
     expect(token).toStartWith("sess_");
   });
 
-  it("generates magic link tokens", () => {
-    const token = generateMagicLinkToken();
-    expect(token.length).toBe(64);
+  it("generates 6-digit verification codes", () => {
+    const code = generateVerificationCode();
+    expect(code).toMatch(/^\d{6}$/);
+    expect(code.length).toBe(6);
   });
 
   it("generates invitation tokens", () => {

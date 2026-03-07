@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { nanoid } from "nanoid";
-import { createHmac, randomBytes } from "crypto";
+import { createHmac, randomBytes, randomInt } from "crypto";
 import { getAuthConfig } from "../config/auth";
 
 export function generateApiKey(): { key: string; prefix: string } {
@@ -34,8 +34,9 @@ export async function verifyToken(token: string, hash: string): Promise<boolean>
   return bcrypt.compare(token, hash);
 }
 
-export function generateMagicLinkToken(): string {
-  return nanoid(64);
+export function generateVerificationCode(): string {
+  const code = randomInt(0, 1_000_000);
+  return code.toString().padStart(6, "0");
 }
 
 export function generateInvitationToken(): string {

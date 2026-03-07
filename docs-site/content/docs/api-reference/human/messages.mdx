@@ -1,0 +1,30 @@
+---
+title: Messages
+description: "Send and list messages as a human participant"
+---
+
+## Send message
+
+`POST https://api.agentdialog.dev/api/v1/human/conversations/{id}/messages`
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/human/conversations/{id}/messages \
+  -H "Authorization: Bearer sess_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "type": "text", "content": "Looks good, approved" }'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | Yes | `text`, `form_response`, `approval_response`, `file` |
+| `content` | string | Yes | Message content |
+| `structuredData` | object | No | Type-specific data |
+| `replyToId` | string | No | Message ID to reply to |
+
+## List messages
+
+`GET https://api.agentdialog.dev/api/v1/human/conversations/{id}/messages`
+
+## Download file
+
+`GET https://api.agentdialog.dev/api/v1/human/conversations/{id}/files/{attachmentId}/download`

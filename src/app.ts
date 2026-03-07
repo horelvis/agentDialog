@@ -1,11 +1,20 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { serveStatic } from "hono/bun";
 import { corsMiddleware } from "./middleware/cors";
 import { requestId } from "./middleware/request-id";
 import { requestLogger } from "./middleware/logger";
 import { errorHandler } from "./middleware/error-handler";
 import { agentAuth } from "./middleware/agent-auth";
 import { humanAuth } from "./middleware/human-auth";
-import { agentRateLimit } from "./middleware/rate-limit";
+import {
+  globalRateLimit,
+  agentRateLimit,
+  humanRateLimit,
+  authRateLimit,
+} from "./middleware/rate-limit";
+import { getLimitsConfig } from "./config/limits";
+import { env } from "./env";
 
 // Routes
 import healthRoutes from "./routes/health";
@@ -26,10 +35,23 @@ import humanUploadRoutes from "./routes/human/upload";
 
 export function createApp() {
   const app = new Hono();
+  const limits = getLimitsConfig();
 
   // Global middleware
   app.use("*", corsMiddleware);
   app.use("*", requestId);
+  app.use("*", globalRateLimit());
+  app.use(
+    "*",
+    bodyLimit({
+      maxSize: limits.maxBodySize,
+      onError: (c) =>
+        c.json(
+          { error: { code: "PAYLOAD_TOO_LARGE", message: "Request body too large" } },
+          413,
+        ),
+    }),
+  );
   app.use("*", requestLogger);
   app.onError(errorHandler);
 
@@ -42,7 +64,7 @@ export function createApp() {
   // Agent routes - authenticated
   const agentApi = new Hono();
   agentApi.use("*", agentAuth);
-  agentApi.use("*", agentRateLimit(60));
+  agentApi.use("*", agentRateLimit(limits.agentRpm));
   agentApi.route("/", agentProfileRoutes);
   agentApi.route("/", agentKeyRoutes);
   agentApi.route("/conversations", agentConversationRoutes);
@@ -52,8 +74,12 @@ export function createApp() {
   agentApi.route("/webhooks", agentWebhookRoutes);
   app.route("/api/v1/agent", agentApi);
 
-  // Human routes - auth (public, no auth required)
-  app.route("/api/v1/human", humanAuthRoutes);
+  // Human routes - auth (public, rate limited per IP)
+  const humanAuthApp = new Hono();
+  humanAuthApp.use("/auth/send-code", authRateLimit("send-code", limits.authSendCodeRpm));
+  humanAuthApp.use("/auth/verify", authRateLimit("verify", limits.authVerifyRpm));
+  humanAuthApp.route("/", humanAuthRoutes);
+  app.route("/api/v1/human", humanAuthApp);
 
   // Human routes - authenticated (specific path middleware to avoid catching /auth/*)
   const humanApi = new Hono();
@@ -63,12 +89,19 @@ export function createApp() {
   humanApi.use("/invitations/*", humanAuth);
   humanApi.use("/conversations", humanAuth);
   humanApi.use("/conversations/*", humanAuth);
+  humanApi.use("*", humanRateLimit(limits.humanRpm));
   humanApi.route("/", humanProfileRoutes);
   humanApi.route("/", humanInvitationRoutes);
   humanApi.route("/", humanConversationRoutes);
   humanApi.route("/", humanMessageRoutes);
   humanApi.route("/", humanUploadRoutes);
   app.route("/api/v1/human", humanApi);
+
+  // Serve frontend static files in production
+  if (env().NODE_ENV === "production") {
+    app.use("/assets/*", serveStatic({ root: "./web/dist" }));
+    app.get("*", serveStatic({ root: "./web/dist", path: "index.html" }));
+  }
 
   return app;
 }

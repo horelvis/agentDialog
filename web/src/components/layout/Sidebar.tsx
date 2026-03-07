@@ -31,9 +31,9 @@ export function Sidebar() {
         <div className="flex h-16 items-center justify-between border-b border-surface-border px-4">
           <Link to="/app" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-              L
+              A
             </div>
-            <span className="font-bold text-gray-100">LangChannelAgent</span>
+            <span className="font-bold text-gray-100">AgentDialog</span>
           </Link>
           {isMobile && (
             <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-gray-200">

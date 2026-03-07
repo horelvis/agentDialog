@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgresql://messeger:messeger@localhost:5432/messeger",
+    url: process.env.DATABASE_URL || "postgresql://agentdialog:agentdialog@localhost:5432/agentdialog",
   },
 });

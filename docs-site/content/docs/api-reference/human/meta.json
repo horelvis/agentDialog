@@ -1,0 +1,4 @@
+{
+  "title": "Human",
+  "pages": ["auth", "profile", "invitations", "conversations", "messages"]
+}

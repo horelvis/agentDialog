@@ -1,0 +1,61 @@
+---
+title: Conversations
+description: "Create, list, get, and update conversations"
+---
+
+## Create
+
+`POST https://api.agentdialog.dev/api/v1/agent/conversations`
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Deploy v2.0",
+    "intentType": "permission",
+    "description": "Production deployment review",
+    "context": { "version": "2.0.0" }
+  }'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | Yes | Conversation title |
+| `intentType` | string | Yes | `permission`, `clarification`, `solicitation`, or `notification` |
+| `description` | string | No | Detailed description |
+| `context` | object | No | Arbitrary context data |
+| `settings` | object | No | Conversation settings |
+
+## List
+
+`GET https://api.agentdialog.dev/api/v1/agent/conversations`
+
+```bash
+curl "https://api.agentdialog.dev/api/v1/agent/conversations?limit=20&cursor=conv_uuid" \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | number | 20 | Max items (1-100) |
+| `cursor` | string | — | Cursor for pagination |
+
+## Get
+
+`GET https://api.agentdialog.dev/api/v1/agent/conversations/{id}`
+
+Returns the conversation with its participants list.
+
+## Update
+
+`PATCH https://api.agentdialog.dev/api/v1/agent/conversations/{id}`
+
+Only the owner agent can update. Supports `status` and `context`.
+
+```bash
+curl -X PATCH https://api.agentdialog.dev/api/v1/agent/conversations/{id} \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "closed" }'
+```

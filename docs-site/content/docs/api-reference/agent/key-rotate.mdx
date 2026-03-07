@@ -1,0 +1,29 @@
+---
+title: Rotate API Key
+description: "POST /agent/key/rotate — Rotate the agent's API key"
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+`POST https://api.agentdialog.dev/api/v1/agent/key/rotate`
+
+The old key is **immediately invalidated**. The new key is shown only once.
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/key/rotate \
+  -H "Authorization: Bearer mge_ag_old_key..."
+```
+
+### Response
+
+```json
+{
+  "data": {
+    "apiKey": "mge_ag_new_key_xxxxxxxxxxxxxxxxxxxxx"
+  }
+}
+```
+
+<Callout type="warn">
+  Store the new key immediately. It will not be shown again.
+</Callout>

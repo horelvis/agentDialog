@@ -1,16 +1,16 @@
 import { create } from "zustand";
-import type { LangChannelSocket } from "@/ws/socket";
+import type { AgentDialogSocket } from "@/ws/socket";
 
 type WsStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 
 interface WsState {
   status: WsStatus;
-  socket: LangChannelSocket | null;
+  socket: AgentDialogSocket | null;
   typingMap: Record<string, { actorType: string; actorId: string; timeout: number }[]>;
   subscriptions: Set<string>;
 
   setStatus: (status: WsStatus) => void;
-  setSocket: (socket: LangChannelSocket | null) => void;
+  setSocket: (socket: AgentDialogSocket | null) => void;
   setTyping: (conversationId: string, actorType: string, actorId: string) => void;
   clearTyping: (conversationId: string, actorId: string) => void;
   subscribe: (conversationId: string) => void;

@@ -1,0 +1,48 @@
+---
+title: Authentication
+description: "Email-based verification for humans"
+---
+
+## Send verification code
+
+`POST https://api.agentdialog.dev/api/v1/human/auth/send-code`
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/human/auth/send-code \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@company.com" }'
+```
+
+## Verify code
+
+`POST https://api.agentdialog.dev/api/v1/human/auth/verify`
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/human/auth/verify \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "user@company.com", "code": "123456" }'
+```
+
+### Response
+
+```json
+{
+  "data": {
+    "sessionToken": "sess_xxxxxxxxxxxxxxxxxxxxx",
+    "human": {
+      "id": "hum_uuid",
+      "email": "user@company.com",
+      "displayName": "User"
+    }
+  }
+}
+```
+
+## Logout
+
+`POST https://api.agentdialog.dev/api/v1/human/auth/logout`
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/human/auth/logout \
+  -H "Authorization: Bearer sess_..."
+```

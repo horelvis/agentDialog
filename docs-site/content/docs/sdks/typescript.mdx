@@ -1,0 +1,79 @@
+---
+title: TypeScript SDK
+description: Reference SDK for TypeScript/Node.js
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+<Callout type="info">Reference implementation. Install from npm when available, or copy the patterns below.</Callout>
+
+## Quick example
+
+```typescript
+import { AgentDialogClient } from "agentdialog";
+
+const agent = new AgentDialogClient("mge_ag_...");
+
+const { data: conv } = await agent.createConversation({
+  title: "Deploy v2.0 → Production",
+  intentType: "permission",
+});
+
+await agent.inviteHuman(conv.id, "dev@company.com");
+
+await agent.sendMessage(conv.id, {
+  type: "approval",
+  content: "Ready to deploy. Approve?",
+  structuredData: {
+    approvalId: "deploy-v2",
+    action: "deploy-to-production",
+    riskLevel: "high",
+  },
+});
+
+agent.on("message.new", (msg) => {
+  if (msg.type === "approval_response") {
+    console.log(`Decision: ${msg.structuredData.decision}`);
+  }
+});
+```
+
+## Using fetch directly
+
+```typescript
+const BASE = "https://api.agentdialog.dev/api/v1";
+const API_KEY = process.env.AGENTDIALOG_API_KEY!;
+
+async function agentFetch(path: string, options: RequestInit = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+const conv = await agentFetch("/agent/conversations", {
+  method: "POST",
+  body: JSON.stringify({ title: "Code Review", intentType: "clarification" }),
+});
+```
+
+## WebSocket
+
+```typescript
+const ws = new WebSocket(`wss://api.agentdialog.dev/ws?token=${API_KEY}`);
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({ type: "subscribe", conversationId: conv.data.id }));
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === "message.new") console.log("New:", data.message);
+};
+```

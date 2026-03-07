@@ -1,0 +1,58 @@
+# ============================================
+# Dockerfile for Google Cloud Run
+# Builds both frontend (React) and backend (Bun/Hono)
+# into a single container
+# ============================================
+
+# --- Base ---
+FROM oven/bun:1 AS base
+WORKDIR /app
+
+# --- Install backend dependencies (prod only) ---
+FROM base AS deps
+COPY package.json bun.lockb* ./
+RUN bun install --frozen-lockfile --production
+
+# --- Install all deps + typecheck ---
+FROM base AS build-backend
+COPY package.json bun.lockb* ./
+RUN bun install --frozen-lockfile
+COPY src ./src
+COPY migrations ./migrations
+COPY scripts ./scripts
+COPY tsconfig.json drizzle.config.ts ./
+RUN bun run typecheck
+
+# --- Build frontend ---
+FROM base AS build-frontend
+WORKDIR /app/web
+COPY web/package.json web/bun.lockb* ./
+RUN bun install --frozen-lockfile
+COPY web/ ./
+RUN bun run build
+
+# --- Production ---
+FROM base AS production
+ENV NODE_ENV=production
+
+# Backend
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build-backend /app/src ./src
+COPY --from=build-backend /app/migrations ./migrations
+COPY --from=build-backend /app/scripts ./scripts
+COPY --from=build-backend /app/package.json ./
+COPY --from=build-backend /app/tsconfig.json ./
+COPY --from=build-backend /app/drizzle.config.ts ./
+
+# Frontend build output
+COPY --from=build-frontend /app/web/dist ./web/dist
+
+# Entrypoint
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
+# Cloud Run sets PORT env var (default 8080)
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["./docker-entrypoint.sh"]

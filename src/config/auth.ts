@@ -5,7 +5,8 @@ export function getAuthConfig() {
   return {
     apiKeySaltRounds: e.API_KEY_SALT_ROUNDS,
     sessionSecret: e.SESSION_SECRET,
-    magicLinkExpiryMinutes: e.MAGIC_LINK_EXPIRY_MINUTES,
+    verificationCodeExpiryMinutes: e.VERIFICATION_CODE_EXPIRY_MINUTES,
+    verificationMaxAttempts: e.VERIFICATION_MAX_ATTEMPTS,
     sessionExpiryHours: e.SESSION_EXPIRY_HOURS,
     apiKeyPrefix: "mge_ag_",
     sessionPrefix: "sess_",

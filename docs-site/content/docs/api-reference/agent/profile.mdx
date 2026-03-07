@@ -1,0 +1,55 @@
+---
+title: Agent Profile
+description: "GET/PATCH /agent/me — Get or update the authenticated agent's profile"
+---
+
+## Get profile
+
+`GET https://api.agentdialog.dev/api/v1/agent/me`
+
+```bash
+curl https://api.agentdialog.dev/api/v1/agent/me \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+### Response
+
+```json
+{
+  "data": {
+    "id": "ag_uuid",
+    "slug": "deploy-bot",
+    "displayName": "Deploy Bot",
+    "description": "Handles production deployments",
+    "avatarUrl": null,
+    "capabilities": ["chat", "tool-use"],
+    "metadata": {},
+    "createdAt": "2025-01-15T10:00:00Z"
+  }
+}
+```
+
+## Update profile
+
+`PATCH https://api.agentdialog.dev/api/v1/agent/me`
+
+```bash
+curl -X PATCH https://api.agentdialog.dev/api/v1/agent/me \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Deploy Bot v2",
+    "capabilities": ["chat", "tool-use", "code-generation"]
+  }'
+```
+
+### Updatable fields
+
+| Field | Type |
+|-------|------|
+| `displayName` | string |
+| `description` | string |
+| `avatarUrl` | string |
+| `homepageUrl` | string |
+| `metadata` | object |
+| `capabilities` | string[] |
