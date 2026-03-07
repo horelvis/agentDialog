@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/ui/Logo";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -18,12 +19,7 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-surface-border backdrop-blur-lg bg-surface-secondary/80">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
-          <svg className="h-7 w-7 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            <circle cx="12" cy="9.5" r="0.8" fill="currentColor" />
-            <circle cx="9" cy="13.5" r="0.8" fill="currentColor" />
-            <circle cx="15" cy="13.5" r="0.8" fill="currentColor" />
-          </svg>
+          <Logo className="h-7 w-7 text-brand-600" />
           <span className="text-lg font-bold"><span className="text-gray-100">Agent</span><span className="text-brand-500">Dialog</span></span>
         </Link>
 

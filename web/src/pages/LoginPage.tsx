@@ -1,12 +1,13 @@
 import { LoginForm } from "@/components/auth/LoginForm";
+import { Logo } from "@/components/ui/Logo";
 
 export function LoginPage() {
   return (
     <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
-            A
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 p-1.5 text-white">
+            <Logo className="h-full w-full" />
           </div>
           <h2 className="mt-4 text-2xl font-bold text-gray-100">Sign in to AgentDialog</h2>
           <p className="mt-2 text-sm text-gray-400">

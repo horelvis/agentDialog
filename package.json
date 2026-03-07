@@ -15,7 +15,8 @@
     "test:integration": "bun test tests/integration",
     "typecheck": "tsc --noEmit",
     "lint": "bunx biome check src/",
-    "format": "bunx biome format --write src/"
+    "format": "bunx biome format --write src/",
+    "demo": "bun run scripts/demo-agent.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.1",

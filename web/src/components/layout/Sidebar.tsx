@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { Logo } from "@/components/ui/Logo";
 
 export function Sidebar() {
   const { id: activeId } = useParams();
@@ -30,8 +31,8 @@ export function Sidebar() {
       >
         <div className="flex h-16 items-center justify-between border-b border-surface-border px-4">
           <Link to="/app" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-              A
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 p-1 text-white">
+              <Logo className="h-full w-full" />
             </div>
             <span className="font-bold text-gray-100">AgentDialog</span>
           </Link>
