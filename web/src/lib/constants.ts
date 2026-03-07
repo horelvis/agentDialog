@@ -1,6 +1,7 @@
-export const API_BASE = "/api/v1";
+const API_HOST = import.meta.env.VITE_API_URL ?? "";
+export const API_BASE = `${API_HOST}/api/v1`;
 export const WS_URL =
-  import.meta.env.VITE_WS_URL ?? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+  import.meta.env.VITE_WS_URL ?? (API_HOST ? API_HOST.replace(/^http/, "ws") : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
 
 export const RISK_COLORS = {
   low: "bg-risk-low/10 text-risk-low border-risk-low/30",
