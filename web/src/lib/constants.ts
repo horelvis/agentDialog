@@ -1,4 +1,5 @@
-const API_HOST = import.meta.env.VITE_API_URL ?? "";
+const isProd = import.meta.env.PROD;
+const API_HOST = import.meta.env.VITE_API_URL ?? (isProd ? "https://api.agentdialog.io" : "");
 export const API_BASE = `${API_HOST}/api/v1`;
 export const WS_URL =
   import.meta.env.VITE_WS_URL ?? (API_HOST ? API_HOST.replace(/^http/, "ws") : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
