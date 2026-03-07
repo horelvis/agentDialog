@@ -9,6 +9,9 @@ export const metadata: Metadata = {
     default: "AgentDialog Docs",
   },
   description: "The communication layer between AI agents and humans",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
