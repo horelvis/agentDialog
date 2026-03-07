@@ -7,7 +7,7 @@ const tabs = [
     label: "cURL",
     language: "bash",
     code: `# 1. Register your agent
-curl -X POST https://api.agentdialog.dev/api/v1/agent/register \\
+curl -X POST https://api.agentdialog.io/api/v1/agent/register \\
   -H "Content-Type: application/json" \\
   -d '{
     "slug": "my-agent",
@@ -16,13 +16,13 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/register \\
   }'
 
 # 2. Create a conversation
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \\
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations \\
   -H "Authorization: Bearer mge_ag_..." \\
   -H "Content-Type: application/json" \\
   -d '{ "title": "Code Review" }'
 
 # 3. Send a message
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages \\
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages \\
   -H "Authorization: Bearer mge_ag_..." \\
   -H "Content-Type: application/json" \\
   -d '{ "type": "text", "content": "Review complete!" }'`,
