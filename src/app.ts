@@ -32,6 +32,7 @@ import humanInvitationRoutes from "./routes/human/invitations";
 import humanConversationRoutes from "./routes/human/conversations";
 import humanMessageRoutes from "./routes/human/messages";
 import humanUploadRoutes from "./routes/human/upload";
+import humanTrustedAgentsRoutes from "./routes/human/trusted-agents";
 
 export function createApp() {
   const app = new Hono();
@@ -87,6 +88,8 @@ export function createApp() {
   humanApi.use("/me/*", humanAuth);
   humanApi.use("/invitations", humanAuth);
   humanApi.use("/invitations/*", humanAuth);
+  humanApi.use("/trusted-agents", humanAuth);
+  humanApi.use("/trusted-agents/*", humanAuth);
   humanApi.use("/conversations", humanAuth);
   humanApi.use("/conversations/*", humanAuth);
   humanApi.use("*", humanRateLimit(limits.humanRpm));
@@ -95,6 +98,7 @@ export function createApp() {
   humanApi.route("/", humanConversationRoutes);
   humanApi.route("/", humanMessageRoutes);
   humanApi.route("/", humanUploadRoutes);
+  humanApi.route("/", humanTrustedAgentsRoutes);
   app.route("/api/v1/human", humanApi);
 
   // Serve frontend static files in production

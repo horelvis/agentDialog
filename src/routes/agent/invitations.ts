@@ -26,14 +26,16 @@ app.post("/:id/invitations", validateBody(createInvitationSchema), async (c) => 
 
   const invitation = await createInvitation(conversationId, agentId, input);
 
-  // Send invitation email
-  const conversation = await getConversation(conversationId);
-  await sendInvitationEmail(
-    input.email,
-    invitation.token,
-    agent.displayName,
-    conversation.title || undefined,
-  );
+  // Only send email if the invitation was NOT auto-accepted
+  if (!invitation.autoAccepted) {
+    const conversation = await getConversation(conversationId);
+    await sendInvitationEmail(
+      input.email,
+      invitation.token,
+      agent.displayName,
+      conversation.title || undefined,
+    );
+  }
 
   return c.json({ data: invitation }, 201);
 });

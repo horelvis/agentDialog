@@ -1,7 +1,9 @@
 import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
 import { invitations } from "../db/schema/invitations";
+import { agentTrustRevocations } from "../db/schema/trust-revocations";
 import { conversationParticipants } from "../db/schema/participants";
+import { humans } from "../db/schema/humans";
 import { generateInvitationToken } from "../lib/crypto";
 import { NotFoundError, ConflictError, ForbiddenError } from "../lib/errors";
 import { getOrCreateHuman } from "./human.service";
@@ -46,7 +48,71 @@ export async function createInvitation(
     })
     .returning();
 
-  return invitation;
+  // Check if the human has a prior trust relationship with this agent
+  const autoAccepted = await tryAutoAccept(invitation, agentId, input.email);
+
+  return { ...invitation, autoAccepted };
+}
+
+async function tryAutoAccept(
+  invitation: { id: string; conversationId: string; invitedHumanEmail: string },
+  agentId: string,
+  email: string,
+): Promise<boolean> {
+  const db = getDb();
+
+  // Find the human by email
+  const [human] = await db
+    .select()
+    .from(humans)
+    .where(eq(humans.email, email))
+    .limit(1);
+
+  if (!human) return false;
+
+  // Check for a prior accepted invitation from this agent to this human
+  const [priorAccepted] = await db
+    .select()
+    .from(invitations)
+    .where(
+      and(
+        eq(invitations.invitedByAgentId, agentId),
+        eq(invitations.invitedHumanEmail, email),
+        eq(invitations.status, "accepted"),
+      ),
+    )
+    .limit(1);
+
+  if (!priorAccepted) return false;
+
+  // Check that the human has NOT revoked trust
+  const [revocation] = await db
+    .select()
+    .from(agentTrustRevocations)
+    .where(
+      and(
+        eq(agentTrustRevocations.agentId, agentId),
+        eq(agentTrustRevocations.humanId, human.id),
+      ),
+    )
+    .limit(1);
+
+  if (revocation) return false;
+
+  // Auto-accept: update invitation status and add human as participant
+  await db
+    .update(invitations)
+    .set({ status: "accepted", updatedAt: new Date() })
+    .where(eq(invitations.id, invitation.id));
+
+  await db.insert(conversationParticipants).values({
+    conversationId: invitation.conversationId,
+    actorType: "human",
+    humanId: human.id,
+    role: "participant",
+  });
+
+  return true;
 }
 
 export async function acceptInvitation(token: string, humanId: string) {
