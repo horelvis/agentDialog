@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Message } from "@/api/types";
 import { formatFileSize } from "@/lib/formatters";
+import { API_BASE } from "@/lib/constants";
 
 interface FileMessageProps {
   message: Message;
@@ -23,7 +24,7 @@ export function FileMessage({ message }: FileMessageProps) {
     let cancelled = false;
 
     const token = localStorage.getItem("token");
-    fetch(`/api/v1${downloadPath}`, {
+    fetch(`${API_BASE}${downloadPath}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => r.blob())
@@ -49,7 +50,7 @@ export function FileMessage({ message }: FileMessageProps) {
     setDownloading(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/v1${downloadPath}`, {
+      const res = await fetch(`${API_BASE}${downloadPath}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const blob = await res.blob();

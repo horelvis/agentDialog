@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Message, VoiceNoteData } from "@/api/types";
+import { API_BASE } from "@/lib/constants";
 
 interface VoiceNoteMessageProps {
   message: Message;
@@ -57,7 +58,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     setError(false);
 
     const token = localStorage.getItem("token");
-    fetch(`/api/v1${downloadPath}`, {
+    fetch(`${API_BASE}${downloadPath}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(async (r) => {
