@@ -10,6 +10,8 @@ import { agentTrustRevocations } from "../db/schema/trust-revocations";
 import { NotFoundError, ForbiddenError } from "../lib/errors";
 import { generateInvitationToken } from "../lib/crypto";
 import { dispatchWebhooks } from "./webhook.service";
+import { sendInvitationEmail } from "./email.service";
+import { getAgentById } from "./agent.service";
 import type { CreateQueryInput, RespondQueryInput } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
@@ -160,11 +162,31 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
     })
     .where(eq(messages.id, queryMessage.id));
 
+  // Send invitation email if not auto-accepted
+  if (status === "pending") {
+    try {
+      const agent = await getAgentById(agentId);
+      await sendInvitationEmail(
+        input.target_human_email,
+        token,
+        agent.displayName,
+        conversation.title || undefined,
+      );
+    } catch (emailErr) {
+      // Log but don't fail the query creation if email fails
+      console.error("Failed to send invitation email:", emailErr);
+    }
+  }
+
   return {
     query_id: query.id,
     status: query.status,
     conversation_id: conversation.id,
-    message: `Query created. Human ${status === "assigned" ? "has been auto-assigned (trusted)" : "has been invited"}.`,
+    message: status === "assigned"
+      ? "Query created. Human is a trusted contact and has been auto-assigned — they can respond immediately."
+      : "Query created. An invitation email has been sent to the human. They must accept the invitation before they can see and respond to your query.",
+    next_step: `Use get_query with query_id "${query.id}" to poll for the response. Wait at least 10-30 seconds between polls.`,
+    expires_at: expiresAt.toISOString(),
   };
 }
 
@@ -263,6 +285,7 @@ export async function getQuery(queryId: string, agentId: string) {
   if (!query) throw new NotFoundError("Query", queryId);
 
   // Lazy expire check
+  let effectiveStatus = query.status;
   if (
     (query.status === "pending" || query.status === "assigned") &&
     new Date() > query.expiresAt
@@ -271,34 +294,28 @@ export async function getQuery(queryId: string, agentId: string) {
       .update(humanQueries)
       .set({ status: "expired", updatedAt: new Date() })
       .where(eq(humanQueries.id, queryId));
-
-    return {
-      query_id: query.id,
-      status: "expired" as const,
-      query_type: query.queryType,
-      question: query.question,
-      context: query.context,
-      confidence: query.confidence,
-      answer: null,
-      comment: null,
-      human_confidence: null,
-      response_time_ms: null,
-      created_at: query.createdAt.toISOString(),
-      expires_at: query.expiresAt.toISOString(),
-    };
+    effectiveStatus = "expired";
   }
+
+  const statusHints: Record<string, string> = {
+    pending: "The human has been invited but hasn't accepted the invitation yet. They need to check their email and click the invitation link. Keep polling — wait 10-30 seconds before checking again.",
+    assigned: "The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again.",
+    answered: "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
+    expired: "The query has expired without a response. The human did not answer in time. You may create a new query if needed.",
+  };
 
   return {
     query_id: query.id,
-    status: query.status,
+    status: effectiveStatus,
+    status_description: statusHints[effectiveStatus] || `Unknown status: ${effectiveStatus}`,
     query_type: query.queryType,
     question: query.question,
     context: query.context,
     confidence: query.confidence,
-    answer: query.answer,
-    comment: query.answerComment,
-    human_confidence: query.answerConfidence,
-    response_time_ms: query.responseTimeMs,
+    answer: effectiveStatus === "answered" ? query.answer : null,
+    comment: effectiveStatus === "answered" ? query.answerComment : null,
+    human_confidence: effectiveStatus === "answered" ? query.answerConfidence : null,
+    response_time_ms: effectiveStatus === "answered" ? query.responseTimeMs : null,
     created_at: query.createdAt.toISOString(),
     expires_at: query.expiresAt.toISOString(),
   };

@@ -11,7 +11,13 @@ export function createMcpServer() {
   // Tool: human_query
   server.tool(
     "human_query",
-    "Create a query for a human to answer. Creates a conversation, invites the human, and sends the question. Returns a query_id to poll for the response.",
+    `Create a query for a human to answer. Creates a conversation, invites the human, and sends the question. Returns a query_id to poll for the response.
+
+IMPORTANT workflow:
+- If the human has NOT previously accepted a query from you, they will receive an invitation email they must accept first. Status will be "pending".
+- If the human has previously accepted (trusted agent), they are auto-assigned. Status will be "assigned".
+- After creating a query, use get_query to poll for the answer. Wait at least 10-30 seconds between polls.
+- Queries expire after timeout_minutes (default: 60 min).`,
     {
       query_type: z.enum(["validation", "interpretation", "expert_query", "labeling"])
         .describe("Type of query: validation (yes/no), interpretation (explain), expert_query (domain knowledge), labeling (classify/tag)"),
@@ -60,7 +66,15 @@ export function createMcpServer() {
   // Tool: get_query
   server.tool(
     "get_query",
-    "Get the status and response of a human query. Use this to poll for the human's answer after creating a query with human_query.",
+    `Get the status and response of a human query. Use this to poll for the human's answer after creating a query with human_query.
+
+Status meanings:
+- "pending": The human has been invited but hasn't accepted the invitation yet. They need to check their email and accept first.
+- "assigned": The human has accepted (or was auto-trusted) and can see the query, but hasn't answered yet.
+- "answered": The human has responded. Check the "answer" field for their response.
+- "expired": The timeout elapsed without a response. The query is closed.
+
+Polling tips: Wait 10-30 seconds between checks. If status is "pending" for a long time, the human may not have seen the invitation email.`,
     {
       query_id: z.string().uuid().describe("The query ID returned by human_query"),
     },
@@ -90,7 +104,13 @@ export function createMcpServer() {
   // Tool: list_queries
   server.tool(
     "list_queries",
-    "List your human queries with optional status filter.",
+    `List your human queries with optional status filter.
+
+Returns queries ordered by creation date (newest first). Use status filter to find specific queries:
+- "pending": Queries waiting for human to accept invitation
+- "assigned": Queries where human accepted but hasn't answered yet
+- "answered": Completed queries with responses
+- "expired": Timed-out queries`,
     {
       status: z.enum(["pending", "assigned", "answered", "expired"]).optional()
         .describe("Filter by query status"),
