@@ -21,7 +21,7 @@ function generateBars(messageId: string, count: number): number[] {
   const bars: number[] = [];
   for (let i = 0; i < count; i++) {
     hash = (hash * 16807 + 12345) | 0;
-    const value = ((hash & 0x7fffffff) % 80) + 20; // 20-100 range
+    const value = ((hash & 0x7fffffff) % 80) + 20;
     bars.push(value);
   }
   return bars;
@@ -32,12 +32,13 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
   const voiceData = message.structuredData as VoiceNoteData | undefined;
   const durationMs = voiceData?.durationMs ?? 0;
 
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(durationMs / 1000);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const [dragging, setDragging] = useState(false);
   const waveformRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +54,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     if (!downloadPath) return;
     let cancelled = false;
     setLoading(true);
+    setError(false);
 
     const token = localStorage.getItem("token");
     fetch(`/api/v1${downloadPath}`, {
@@ -60,7 +62,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Download failed: ${r.status}`);
-        const contentType = r.headers.get("Content-Type") || attachment!.mimeType || "audio/wav";
+        const contentType = r.headers.get("Content-Type") || "audio/wav";
         const buf = await r.arrayBuffer();
         return new Blob([buf], { type: contentType });
       })
@@ -74,6 +76,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
         if (!cancelled) {
           console.error("[VoiceNote] Failed to load audio:", err);
           setLoading(false);
+          setError(true);
         }
       });
 
@@ -89,10 +92,13 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     };
   }, [audioUrl]);
 
-  // Audio event handlers
+  // Set audio src when URL is ready and bind events
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !audioUrl) return;
+
+    audio.src = audioUrl;
+    audio.load();
 
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onLoadedMetadata = () => {
@@ -104,15 +110,21 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
       setPlaying(false);
       setCurrentTime(0);
     };
+    const onError = () => {
+      console.error("[VoiceNote] Audio element error:", audio.error);
+      setError(true);
+    };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
 
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
     };
   }, [audioUrl]);
 
@@ -126,7 +138,10 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     } else {
       audio.play()
         .then(() => setPlaying(true))
-        .catch((err) => console.error("[VoiceNote] Play failed:", err));
+        .catch((err) => {
+          console.error("[VoiceNote] Play failed:", err);
+          setError(true);
+        });
     }
   }, [playing, audioUrl]);
 
@@ -177,10 +192,13 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
 
   return (
     <div className="flex items-center gap-3 min-w-[260px] max-w-[320px]">
+      {/* Always-mounted hidden audio element */}
+      <audio ref={audioRef} preload="none" style={{ display: "none" }} />
+
       {/* Play/Pause button */}
       <button
         onClick={togglePlay}
-        disabled={loading || !audioUrl}
+        disabled={loading || !audioUrl || error}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors"
       >
         {loading ? (
@@ -217,18 +235,17 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
                 style={{
                   height: `${height}%`,
                   backgroundColor: isActive
-                    ? "rgb(16 185 129)" // emerald-500
-                    : "rgb(75 85 99)",   // gray-600
+                    ? "rgb(16 185 129)"
+                    : "rgb(75 85 99)",
                 }}
               />
             );
           })}
         </div>
-        <p className="text-xs text-gray-400 mt-0.5">{displayTime}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {error ? "Error" : displayTime}
+        </p>
       </div>
-
-      {/* Hidden audio element */}
-      {audioUrl && <audio ref={audioRef} src={audioUrl} preload="metadata" />}
     </div>
   );
 }
