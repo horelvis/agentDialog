@@ -13,7 +13,7 @@ import {
 
 const app = new Hono();
 
-// Authenticate agent from Bearer token for MCP requests
+// Authenticate agent from Bearer token header
 async function authenticateAgent(req: Request): Promise<string | null> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer mge_ag_")) return null;
@@ -36,7 +36,7 @@ async function authenticateAgent(req: Request): Promise<string | null> {
   return agent.id;
 }
 
-// --- OAuth 2.1 routes ---
+// --- OAuth 2.1 routes (for Claude Web MCP integration) ---
 
 // Dynamic Client Registration
 app.post("/oauth/register", async (c) => {
@@ -52,7 +52,7 @@ app.get("/oauth/authorize", async (c) => {
   return c.html(result.html, result.status);
 });
 
-// Authorize - process form submission
+// Authorize - create agent & redirect with code
 app.post("/oauth/authorize", async (c) => {
   const body = await c.req.parseBody();
   const result = await handleAuthorizeSubmit(body as Record<string, string>);
@@ -71,7 +71,6 @@ app.post("/oauth/token", async (c) => {
 
 // --- MCP protocol handler ---
 
-// All MCP methods go through the same handler
 app.all("/", async (c) => {
   const agentId = await authenticateAgent(c.req.raw);
   if (!agentId) {

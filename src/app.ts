@@ -110,7 +110,7 @@ export function createApp() {
   humanApi.route("/", humanQueryRoutes);
   app.route("/api/v1/human", humanApi);
 
-  // OAuth 2.1 well-known metadata (before static files)
+  // OAuth 2.1 well-known metadata (for Claude Web MCP integration)
   app.get("/.well-known/oauth-protected-resource/mcp", (c) => {
     const host = c.req.header("x-forwarded-host") || c.req.header("host") || new URL(c.req.url).host;
     const proto = c.req.header("x-forwarded-proto") || "https";
@@ -124,7 +124,7 @@ export function createApp() {
     return c.json(getAuthServerMetadata(baseUrl));
   });
 
-  // MCP server endpoint (agent auth handled internally, OAuth routes included)
+  // MCP server endpoint
   app.route("/mcp", mcpRoutes);
 
   // Serve frontend static files in production

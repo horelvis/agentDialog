@@ -1,9 +1,8 @@
 import { nanoid } from "nanoid";
 import { eq, lt } from "drizzle-orm";
 import { getDb } from "../db";
-import { agents } from "../db/schema/agents";
 import { oauthClients, oauthCodes } from "../db/schema/oauth";
-import { verifyApiKey } from "../lib/crypto";
+import { registerAgent } from "../services/agent.service";
 import { createHash } from "crypto";
 
 // --- Helpers ---
@@ -16,19 +15,13 @@ function sha256(input: string): Buffer {
   return createHash("sha256").update(input).digest();
 }
 
-async function validateApiKey(apiKey: string): Promise<boolean> {
-  if (!apiKey.startsWith("mge_ag_")) return false;
-
-  const prefix = apiKey.slice(0, 15); // "mge_ag_" + 8 chars
-  const db = getDb();
-  const [agent] = await db
-    .select()
-    .from(agents)
-    .where(eq(agents.apiKeyPrefix, prefix))
-    .limit(1);
-
-  if (!agent || agent.status !== "active") return false;
-  return verifyApiKey(apiKey, agent.apiKeyHash);
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // --- Protected Resource Metadata (RFC 9728) ---
@@ -51,13 +44,14 @@ export function getAuthServerMetadata(baseUrl: string) {
     registration_endpoint: `${baseUrl}/mcp/oauth/register`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code"],
-    token_endpoint_auth_methods_supported: ["client_secret_post"],
+    token_endpoint_auth_methods_supported: ["none"],
     code_challenge_methods_supported: ["S256"],
     scopes_supported: ["mcp"],
   };
 }
 
 // --- Dynamic Client Registration (RFC 7591) ---
+// Minimal: Claude Desktop calls this automatically, we return a dummy client.
 
 export async function handleRegister(body: Record<string, unknown>) {
   const redirectUris = body.redirect_uris;
@@ -66,15 +60,6 @@ export async function handleRegister(body: Record<string, unknown>) {
       status: 400 as const,
       body: { error: "invalid_client_metadata", error_description: "redirect_uris is required" },
     };
-  }
-
-  for (const uri of redirectUris) {
-    if (typeof uri !== "string") {
-      return {
-        status: 400 as const,
-        body: { error: "invalid_client_metadata", error_description: "redirect_uris must be strings" },
-      };
-    }
   }
 
   const clientId = `client_${nanoid(24)}`;
@@ -95,11 +80,11 @@ export async function handleRegister(body: Record<string, unknown>) {
       client_id: clientId,
       client_secret: clientSecret,
       client_id_issued_at: Math.floor(now.getTime() / 1000),
-      client_secret_expires_at: 0, // never expires
+      client_secret_expires_at: 0,
       redirect_uris: redirectUris,
       grant_types: ["authorization_code"],
       response_types: ["code"],
-      token_endpoint_auth_method: "client_secret_post",
+      token_endpoint_auth_method: "none",
       ...(typeof body.client_name === "string" ? { client_name: body.client_name } : {}),
     },
   };
@@ -108,30 +93,13 @@ export async function handleRegister(body: Record<string, unknown>) {
 // --- Authorize (GET → render form) ---
 
 export async function renderAuthorizePage(query: Record<string, string>) {
-  const { client_id, redirect_uri, state, code_challenge, code_challenge_method, scope } = query;
+  const { redirect_uri, state, code_challenge, code_challenge_method } = query;
 
-  // Validate required params
-  if (!client_id || !redirect_uri || !code_challenge) {
+  if (!redirect_uri || !code_challenge) {
     return {
       status: 400 as const,
-      html: errorPage("Missing required parameters: client_id, redirect_uri, code_challenge"),
+      html: errorPage("Missing required parameters: redirect_uri, code_challenge"),
     };
-  }
-
-  const db = getDb();
-  const [client] = await db
-    .select()
-    .from(oauthClients)
-    .where(eq(oauthClients.clientId, client_id))
-    .limit(1);
-
-  if (!client) {
-    return { status: 400 as const, html: errorPage("Unknown client_id") };
-  }
-
-  const uris: string[] = JSON.parse(client.redirectUris);
-  if (!uris.includes(redirect_uri)) {
-    return { status: 400 as const, html: errorPage("Invalid redirect_uri") };
   }
 
   if (code_challenge_method && code_challenge_method !== "S256") {
@@ -140,63 +108,54 @@ export async function renderAuthorizePage(query: Record<string, string>) {
 
   return {
     status: 200 as const,
-    html: authorizePage({ client_id, redirect_uri, state, code_challenge, code_challenge_method: code_challenge_method || "S256", scope, clientName: client.clientName ?? undefined }),
+    html: authorizePage({ redirect_uri, state, code_challenge, code_challenge_method: code_challenge_method || "S256" }),
   };
 }
 
-// --- Authorize (POST → validate API key, redirect with code) ---
+// --- Authorize (POST → create agent, redirect with code) ---
 
 export async function handleAuthorizeSubmit(body: Record<string, string>) {
-  const { client_id, redirect_uri, state, code_challenge, code_challenge_method, api_key } = body;
+  const { redirect_uri, state, code_challenge, code_challenge_method, agent_name } = body;
 
-  // Re-validate params
-  if (!client_id || !redirect_uri || !code_challenge || !api_key) {
+  if (!redirect_uri || !code_challenge || !agent_name) {
     return {
       status: 400 as const,
       html: errorPage("Missing required parameters"),
     };
   }
 
-  const db = getDb();
-  const [client] = await db
-    .select()
-    .from(oauthClients)
-    .where(eq(oauthClients.clientId, client_id))
-    .limit(1);
+  // Create agent with the given name
+  const slug = agent_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `agent-${nanoid(8)}`;
+  let apiKey: string;
 
-  if (!client) {
-    return { status: 400 as const, html: errorPage("Unknown client_id") };
-  }
-
-  const uris: string[] = JSON.parse(client.redirectUris);
-  if (!uris.includes(redirect_uri)) {
-    return { status: 400 as const, html: errorPage("Invalid redirect_uri") };
-  }
-
-  // Validate the API key against the database
-  const valid = await validateApiKey(api_key);
-  if (!valid) {
+  try {
+    const result = await registerAgent({
+      slug,
+      displayName: agent_name,
+    });
+    apiKey = result.apiKey;
+  } catch (err: any) {
     return {
       status: 200 as const,
       html: authorizePage({
-        client_id,
         redirect_uri,
         state,
         code_challenge,
         code_challenge_method: code_challenge_method || "S256",
-        errorMessage: "Invalid API key. Please check and try again.",
+        errorMessage: err.message || "Failed to create agent",
       }),
     };
   }
 
-  // Generate authorization code and store in DB
+  // Generate authorization code
   const code = nanoid(32);
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
+  const db = getDb();
   await db.insert(oauthCodes).values({
     code,
-    clientId: client_id,
-    apiKey: api_key,
+    clientId: "direct",
+    apiKey,
     codeChallenge: code_challenge,
     codeChallengeMethod: code_challenge_method || "S256",
     redirectUri: redirect_uri,
@@ -204,7 +163,7 @@ export async function handleAuthorizeSubmit(body: Record<string, string>) {
     expiresAt,
   });
 
-  // Build redirect URL
+  // Redirect back with code
   const redirectUrl = new URL(redirect_uri);
   redirectUrl.searchParams.set("code", code);
   if (state) redirectUrl.searchParams.set("state", state);
@@ -215,7 +174,7 @@ export async function handleAuthorizeSubmit(body: Record<string, string>) {
 // --- Token Exchange ---
 
 export async function handleToken(body: Record<string, string>) {
-  const { grant_type, code, code_verifier, client_id, client_secret, redirect_uri } = body;
+  const { grant_type, code, code_verifier } = body;
 
   if (grant_type !== "authorization_code") {
     return {
@@ -245,7 +204,6 @@ export async function handleToken(body: Record<string, string>) {
     };
   }
 
-  // Check expiry
   if (authCode.expiresAt < new Date()) {
     await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
     return {
@@ -254,23 +212,7 @@ export async function handleToken(body: Record<string, string>) {
     };
   }
 
-  // Verify client
-  if (client_id && authCode.clientId !== client_id) {
-    return {
-      status: 400 as const,
-      body: { error: "invalid_grant", error_description: "client_id mismatch" },
-    };
-  }
-
-  // Verify redirect_uri matches
-  if (redirect_uri && authCode.redirectUri !== redirect_uri) {
-    return {
-      status: 400 as const,
-      body: { error: "invalid_grant", error_description: "redirect_uri mismatch" },
-    };
-  }
-
-  // Verify PKCE: S256 → BASE64URL(SHA256(code_verifier)) === code_challenge
+  // Verify PKCE
   const computedChallenge = base64UrlEncode(sha256(code_verifier));
   if (computedChallenge !== authCode.codeChallenge) {
     return {
@@ -279,13 +221,12 @@ export async function handleToken(body: Record<string, string>) {
     };
   }
 
-  // Consume the code (single use)
+  // Consume the code
   await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
 
-  // Cleanup expired codes opportunistically
+  // Cleanup expired codes
   db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, new Date())).catch(() => {});
 
-  // The access_token IS the agent's API key
   return {
     status: 200 as const,
     body: {
@@ -299,16 +240,13 @@ export async function handleToken(body: Record<string, string>) {
 // --- HTML Templates ---
 
 function authorizePage(params: {
-  client_id: string;
   redirect_uri: string;
   state?: string;
   code_challenge: string;
   code_challenge_method: string;
-  scope?: string;
-  clientName?: string;
   errorMessage?: string;
 }): string {
-  const { client_id, redirect_uri, state, code_challenge, code_challenge_method, clientName, errorMessage } = params;
+  const { redirect_uri, state, code_challenge, code_challenge_method, errorMessage } = params;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -348,10 +286,6 @@ function authorizePage(params: {
       margin-bottom: 1.5rem;
       line-height: 1.5;
     }
-    .client-name {
-      color: #60a5fa;
-      font-weight: 500;
-    }
     label {
       display: block;
       font-size: 0.875rem;
@@ -367,7 +301,6 @@ function authorizePage(params: {
       border-radius: 8px;
       color: #fafafa;
       font-size: 0.875rem;
-      font-family: 'SF Mono', 'Fira Code', monospace;
       outline: none;
       transition: border-color 0.15s;
     }
@@ -412,19 +345,18 @@ function authorizePage(params: {
   <div class="container">
     <h1>Authorize MCP Access</h1>
     <p class="subtitle">
-      ${clientName ? `<span class="client-name">${escapeHtml(clientName)}</span> is requesting` : "An application is requesting"} access to your AgentDialog agent via MCP.
+      Create a new agent to connect to AgentDialog via MCP.
     </p>
     ${errorMessage ? `<div class="error">${escapeHtml(errorMessage)}</div>` : ""}
     <form method="POST" action="/mcp/oauth/authorize">
-      <input type="hidden" name="client_id" value="${escapeHtml(client_id)}">
       <input type="hidden" name="redirect_uri" value="${escapeHtml(redirect_uri)}">
       <input type="hidden" name="code_challenge" value="${escapeHtml(code_challenge)}">
       <input type="hidden" name="code_challenge_method" value="${escapeHtml(code_challenge_method)}">
       ${state ? `<input type="hidden" name="state" value="${escapeHtml(state)}">` : ""}
-      <label for="api_key">Agent API Key</label>
-      <input type="text" id="api_key" name="api_key" placeholder="mge_ag_..." required autocomplete="off" spellcheck="false">
-      <p class="hint">Enter your agent's API key to authorize this connection.</p>
-      <button type="submit">Authorize</button>
+      <label for="agent_name">Agent Name</label>
+      <input type="text" id="agent_name" name="agent_name" placeholder="My Agent" required autocomplete="off">
+      <p class="hint">Choose a name for your agent. A token will be auto-generated.</p>
+      <button type="submit">Create Agent & Authorize</button>
     </form>
   </div>
 </body>
@@ -470,13 +402,4 @@ function errorPage(message: string): string {
   </div>
 </body>
 </html>`;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
