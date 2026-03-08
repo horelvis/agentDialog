@@ -41,14 +41,14 @@ async function authenticateAgent(req: Request): Promise<string | null> {
 // Dynamic Client Registration
 app.post("/oauth/register", async (c) => {
   const body = await c.req.json();
-  const result = handleRegister(body);
+  const result = await handleRegister(body);
   return c.json(result.body, result.status);
 });
 
 // Authorize - render form
-app.get("/oauth/authorize", (c) => {
+app.get("/oauth/authorize", async (c) => {
   const query = c.req.query();
-  const result = renderAuthorizePage(query);
+  const result = await renderAuthorizePage(query);
   return c.html(result.html, result.status);
 });
 
@@ -65,7 +65,7 @@ app.post("/oauth/authorize", async (c) => {
 // Token exchange
 app.post("/oauth/token", async (c) => {
   const body = await c.req.parseBody();
-  const result = handleToken(body as Record<string, string>);
+  const result = await handleToken(body as Record<string, string>);
   return c.json(result.body, result.status);
 });
 

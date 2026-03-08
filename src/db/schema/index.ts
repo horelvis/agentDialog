@@ -9,3 +9,4 @@ export * from "./invitations";
 export * from "./webhooks";
 export * from "./trust-revocations";
 export * from "./human-queries";
+export * from "./oauth";

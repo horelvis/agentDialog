@@ -1,42 +1,10 @@
 import { nanoid } from "nanoid";
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { getDb } from "../db";
 import { agents } from "../db/schema/agents";
+import { oauthClients, oauthCodes } from "../db/schema/oauth";
 import { verifyApiKey } from "../lib/crypto";
 import { createHash } from "crypto";
-
-// --- Types ---
-
-interface OAuthClient {
-  clientId: string;
-  clientSecret: string;
-  redirectUris: string[];
-  clientName?: string;
-  createdAt: number;
-}
-
-interface AuthCode {
-  apiKey: string;
-  clientId: string;
-  codeChallenge: string;
-  codeChallengeMethod: string;
-  redirectUri: string;
-  state?: string;
-  expiresAt: number;
-}
-
-// --- In-memory stores ---
-
-const oauthClients = new Map<string, OAuthClient>();
-const authCodes = new Map<string, AuthCode>();
-
-// Cleanup expired auth codes periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, data] of authCodes) {
-    if (data.expiresAt < now) authCodes.delete(code);
-  }
-}, 60_000);
 
 // --- Helpers ---
 
@@ -91,7 +59,7 @@ export function getAuthServerMetadata(baseUrl: string) {
 
 // --- Dynamic Client Registration (RFC 7591) ---
 
-export function handleRegister(body: Record<string, unknown>) {
+export async function handleRegister(body: Record<string, unknown>) {
   const redirectUris = body.redirect_uris;
   if (!Array.isArray(redirectUris) || redirectUris.length === 0) {
     return {
@@ -111,36 +79,35 @@ export function handleRegister(body: Record<string, unknown>) {
 
   const clientId = `client_${nanoid(24)}`;
   const clientSecret = `secret_${nanoid(48)}`;
+  const now = new Date();
 
-  const client: OAuthClient = {
+  const db = getDb();
+  await db.insert(oauthClients).values({
     clientId,
     clientSecret,
-    redirectUris: redirectUris as string[],
-    clientName: typeof body.client_name === "string" ? body.client_name : undefined,
-    createdAt: Date.now(),
-  };
-
-  oauthClients.set(clientId, client);
+    redirectUris: JSON.stringify(redirectUris),
+    clientName: typeof body.client_name === "string" ? body.client_name : null,
+  });
 
   return {
     status: 201 as const,
     body: {
       client_id: clientId,
       client_secret: clientSecret,
-      client_id_issued_at: Math.floor(client.createdAt / 1000),
+      client_id_issued_at: Math.floor(now.getTime() / 1000),
       client_secret_expires_at: 0, // never expires
-      redirect_uris: client.redirectUris,
+      redirect_uris: redirectUris,
       grant_types: ["authorization_code"],
       response_types: ["code"],
       token_endpoint_auth_method: "client_secret_post",
-      ...(client.clientName ? { client_name: client.clientName } : {}),
+      ...(typeof body.client_name === "string" ? { client_name: body.client_name } : {}),
     },
   };
 }
 
 // --- Authorize (GET → render form) ---
 
-export function renderAuthorizePage(query: Record<string, string>) {
+export async function renderAuthorizePage(query: Record<string, string>) {
   const { client_id, redirect_uri, state, code_challenge, code_challenge_method, scope } = query;
 
   // Validate required params
@@ -151,12 +118,19 @@ export function renderAuthorizePage(query: Record<string, string>) {
     };
   }
 
-  const client = oauthClients.get(client_id);
+  const db = getDb();
+  const [client] = await db
+    .select()
+    .from(oauthClients)
+    .where(eq(oauthClients.clientId, client_id))
+    .limit(1);
+
   if (!client) {
     return { status: 400 as const, html: errorPage("Unknown client_id") };
   }
 
-  if (!client.redirectUris.includes(redirect_uri)) {
+  const uris: string[] = JSON.parse(client.redirectUris);
+  if (!uris.includes(redirect_uri)) {
     return { status: 400 as const, html: errorPage("Invalid redirect_uri") };
   }
 
@@ -166,7 +140,7 @@ export function renderAuthorizePage(query: Record<string, string>) {
 
   return {
     status: 200 as const,
-    html: authorizePage({ client_id, redirect_uri, state, code_challenge, code_challenge_method: code_challenge_method || "S256", scope, clientName: client.clientName }),
+    html: authorizePage({ client_id, redirect_uri, state, code_challenge, code_challenge_method: code_challenge_method || "S256", scope, clientName: client.clientName ?? undefined }),
   };
 }
 
@@ -183,12 +157,19 @@ export async function handleAuthorizeSubmit(body: Record<string, string>) {
     };
   }
 
-  const client = oauthClients.get(client_id);
+  const db = getDb();
+  const [client] = await db
+    .select()
+    .from(oauthClients)
+    .where(eq(oauthClients.clientId, client_id))
+    .limit(1);
+
   if (!client) {
     return { status: 400 as const, html: errorPage("Unknown client_id") };
   }
 
-  if (!client.redirectUris.includes(redirect_uri)) {
+  const uris: string[] = JSON.parse(client.redirectUris);
+  if (!uris.includes(redirect_uri)) {
     return { status: 400 as const, html: errorPage("Invalid redirect_uri") };
   }
 
@@ -208,16 +189,19 @@ export async function handleAuthorizeSubmit(body: Record<string, string>) {
     };
   }
 
-  // Generate authorization code
+  // Generate authorization code and store in DB
   const code = nanoid(32);
-  authCodes.set(code, {
-    apiKey: api_key,
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+  await db.insert(oauthCodes).values({
+    code,
     clientId: client_id,
+    apiKey: api_key,
     codeChallenge: code_challenge,
     codeChallengeMethod: code_challenge_method || "S256",
     redirectUri: redirect_uri,
-    state,
-    expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+    state: state || null,
+    expiresAt,
   });
 
   // Build redirect URL
@@ -230,7 +214,7 @@ export async function handleAuthorizeSubmit(body: Record<string, string>) {
 
 // --- Token Exchange ---
 
-export function handleToken(body: Record<string, string>) {
+export async function handleToken(body: Record<string, string>) {
   const { grant_type, code, code_verifier, client_id, client_secret, redirect_uri } = body;
 
   if (grant_type !== "authorization_code") {
@@ -247,7 +231,13 @@ export function handleToken(body: Record<string, string>) {
     };
   }
 
-  const authCode = authCodes.get(code);
+  const db = getDb();
+  const [authCode] = await db
+    .select()
+    .from(oauthCodes)
+    .where(eq(oauthCodes.code, code))
+    .limit(1);
+
   if (!authCode) {
     return {
       status: 400 as const,
@@ -256,8 +246,8 @@ export function handleToken(body: Record<string, string>) {
   }
 
   // Check expiry
-  if (authCode.expiresAt < Date.now()) {
-    authCodes.delete(code);
+  if (authCode.expiresAt < new Date()) {
+    await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
     return {
       status: 400 as const,
       body: { error: "invalid_grant", error_description: "Authorization code expired" },
@@ -290,7 +280,10 @@ export function handleToken(body: Record<string, string>) {
   }
 
   // Consume the code (single use)
-  authCodes.delete(code);
+  await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
+
+  // Cleanup expired codes opportunistically
+  db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, new Date())).catch(() => {});
 
   // The access_token IS the agent's API key
   return {
