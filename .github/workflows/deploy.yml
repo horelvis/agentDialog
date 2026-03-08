@@ -48,6 +48,7 @@ jobs:
         run: |
           docker run --rm \
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            -e SESSION_SECRET="ci-migration-only-not-a-real-secret" \
             "${IMAGE}:${{ github.event.release.tag_name }}" \
             bun run db:migrate
 
