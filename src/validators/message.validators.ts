@@ -60,11 +60,28 @@ const voiceNoteData = z.object({
   durationMs: z.number().positive(),
 });
 
+const humanQueryData = z.object({
+  queryId: z.string().uuid(),
+  queryType: z.enum(["validation", "interpretation", "expert_query", "labeling"]),
+  question: z.string(),
+  context: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  timeoutMinutes: z.number().int().optional(),
+});
+
+const humanQueryResponseData = z.object({
+  queryId: z.string().uuid(),
+  answer: z.string(),
+  comment: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
 export const createMessageSchema = z.object({
   type: z.enum([
     "text", "structured", "file", "tool_call", "tool_result",
     "form", "form_response", "approval", "approval_response",
     "notification", "system", "voice_note",
+    "human_query", "human_query_response",
   ]).default("text"),
   content: z.string().max(32_000).optional(),
   structuredData: z.record(z.unknown()).optional(),
@@ -85,4 +102,6 @@ export const structuredDataValidators: Record<string, z.ZodSchema> = {
   approval_response: approvalResponseData,
   notification: notificationData,
   voice_note: voiceNoteData,
+  human_query: humanQueryData,
+  human_query_response: humanQueryResponseData,
 };

@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router";
 import { useConversationStore } from "@/stores/conversationStore";
 import { useInvitationStore } from "@/stores/invitationStore";
+import { useQueryStore } from "@/stores/queryStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useAuthStore } from "@/stores/authStore";
 import { Avatar } from "@/components/ui/Avatar";
@@ -12,6 +13,7 @@ export function Sidebar() {
   const { id: activeId } = useParams();
   const conversations = useConversationStore((s) => s.conversations);
   const invitations = useInvitationStore((s) => s.invitations);
+  const pendingQueries = useQueryStore((s) => s.queries);
   const { sidebarOpen, isMobile, setSidebarOpen } = useUiStore();
   const human = useAuthStore((s) => s.human);
   const logout = useAuthStore((s) => s.logout);
@@ -57,6 +59,21 @@ export function Sidebar() {
             {invitations.length > 0 && (
               <span className="ml-auto rounded-full bg-brand-600 px-2 py-0.5 text-xs text-white">
                 {invitations.length}
+              </span>
+            )}
+          </Link>
+
+          <Link
+            to="/app/queries"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-surface-hover"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Queries
+            {pendingQueries.length > 0 && (
+              <span className="ml-auto rounded-full bg-brand-600 px-2 py-0.5 text-xs text-white">
+                {pendingQueries.length}
               </span>
             )}
           </Link>

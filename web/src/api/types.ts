@@ -3,7 +3,9 @@ export type ActorType = "agent" | "human";
 export type ConversationStatus = "active" | "archived" | "closed";
 export type IntentType = "permission" | "clarification" | "solicitation" | "notification";
 export type InvitationStatus = "pending" | "accepted" | "declined" | "expired" | "revoked";
-export type MessageType = "text" | "tool_call" | "tool_result" | "form" | "form_response" | "approval" | "approval_response" | "notification" | "file" | "system" | "voice_note";
+export type MessageType = "text" | "tool_call" | "tool_result" | "form" | "form_response" | "approval" | "approval_response" | "notification" | "file" | "system" | "voice_note" | "human_query" | "human_query_response";
+export type QueryType = "validation" | "interpretation" | "expert_query" | "labeling";
+export type QueryStatus = "pending" | "assigned" | "answered" | "expired";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type Severity = "info" | "warning" | "error" | "success";
 export type ToolCallStatus = "running" | "completed" | "failed";
@@ -171,6 +173,28 @@ export interface ApiError {
     details?: Record<string, unknown>;
     retryAfter?: number;
   };
+}
+
+export interface HumanQuery {
+  id: string;
+  agentId: string;
+  humanEmail: string;
+  humanId: string | null;
+  conversationId: string;
+  queryType: QueryType;
+  status: QueryStatus;
+  question: string;
+  context: string | null;
+  confidence: number | null;
+  timeoutMinutes: number;
+  expiresAt: string;
+  answer: string | null;
+  answerComment: string | null;
+  answerConfidence: number | null;
+  responseTimeMs: number | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SendMessageInput {

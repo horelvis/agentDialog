@@ -33,6 +33,8 @@ import humanConversationRoutes from "./routes/human/conversations";
 import humanMessageRoutes from "./routes/human/messages";
 import humanUploadRoutes from "./routes/human/upload";
 import humanTrustedAgentsRoutes from "./routes/human/trusted-agents";
+import humanQueryRoutes from "./routes/human/queries";
+import mcpRoutes from "./routes/mcp";
 
 export function createApp() {
   const app = new Hono();
@@ -90,6 +92,8 @@ export function createApp() {
   humanApi.use("/invitations/*", humanAuth);
   humanApi.use("/trusted-agents", humanAuth);
   humanApi.use("/trusted-agents/*", humanAuth);
+  humanApi.use("/queries", humanAuth);
+  humanApi.use("/queries/*", humanAuth);
   humanApi.use("/conversations", humanAuth);
   humanApi.use("/conversations/*", humanAuth);
   humanApi.use("*", humanRateLimit(limits.humanRpm));
@@ -99,7 +103,11 @@ export function createApp() {
   humanApi.route("/", humanMessageRoutes);
   humanApi.route("/", humanUploadRoutes);
   humanApi.route("/", humanTrustedAgentsRoutes);
+  humanApi.route("/", humanQueryRoutes);
   app.route("/api/v1/human", humanApi);
+
+  // MCP server endpoint (agent auth handled internally)
+  app.route("/mcp", mcpRoutes);
 
   // Serve frontend static files in production
   if (env().NODE_ENV === "production") {

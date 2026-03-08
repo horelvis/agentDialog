@@ -8,6 +8,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { InvitationsPage } from "@/pages/InvitationsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { TrustedAgentsPage } from "@/pages/TrustedAgentsPage";
+import { QueriesPage } from "@/pages/QueriesPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="c/:id" element={<DashboardPage />} />
             <Route path="invitations" element={<InvitationsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="queries" element={<QueriesPage />} />
             <Route path="trusted-agents" element={<TrustedAgentsPage />} />
           </Route>
         </Route>

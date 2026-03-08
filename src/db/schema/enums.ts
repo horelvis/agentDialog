@@ -6,6 +6,9 @@ export const messageTypeEnum = pgEnum("message_type", [
   "text", "structured", "file", "tool_call", "tool_result",
   "form", "form_response", "approval", "approval_response",
   "notification", "system", "voice_note",
+  "human_query", "human_query_response",
 ]);
+export const queryTypeEnum = pgEnum("query_type", ["validation", "interpretation", "expert_query", "labeling"]);
+export const queryStatusEnum = pgEnum("query_status", ["pending", "assigned", "answered", "expired"]);
 export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "declined", "expired", "revoked"]);
 export const agentStatusEnum = pgEnum("agent_status", ["active", "suspended", "deactivated"]);
