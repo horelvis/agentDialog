@@ -56,11 +56,15 @@ const notificationData = z.object({
   acknowledgeRequired: z.boolean().optional(),
 });
 
+const voiceNoteData = z.object({
+  durationMs: z.number().positive(),
+});
+
 export const createMessageSchema = z.object({
   type: z.enum([
     "text", "structured", "file", "tool_call", "tool_result",
     "form", "form_response", "approval", "approval_response",
-    "notification", "system",
+    "notification", "system", "voice_note",
   ]).default("text"),
   content: z.string().max(32_000).optional(),
   structuredData: z.record(z.unknown()).optional(),
@@ -80,4 +84,5 @@ export const structuredDataValidators: Record<string, z.ZodSchema> = {
   approval: approvalData,
   approval_response: approvalResponseData,
   notification: notificationData,
+  voice_note: voiceNoteData,
 };

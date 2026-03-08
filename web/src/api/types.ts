@@ -3,7 +3,7 @@ export type ActorType = "agent" | "human";
 export type ConversationStatus = "active" | "archived" | "closed";
 export type IntentType = "permission" | "clarification" | "solicitation" | "notification";
 export type InvitationStatus = "pending" | "accepted" | "declined" | "expired" | "revoked";
-export type MessageType = "text" | "tool_call" | "tool_result" | "form" | "form_response" | "approval" | "approval_response" | "notification" | "file" | "system";
+export type MessageType = "text" | "tool_call" | "tool_result" | "form" | "form_response" | "approval" | "approval_response" | "notification" | "file" | "system" | "voice_note";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type Severity = "info" | "warning" | "error" | "success";
 export type ToolCallStatus = "running" | "completed" | "failed";
@@ -108,6 +108,10 @@ export interface NotificationData {
   acknowledgeRequired?: boolean;
 }
 
+export interface VoiceNoteData {
+  durationMs: number;
+}
+
 export interface FileAttachment {
   id: string;
   fileName: string;
@@ -124,7 +128,7 @@ export interface Message {
   senderHumanId?: string;
   type: MessageType;
   content: string | null;
-  structuredData?: ToolCallData | ToolResultData | FormData | FormResponseData | ApprovalData | ApprovalResponseData | NotificationData | null;
+  structuredData?: ToolCallData | ToolResultData | FormData | FormResponseData | ApprovalData | ApprovalResponseData | NotificationData | VoiceNoteData | null;
   replyToId?: string;
   metadata?: Record<string, unknown>;
   attachments?: FileAttachment[];

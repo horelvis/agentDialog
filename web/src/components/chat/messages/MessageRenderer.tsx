@@ -9,6 +9,7 @@ import { ApprovalMessage } from "./ApprovalMessage";
 import { ApprovalResponseMessage } from "./ApprovalResponseMessage";
 import { NotificationMessage } from "./NotificationMessage";
 import { FileMessage } from "./FileMessage";
+import { VoiceNoteMessage } from "./VoiceNoteMessage";
 import { SystemMessage } from "./SystemMessage";
 
 interface MessageRendererProps {
@@ -70,6 +71,8 @@ export function MessageRenderer({ message }: MessageRendererProps) {
         return <ApprovalResponseMessage message={message} />;
       case "file":
         return <FileMessage message={message} />;
+      case "voice_note":
+        return <VoiceNoteMessage message={message} />;
       default:
         return <p className="text-sm">{message.content}</p>;
     }
