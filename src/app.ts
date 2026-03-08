@@ -112,12 +112,12 @@ export function createApp() {
 
   // OAuth 2.1 well-known metadata (before static files)
   app.get("/.well-known/oauth-protected-resource/mcp", (c) => {
-    const baseUrl = env().APP_URL;
-    return c.json(getProtectedResourceMetadata(baseUrl));
+    const origin = new URL(c.req.url).origin;
+    return c.json(getProtectedResourceMetadata(origin));
   });
   app.get("/.well-known/oauth-authorization-server", (c) => {
-    const baseUrl = env().APP_URL;
-    return c.json(getAuthServerMetadata(baseUrl));
+    const origin = new URL(c.req.url).origin;
+    return c.json(getAuthServerMetadata(origin));
   });
 
   // MCP server endpoint (agent auth handled internally, OAuth routes included)
