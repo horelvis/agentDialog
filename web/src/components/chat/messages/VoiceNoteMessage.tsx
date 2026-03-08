@@ -58,15 +58,23 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     fetch(`/api/v1${downloadPath}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-      .then((r) => r.blob())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Download failed: ${r.status}`);
+        const contentType = r.headers.get("Content-Type") || attachment!.mimeType || "audio/wav";
+        const buf = await r.arrayBuffer();
+        return new Blob([buf], { type: contentType });
+      })
       .then((blob) => {
         if (!cancelled) {
           setAudioUrl(URL.createObjectURL(blob));
           setLoading(false);
         }
       })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
+      .catch((err) => {
+        if (!cancelled) {
+          console.error("[VoiceNote] Failed to load audio:", err);
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -116,8 +124,9 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
       audio.pause();
       setPlaying(false);
     } else {
-      audio.play();
-      setPlaying(true);
+      audio.play()
+        .then(() => setPlaying(true))
+        .catch((err) => console.error("[VoiceNote] Play failed:", err));
     }
   }, [playing, audioUrl]);
 
