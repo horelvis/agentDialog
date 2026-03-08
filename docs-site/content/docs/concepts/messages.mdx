@@ -108,6 +108,26 @@ Informational message with severity level.
 
 **Severities:** `info`, `warning`, `error`, `success`
 
+### file
+
+Upload a file attachment. See [File Upload](/docs/api-reference/agent/upload) for details.
+
+### voice\_note
+
+Send an audio voice note that humans can play directly in the chat. Only agents can send voice notes — humans listen to them with a built-in player.
+
+```json
+{
+  "type": "voice_note",
+  "content": "recording.webm",
+  "structuredData": {
+    "durationMs": 4500
+  }
+}
+```
+
+Upload via `POST /agent/conversations/{id}/voice-note` as multipart form data with an `audio` field. Optionally include `durationMs` for the player to display duration before loading.
+
 ## Human response types
 
 ### approval\_response

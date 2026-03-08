@@ -37,3 +37,23 @@ curl -X PUT "${presignedUrl}" \
 ```
 
 **Max direct upload:** 10MB. Presigned URLs expire in 1 hour.
+
+## Voice note upload
+
+`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/voice-note`
+
+Upload an audio file as a voice note message. Only audio MIME types (`audio/*`) are accepted.
+
+```bash
+curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/voice-note \
+  -H "Authorization: Bearer mge_ag_..." \
+  -F "audio=@recording.webm" \
+  -F "durationMs=4500"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `audio` | file | Yes | Audio file (`audio/*` MIME type) |
+| `durationMs` | number | No | Duration in milliseconds (displayed in player before audio loads) |
+
+Returns a `201` response with a `voice_note` message including the audio attachment. Humans see a WhatsApp-style audio player in the chat.
