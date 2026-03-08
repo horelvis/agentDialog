@@ -8,6 +8,8 @@ import { paginationQuery } from "../../validators/common.validators";
 import { getLimit } from "../../lib/pagination";
 import { getRedis } from "../../lib/redis";
 import { NotFoundError } from "../../lib/errors";
+import { dispatchWebhooks } from "../../services/webhook.service";
+import { getConversation } from "../../services/conversation.service";
 
 const app = new Hono<AppEnv>();
 
@@ -58,6 +60,10 @@ app.post("/conversations/:id/messages", validateBody(createMessageSchema), async
     `conversation:${conversationId}`,
     JSON.stringify({ type: "message.new", data: message }),
   );
+
+  // Dispatch webhooks so the owning agent is notified
+  const conversation = await getConversation(conversationId);
+  dispatchWebhooks(conversation.createdByAgentId, "message.new", { message });
 
   return c.json({ data: message }, 201);
 });

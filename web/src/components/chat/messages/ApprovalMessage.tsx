@@ -13,7 +13,16 @@ interface ApprovalMessageProps {
 export function ApprovalMessage({ message }: ApprovalMessageProps) {
   const data = message.structuredData as ApprovalData;
   const sendMessage = useConversationStore((s) => s.sendMessage);
-  const [responded, setResponded] = useState(false);
+  const messages = useConversationStore(
+    (s) => s.messagesMap[message.conversationId] ?? [],
+  );
+
+  const existingResponse = messages.find(
+    (m) =>
+      m.type === "approval_response" &&
+      (m.structuredData as any)?.approvalId === data.approvalId,
+  );
+
   const [loading, setLoading] = useState(false);
 
   const handleDecision = async (decision: "approved" | "denied") => {
@@ -26,11 +35,15 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
           decision,
         },
       });
-      setResponded(true);
     } finally {
       setLoading(false);
     }
   };
+
+  const responded = !!existingResponse;
+  const decision = responded
+    ? (existingResponse.structuredData as any)?.decision
+    : null;
 
   return (
     <Card
@@ -70,7 +83,17 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
             </Button>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-gray-400">Response submitted.</p>
+          <div className="mt-4">
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                decision === "approved"
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-red-500/20 text-red-400"
+              }`}
+            >
+              {decision === "approved" ? "Approved" : "Denied"}
+            </span>
+          </div>
         )}
       </div>
     </Card>

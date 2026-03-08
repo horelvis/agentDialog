@@ -12,6 +12,16 @@ interface FormMessageProps {
 export function FormMessage({ message }: FormMessageProps) {
   const data = message.structuredData as FormDataType;
   const sendMessage = useConversationStore((s) => s.sendMessage);
+  const messages = useConversationStore(
+    (s) => s.messagesMap[message.conversationId] ?? [],
+  );
+
+  const existingResponse = messages.find(
+    (m) =>
+      m.type === "form_response" &&
+      (m.structuredData as any)?.formId === data.formId,
+  );
+
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const defaults: Record<string, unknown> = {};
     for (const field of data.fields) {
@@ -19,7 +29,6 @@ export function FormMessage({ message }: FormMessageProps) {
     }
     return defaults;
   });
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -33,16 +42,39 @@ export function FormMessage({ message }: FormMessageProps) {
           responses: values,
         },
       });
-      setSubmitted(true);
     } finally {
       setLoading(false);
     }
   };
 
-  if (submitted) {
+  if (existingResponse) {
+    const responses =
+      (existingResponse.structuredData as any)?.responses ?? {};
     return (
-      <Card className="p-4">
-        <p className="text-sm text-green-400 font-medium">Form submitted successfully</p>
+      <Card className="overflow-hidden" borderColor="border-l-brand-500">
+        <div className="border-b border-surface-border bg-surface-tertiary px-4 py-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-gray-100">{data.title}</h4>
+            <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
+              Submitted
+            </span>
+          </div>
+          {message.content && (
+            <p className="mt-1 text-sm text-gray-400">{message.content}</p>
+          )}
+        </div>
+        <div className="space-y-4 p-4">
+          {data.fields.map((field) => (
+            <div key={field.name} className="space-y-1">
+              <label className="block text-sm font-medium text-gray-300">
+                {field.label}
+              </label>
+              <p className="text-sm text-gray-400">
+                {String(responses[field.name] ?? "-")}
+              </p>
+            </div>
+          ))}
+        </div>
       </Card>
     );
   }
