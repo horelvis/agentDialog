@@ -15,6 +15,13 @@
       "when": 1772136000000,
       "tag": "0001_verification_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772150000000,
+      "tag": "0002_session_token_prefix",
+      "breakpoints": true
     }
   ]
 }

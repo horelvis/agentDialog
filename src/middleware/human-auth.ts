@@ -13,31 +13,29 @@ export const humanAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
 
   const token = authHeader.slice(7); // Remove "Bearer "
+  const prefix = token.slice(0, 15);
 
   const db = getDb();
-  const allHumans = await db
+  const [human] = await db
     .select()
     .from(humans)
-    .where(eq(humans.sessionTokenHash, humans.sessionTokenHash)); // We need to check all active sessions
+    .where(eq(humans.sessionTokenPrefix, prefix))
+    .limit(1);
 
-  // Find the human with a matching session token
-  let matchedHuman = null;
-  for (const human of await db.select().from(humans)) {
-    if (!human.sessionTokenHash || !human.sessionExpiresAt) continue;
-    if (new Date() > human.sessionExpiresAt) continue;
-
-    const valid = await verifyToken(token, human.sessionTokenHash);
-    if (valid) {
-      matchedHuman = human;
-      break;
-    }
-  }
-
-  if (!matchedHuman) {
+  if (!human || !human.sessionTokenHash || !human.sessionExpiresAt) {
     throw new UnauthorizedError("Invalid or expired session");
   }
 
-  c.set("human", matchedHuman);
-  c.set("humanId", matchedHuman.id);
+  if (new Date() > human.sessionExpiresAt) {
+    throw new UnauthorizedError("Session expired");
+  }
+
+  const valid = await verifyToken(token, human.sessionTokenHash);
+  if (!valid) {
+    throw new UnauthorizedError("Invalid session token");
+  }
+
+  c.set("human", human);
+  c.set("humanId", human.id);
   await next();
 };

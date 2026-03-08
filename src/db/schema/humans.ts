@@ -9,10 +9,12 @@ export const humans = pgTable("humans", {
   verificationCodeExpiresAt: timestamp("verification_code_expires_at", { withTimezone: true }),
   verificationAttempts: integer("verification_attempts").default(0).notNull(),
   sessionTokenHash: varchar("session_token_hash", { length: 256 }),
+  sessionTokenPrefix: varchar("session_token_prefix", { length: 20 }),
   sessionExpiresAt: timestamp("session_expires_at", { withTimezone: true }),
   preferences: jsonb("preferences").$type<Record<string, unknown>>().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("humans_email_idx").on(table.email),
+  index("humans_session_prefix_idx").on(table.sessionTokenPrefix),
 ]);

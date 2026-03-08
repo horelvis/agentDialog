@@ -40,6 +40,12 @@ app.post("/:id/invitations", validateBody(createInvitationSchema), async (c) => 
 
 app.get("/:id/invitations", async (c) => {
   const conversationId = c.req.param("id");
+  const agentId = c.get("agentId");
+
+  if (!(await isParticipant(conversationId, "agent", agentId))) {
+    throw new ForbiddenError("Not a participant in this conversation");
+  }
+
   const invitationList = await listConversationInvitations(conversationId);
   return c.json({ data: invitationList });
 });

@@ -35,17 +35,19 @@ async function authenticateAgentWs(apiKey: string) {
 
 async function authenticateHumanWs(sessionToken: string) {
   const db = getDb();
-  const allHumans = await db.select().from(humans);
+  const prefix = sessionToken.slice(0, 15);
 
-  for (const human of allHumans) {
-    if (!human.sessionTokenHash || !human.sessionExpiresAt) continue;
-    if (new Date() > human.sessionExpiresAt) continue;
+  const [human] = await db
+    .select()
+    .from(humans)
+    .where(eq(humans.sessionTokenPrefix, prefix))
+    .limit(1);
 
-    const valid = await verifyToken(sessionToken, human.sessionTokenHash);
-    if (valid) {
-      return { actorType: "human" as const, actorId: human.id };
-    }
-  }
+  if (!human?.sessionTokenHash || !human.sessionExpiresAt) return null;
+  if (new Date() > human.sessionExpiresAt) return null;
 
-  return null;
+  const valid = await verifyToken(sessionToken, human.sessionTokenHash);
+  if (!valid) return null;
+
+  return { actorType: "human" as const, actorId: human.id };
 }

@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/hono";
 import { createMessage, listMessages } from "../../services/message.service";
+import { isParticipant } from "../../services/conversation.service";
+import { ForbiddenError } from "../../lib/errors";
 import { createMessageSchema } from "../../validators/message.validators";
 import { validateBody, validateQuery } from "../../middleware/validate";
 import { paginationQuery } from "../../validators/common.validators";
@@ -32,6 +34,12 @@ app.post("/:id/messages", validateBody(createMessageSchema), async (c) => {
 
 app.get("/:id/messages", validateQuery(paginationQuery), async (c) => {
   const conversationId = c.req.param("id");
+  const agentId = c.get("agentId");
+
+  if (!(await isParticipant(conversationId, "agent", agentId))) {
+    throw new ForbiddenError("Not a participant in this conversation");
+  }
+
   const query = c.get("validatedQuery") as any;
   const limit = getLimit(query.limit);
   const result = await listMessages(conversationId, limit, query.cursor);

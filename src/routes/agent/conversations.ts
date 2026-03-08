@@ -3,9 +3,11 @@ import type { AppEnv } from "../../types/hono";
 import {
   createConversation,
   getConversationWithParticipants,
+  isParticipant,
   listAgentConversations,
   updateConversation,
 } from "../../services/conversation.service";
+import { ForbiddenError } from "../../lib/errors";
 import { createConversationSchema, updateConversationSchema } from "../../validators/conversation.validators";
 import { validateBody, validateQuery } from "../../middleware/validate";
 import { paginationQuery } from "../../validators/common.validators";
@@ -35,6 +37,12 @@ app.get("/", validateQuery(paginationQuery), async (c) => {
 
 app.get("/:id", async (c) => {
   const conversationId = c.req.param("id");
+  const agentId = c.get("agentId");
+
+  if (!(await isParticipant(conversationId, "agent", agentId))) {
+    throw new ForbiddenError("Not a participant in this conversation");
+  }
+
   const conversation = await getConversationWithParticipants(conversationId);
   return c.json({ data: conversation });
 });

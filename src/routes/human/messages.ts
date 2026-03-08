@@ -7,14 +7,21 @@ import { validateBody, validateQuery } from "../../middleware/validate";
 import { paginationQuery } from "../../validators/common.validators";
 import { getLimit } from "../../lib/pagination";
 import { getRedis } from "../../lib/redis";
-import { NotFoundError } from "../../lib/errors";
+import { ForbiddenError, NotFoundError } from "../../lib/errors";
+import { getConversation, isParticipant } from "../../services/conversation.service";
 import { dispatchWebhooks } from "../../services/webhook.service";
-import { getConversation } from "../../services/conversation.service";
 
 const app = new Hono<AppEnv>();
 
 app.get("/conversations/:id/files/:attachmentId/download", async (c) => {
+  const conversationId = c.req.param("id");
+  const humanId = c.get("humanId");
   const attachmentId = c.req.param("attachmentId");
+
+  if (!(await isParticipant(conversationId, "human", humanId))) {
+    throw new ForbiddenError("Not a participant in this conversation");
+  }
+
   const result = await getFileDownloadUrl(attachmentId);
   if (!result) throw new NotFoundError("Attachment", attachmentId);
 
@@ -33,6 +40,12 @@ app.get("/conversations/:id/files/:attachmentId/download", async (c) => {
 
 app.get("/conversations/:id/messages", validateQuery(paginationQuery), async (c) => {
   const conversationId = c.req.param("id");
+  const humanId = c.get("humanId");
+
+  if (!(await isParticipant(conversationId, "human", humanId))) {
+    throw new ForbiddenError("Not a participant in this conversation");
+  }
+
   const query = c.get("validatedQuery") as any;
   const limit = getLimit(query.limit);
   const result = await listMessages(conversationId, limit, query.cursor);

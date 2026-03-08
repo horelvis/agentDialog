@@ -112,6 +112,7 @@ export async function verifyCode(email: string, code: string) {
   // Create session
   const sessionToken = generateSessionToken();
   const sessionHash = await hashToken(sessionToken);
+  const sessionPrefix = sessionToken.slice(0, 15);
   const sessionExpires = new Date(Date.now() + e.SESSION_EXPIRY_HOURS * 3600 * 1000);
 
   await db
@@ -121,6 +122,7 @@ export async function verifyCode(email: string, code: string) {
       verificationCodeExpiresAt: null,
       verificationAttempts: 0,
       sessionTokenHash: sessionHash,
+      sessionTokenPrefix: sessionPrefix,
       sessionExpiresAt: sessionExpires,
       updatedAt: new Date(),
     })
@@ -135,6 +137,7 @@ export async function logout(humanId: string) {
     .update(humans)
     .set({
       sessionTokenHash: null,
+      sessionTokenPrefix: null,
       sessionExpiresAt: null,
       updatedAt: new Date(),
     })
