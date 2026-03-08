@@ -4,6 +4,12 @@ import { getDb } from "../db";
 import { agents } from "../db/schema/agents";
 import { verifyApiKey } from "../lib/crypto";
 import { handleMcpRequest } from "../mcp/transport";
+import {
+  handleRegister,
+  renderAuthorizePage,
+  handleAuthorizeSubmit,
+  handleToken,
+} from "../mcp/oauth";
 
 const app = new Hono();
 
@@ -29,6 +35,41 @@ async function authenticateAgent(req: Request): Promise<string | null> {
 
   return agent.id;
 }
+
+// --- OAuth 2.1 routes ---
+
+// Dynamic Client Registration
+app.post("/oauth/register", async (c) => {
+  const body = await c.req.json();
+  const result = handleRegister(body);
+  return c.json(result.body, result.status);
+});
+
+// Authorize - render form
+app.get("/oauth/authorize", (c) => {
+  const query = c.req.query();
+  const result = renderAuthorizePage(query);
+  return c.html(result.html, result.status);
+});
+
+// Authorize - process form submission
+app.post("/oauth/authorize", async (c) => {
+  const body = await c.req.parseBody();
+  const result = await handleAuthorizeSubmit(body as Record<string, string>);
+  if (result.status === 302) {
+    return c.redirect(result.redirect!, 302);
+  }
+  return c.html(result.html!, result.status);
+});
+
+// Token exchange
+app.post("/oauth/token", async (c) => {
+  const body = await c.req.parseBody();
+  const result = handleToken(body as Record<string, string>);
+  return c.json(result.body, result.status);
+});
+
+// --- MCP protocol handler ---
 
 // All MCP methods go through the same handler
 app.all("/", async (c) => {

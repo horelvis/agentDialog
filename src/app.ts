@@ -35,6 +35,10 @@ import humanUploadRoutes from "./routes/human/upload";
 import humanTrustedAgentsRoutes from "./routes/human/trusted-agents";
 import humanQueryRoutes from "./routes/human/queries";
 import mcpRoutes from "./routes/mcp";
+import {
+  getProtectedResourceMetadata,
+  getAuthServerMetadata,
+} from "./mcp/oauth";
 
 export function createApp() {
   const app = new Hono();
@@ -106,7 +110,17 @@ export function createApp() {
   humanApi.route("/", humanQueryRoutes);
   app.route("/api/v1/human", humanApi);
 
-  // MCP server endpoint (agent auth handled internally)
+  // OAuth 2.1 well-known metadata (before static files)
+  app.get("/.well-known/oauth-protected-resource/mcp", (c) => {
+    const baseUrl = env().APP_URL;
+    return c.json(getProtectedResourceMetadata(baseUrl));
+  });
+  app.get("/.well-known/oauth-authorization-server", (c) => {
+    const baseUrl = env().APP_URL;
+    return c.json(getAuthServerMetadata(baseUrl));
+  });
+
+  // MCP server endpoint (agent auth handled internally, OAuth routes included)
   app.route("/mcp", mcpRoutes);
 
   // Serve frontend static files in production
