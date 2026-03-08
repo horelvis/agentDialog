@@ -51,6 +51,9 @@ export async function createInvitation(
   // Check if the human has a prior trust relationship with this agent
   const autoAccepted = await tryAutoAccept(invitation, agentId, input.email);
 
+  if (autoAccepted) {
+    return { ...invitation, status: "accepted" as const, autoAccepted };
+  }
   return { ...invitation, autoAccepted };
 }
 
