@@ -21,7 +21,7 @@ export const corsMiddleware = cors({
     return "";
   },
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
-  exposeHeaders: ["X-Request-ID", "X-RateLimit-Remaining", "X-RateLimit-Limit"],
+  allowHeaders: ["Content-Type", "Authorization", "X-Request-ID", "Mcp-Session-Id"],
+  exposeHeaders: ["X-Request-ID", "X-RateLimit-Remaining", "X-RateLimit-Limit", "Mcp-Session-Id"],
   maxAge: 86400,
 });
