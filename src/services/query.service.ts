@@ -105,7 +105,12 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
 
         humanId = human.id;
         status = "assigned";
+        console.log(`[QUERY] Auto-accepted: ${input.target_human_email} trusts agent ${agentId}`);
+      } else {
+        console.log(`[QUERY] Trust revoked: ${input.target_human_email} revoked agent ${agentId}`);
       }
+    } else {
+      console.log(`[QUERY] No prior trust: ${input.target_human_email} has no accepted invitations from agent ${agentId}`);
     }
   }
 
@@ -172,11 +177,13 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         agent.displayName,
         conversation.title || undefined,
       );
+      console.log(`[QUERY] Email sent to ${input.target_human_email}`);
     } catch (emailErr) {
-      // Log but don't fail the query creation if email fails
-      console.error("Failed to send invitation email:", emailErr);
+      console.error(`[QUERY] Email FAILED for ${input.target_human_email}:`, emailErr);
     }
   }
+
+  console.log(`[QUERY] Created ${query.id} for ${input.target_human_email} (status: ${status}, type: ${input.query_type}, agent: ${agentId})`);
 
   return {
     query_id: query.id,
@@ -261,6 +268,7 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
     .returning();
 
   // Dispatch webhook to agent
+  console.log(`[QUERY] Answered: ${queryId} by human ${humanId} (response_time: ${responseTimeMs}ms)`);
   dispatchWebhooks(query.agentId, "query.answered", {
     query_id: query.id,
     status: "answered",
@@ -268,6 +276,8 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
     comment: input.comment,
     human_confidence: input.confidence,
     response_time_ms: responseTimeMs,
+  }).catch((err) => {
+    console.error(`[QUERY] Webhook dispatch failed for ${queryId}:`, err);
   });
 
   return updated;
@@ -295,6 +305,7 @@ export async function getQuery(queryId: string, agentId: string) {
       .set({ status: "expired", updatedAt: new Date() })
       .where(eq(humanQueries.id, queryId));
     effectiveStatus = "expired";
+    console.log(`[QUERY] Expired: ${queryId} (was ${query.status})`);
   }
 
   const statusHints: Record<string, string> = {
@@ -385,6 +396,7 @@ export async function listHumanQueries(humanId: string) {
         .update(humanQueries)
         .set({ status: "expired", updatedAt: now })
         .where(eq(humanQueries.id, q.id));
+      console.log(`[QUERY] Expired: ${q.id} (was ${q.status})`);
       continue;
     }
     result.push(q);

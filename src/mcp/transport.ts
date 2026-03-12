@@ -25,9 +25,11 @@ export async function handleMcpRequest(
       sessionIdGenerator: () => crypto.randomUUID(),
       onsessioninitialized: (sid) => {
         sessions.set(sid, transport);
+        console.log(`[MCP] Session created: ${sid} for agent ${agentId} (active: ${sessions.size})`);
       },
       onsessionclosed: (sid) => {
         sessions.delete(sid);
+        console.log(`[MCP] Session closed: ${sid} (active: ${sessions.size})`);
       },
     });
 
@@ -44,7 +46,12 @@ export async function handleMcpRequest(
       }
     };
 
-    await server.connect(transport);
+    try {
+      await server.connect(transport);
+    } catch (err) {
+      console.error(`[MCP] Failed to connect server for agent ${agentId}:`, err);
+      return new Response("Internal server error", { status: 500 });
+    }
 
     // Now re-inject after connect overwrites onmessage
     const serverOnMessage = transport.onmessage;
@@ -68,6 +75,7 @@ export async function handleMcpRequest(
     if (sessionId && sessions.has(sessionId)) {
       return sessions.get(sessionId)!.handleRequest(req);
     }
+    console.warn(`[MCP] GET session not found: ${sessionId}`);
     return new Response("Session not found", { status: 404 });
   }
 
@@ -78,8 +86,10 @@ export async function handleMcpRequest(
       const transport = sessions.get(sessionId)!;
       const response = await transport.handleRequest(req);
       sessions.delete(sessionId);
+      console.log(`[MCP] Session deleted via DELETE: ${sessionId} (active: ${sessions.size})`);
       return response;
     }
+    console.warn(`[MCP] DELETE session not found: ${sessionId}`);
     return new Response("Session not found", { status: 404 });
   }
 

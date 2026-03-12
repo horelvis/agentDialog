@@ -16,23 +16,47 @@ const app = new Hono();
 // Authenticate agent from Bearer token header
 async function authenticateAgent(req: Request): Promise<string | null> {
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer mge_ag_")) return null;
+  if (!authHeader) {
+    console.warn("[MCP:AUTH] Failed: no Authorization header");
+    return null;
+  }
+  if (!authHeader.startsWith("Bearer mge_ag_")) {
+    console.warn("[MCP:AUTH] Failed: invalid token prefix");
+    return null;
+  }
 
   const apiKey = authHeader.slice(7); // Remove "Bearer "
   const prefix = apiKey.slice(0, 15); // "mge_ag_" + 8 chars
 
-  const db = getDb();
-  const [agent] = await db
-    .select()
-    .from(agents)
-    .where(eq(agents.apiKeyPrefix, prefix))
-    .limit(1);
+  let agent;
+  try {
+    const db = getDb();
+    [agent] = await db
+      .select()
+      .from(agents)
+      .where(eq(agents.apiKeyPrefix, prefix))
+      .limit(1);
+  } catch (err) {
+    console.error("[MCP:AUTH] DB error looking up agent:", err);
+    return null;
+  }
 
-  if (!agent || agent.status !== "active") return null;
+  if (!agent) {
+    console.warn("[MCP:AUTH] Failed: agent not found for prefix", prefix);
+    return null;
+  }
+  if (agent.status !== "active") {
+    console.warn(`[MCP:AUTH] Failed: agent ${agent.id} is ${agent.status}`);
+    return null;
+  }
 
   const valid = await verifyApiKey(apiKey, agent.apiKeyHash);
-  if (!valid) return null;
+  if (!valid) {
+    console.warn(`[MCP:AUTH] Failed: invalid API key hash for agent ${agent.id}`);
+    return null;
+  }
 
+  console.log(`[MCP:AUTH] Success: agent ${agent.id}`);
   return agent.id;
 }
 

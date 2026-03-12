@@ -14,7 +14,18 @@
       "Bash(npm install:*)",
       "Bash(npm view:*)",
       "Bash(source:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git push:*)",
+      "Bash(python3:*)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:modelcontextprotocol.info)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:ai-sdk.dev)",
+      "WebFetch(domain:dev.to)",
+      "Bash(bun add:*)",
+      "Bash(gh release:*)",
+      "Bash(gcloud logging:*)"
     ]
   }
 }

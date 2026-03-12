@@ -35,11 +35,14 @@ IMPORTANT workflow:
     async (args, extra) => {
       const agentId = (extra as any).agentId as string;
       if (!agentId) {
+        console.warn("[MCP:TOOL] human_query called without agentId");
         return {
           content: [{ type: "text", text: JSON.stringify({ error: "Authentication required" }) }],
           isError: true,
         };
       }
+
+      console.log(`[MCP:TOOL] human_query called by ${agentId} (type: ${args.query_type}, email: ${args.target_human_email})`);
 
       try {
         const result = await createQuery(agentId, {
@@ -55,6 +58,7 @@ IMPORTANT workflow:
           content: [{ type: "text", text: JSON.stringify(result) }],
         };
       } catch (err: any) {
+        console.error(`[MCP:TOOL] human_query error for ${agentId}:`, err);
         return {
           content: [{ type: "text", text: JSON.stringify({ error: err.message }) }],
           isError: true,
@@ -81,11 +85,14 @@ Polling tips: Wait 10-30 seconds between checks. If status is "pending" for a lo
     async (args, extra) => {
       const agentId = (extra as any).agentId as string;
       if (!agentId) {
+        console.warn("[MCP:TOOL] get_query called without agentId");
         return {
           content: [{ type: "text", text: JSON.stringify({ error: "Authentication required" }) }],
           isError: true,
         };
       }
+
+      console.log(`[MCP:TOOL] get_query called by ${agentId} (queryId: ${args.query_id})`);
 
       try {
         const result = await getQuery(args.query_id, agentId);
@@ -93,6 +100,7 @@ Polling tips: Wait 10-30 seconds between checks. If status is "pending" for a lo
           content: [{ type: "text", text: JSON.stringify(result) }],
         };
       } catch (err: any) {
+        console.error(`[MCP:TOOL] get_query error for ${agentId}:`, err);
         return {
           content: [{ type: "text", text: JSON.stringify({ error: err.message }) }],
           isError: true,
@@ -120,11 +128,14 @@ Returns queries ordered by creation date (newest first). Use status filter to fi
     async (args, extra) => {
       const agentId = (extra as any).agentId as string;
       if (!agentId) {
+        console.warn("[MCP:TOOL] list_queries called without agentId");
         return {
           content: [{ type: "text", text: JSON.stringify({ error: "Authentication required" }) }],
           isError: true,
         };
       }
+
+      console.log(`[MCP:TOOL] list_queries called by ${agentId} (status: ${args.status || "all"}, limit: ${args.limit})`);
 
       try {
         const queries = await listAgentQueries(agentId, {
@@ -135,6 +146,7 @@ Returns queries ordered by creation date (newest first). Use status filter to fi
           content: [{ type: "text", text: JSON.stringify({ queries }) }],
         };
       } catch (err: any) {
+        console.error(`[MCP:TOOL] list_queries error for ${agentId}:`, err);
         return {
           content: [{ type: "text", text: JSON.stringify({ error: err.message }) }],
           isError: true,

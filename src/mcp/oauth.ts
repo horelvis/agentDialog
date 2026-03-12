@@ -56,6 +56,7 @@ export function getAuthServerMetadata(baseUrl: string) {
 export async function handleRegister(body: Record<string, unknown>) {
   const redirectUris = body.redirect_uris;
   if (!Array.isArray(redirectUris) || redirectUris.length === 0) {
+    console.warn("[OAUTH] Client registration failed: missing redirect_uris");
     return {
       status: 400 as const,
       body: { error: "invalid_client_metadata", error_description: "redirect_uris is required" },
@@ -66,13 +67,20 @@ export async function handleRegister(body: Record<string, unknown>) {
   const clientSecret = `secret_${nanoid(48)}`;
   const now = new Date();
 
-  const db = getDb();
-  await db.insert(oauthClients).values({
-    clientId,
-    clientSecret,
-    redirectUris: JSON.stringify(redirectUris),
-    clientName: typeof body.client_name === "string" ? body.client_name : null,
-  });
+  try {
+    const db = getDb();
+    await db.insert(oauthClients).values({
+      clientId,
+      clientSecret,
+      redirectUris: JSON.stringify(redirectUris),
+      clientName: typeof body.client_name === "string" ? body.client_name : null,
+    });
+  } catch (err) {
+    console.error(`[OAUTH] DB error registering client ${clientId}:`, err);
+    throw err;
+  }
+
+  console.log(`[OAUTH] Client registered: ${clientId} (name: ${body.client_name || "none"})`);
 
   return {
     status: 201 as const,
@@ -96,6 +104,7 @@ export async function renderAuthorizePage(query: Record<string, string>) {
   const { redirect_uri, state, code_challenge, code_challenge_method } = query;
 
   if (!redirect_uri || !code_challenge) {
+    console.warn("[OAUTH] Authorize page: missing required params");
     return {
       status: 400 as const,
       html: errorPage("Missing required parameters: redirect_uri, code_challenge"),
@@ -103,9 +112,11 @@ export async function renderAuthorizePage(query: Record<string, string>) {
   }
 
   if (code_challenge_method && code_challenge_method !== "S256") {
+    console.warn(`[OAUTH] Authorize page: unsupported code_challenge_method ${code_challenge_method}`);
     return { status: 400 as const, html: errorPage("Only S256 code_challenge_method is supported") };
   }
 
+  console.log("[OAUTH] Authorize page rendered");
   return {
     status: 200 as const,
     html: authorizePage({ redirect_uri, state, code_challenge, code_challenge_method: code_challenge_method || "S256" }),
@@ -134,7 +145,9 @@ export async function handleAuthorizeSubmit(body: Record<string, string>) {
       displayName: agent_name,
     });
     apiKey = result.apiKey;
+    console.log(`[OAUTH] Agent created: ${slug} → ${result.agent.id}`);
   } catch (err: any) {
+    console.error(`[OAUTH] Agent creation failed for slug ${slug}:`, err);
     return {
       status: 200 as const,
       html: authorizePage({
@@ -151,17 +164,24 @@ export async function handleAuthorizeSubmit(body: Record<string, string>) {
   const code = nanoid(32);
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  const db = getDb();
-  await db.insert(oauthCodes).values({
-    code,
-    clientId: "direct",
-    apiKey,
-    codeChallenge: code_challenge,
-    codeChallengeMethod: code_challenge_method || "S256",
-    redirectUri: redirect_uri,
-    state: state || null,
-    expiresAt,
-  });
+  try {
+    const db = getDb();
+    await db.insert(oauthCodes).values({
+      code,
+      clientId: "direct",
+      apiKey,
+      codeChallenge: code_challenge,
+      codeChallengeMethod: code_challenge_method || "S256",
+      redirectUri: redirect_uri,
+      state: state || null,
+      expiresAt,
+    });
+  } catch (err) {
+    console.error("[OAUTH] DB error inserting authorization code:", err);
+    throw err;
+  }
+
+  console.log(`[OAUTH] Authorization code generated for slug ${slug}`);
 
   // Redirect back with code
   const redirectUrl = new URL(redirect_uri);
@@ -177,6 +197,7 @@ export async function handleToken(body: Record<string, string>) {
   const { grant_type, code, code_verifier } = body;
 
   if (grant_type !== "authorization_code") {
+    console.warn(`[OAUTH] Token exchange failed: unsupported grant_type ${grant_type}`);
     return {
       status: 400 as const,
       body: { error: "unsupported_grant_type" },
@@ -184,6 +205,7 @@ export async function handleToken(body: Record<string, string>) {
   }
 
   if (!code || !code_verifier) {
+    console.warn("[OAUTH] Token exchange failed: missing code or code_verifier");
     return {
       status: 400 as const,
       body: { error: "invalid_request", error_description: "code and code_verifier are required" },
@@ -198,6 +220,7 @@ export async function handleToken(body: Record<string, string>) {
     .limit(1);
 
   if (!authCode) {
+    console.warn("[OAUTH] Token exchange failed: invalid or expired code");
     return {
       status: 400 as const,
       body: { error: "invalid_grant", error_description: "Invalid or expired authorization code" },
@@ -206,6 +229,7 @@ export async function handleToken(body: Record<string, string>) {
 
   if (authCode.expiresAt < new Date()) {
     await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
+    console.warn("[OAUTH] Token exchange failed: code expired");
     return {
       status: 400 as const,
       body: { error: "invalid_grant", error_description: "Authorization code expired" },
@@ -215,6 +239,7 @@ export async function handleToken(body: Record<string, string>) {
   // Verify PKCE
   const computedChallenge = base64UrlEncode(sha256(code_verifier));
   if (computedChallenge !== authCode.codeChallenge) {
+    console.warn("[OAUTH] Token exchange failed: PKCE verification mismatch");
     return {
       status: 400 as const,
       body: { error: "invalid_grant", error_description: "PKCE verification failed" },
@@ -225,7 +250,11 @@ export async function handleToken(body: Record<string, string>) {
   await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
 
   // Cleanup expired codes
-  db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, new Date())).catch(() => {});
+  db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, new Date())).catch((err) => {
+    console.error("[OAUTH] Failed to cleanup expired codes:", err);
+  });
+
+  console.log(`[OAUTH] Token exchanged successfully (clientId: ${authCode.clientId})`);
 
   return {
     status: 200 as const,
