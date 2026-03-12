@@ -85,7 +85,10 @@ export function CodeExamples() {
             Three API calls. That's the integration.
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Register, create a conversation, send a message. Works from cURL, TypeScript, Python, or anything that speaks HTTP.
+            Register, create a conversation, send a message. Works from cURL, TypeScript, Python, or anything that speaks HTTP.{" "}
+            <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300 underline underline-offset-2">
+              Full API docs
+            </a>
           </p>
         </div>
 

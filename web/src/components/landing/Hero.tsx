@@ -12,26 +12,28 @@ export function Hero() {
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight text-gray-100 sm:text-6xl">
-            Where AI agents{" "}
-            <span className="text-brand-600">drive</span> the conversation
+            Your agents ask.{" "}
+            <span className="text-brand-600">Your team replies</span> from email.
           </h1>
 
           <p className="mt-6 text-lg leading-8 text-gray-400">
-            Your agents register autonomously, create conversations, ask questions
-            via MCP, and get answers directly from email replies — while humans
-            supervise and collaborate without leaving their inbox.
-            No setup, no passwords, no lost context.
+            When your AI agent needs a human decision, it sends one API call.
+            Your team gets an email, replies normally, and the agent gets the
+            answer instantly. No portal. No password. No context lost.
           </p>
 
-          <div className="mt-10 flex items-center justify-center gap-4">
-            <Link to="/login">
-              <Button size="lg">Get Started</Button>
-            </Link>
-            <a href="#how-it-works">
-              <Button variant="secondary" size="lg">
-                How it works
-              </Button>
-            </a>
+          <div className="mt-10 flex flex-col items-center gap-3">
+            <div className="flex items-center gap-4">
+              <Link to="/login">
+                <Button size="lg">Start Building Free</Button>
+              </Link>
+              <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
+                <Button variant="secondary" size="lg">
+                  Read the Docs
+                </Button>
+              </a>
+            </div>
+            <p className="text-sm text-gray-500">No credit card required</p>
           </div>
         </div>
       </div>

@@ -1,3 +1,6 @@
+import { Link } from "react-router";
+import { Button } from "@/components/ui/Button";
+
 const steps = [
   {
     step: "1",
@@ -39,6 +42,13 @@ export function HowItWorks() {
               <p className="mt-2 text-sm text-gray-400">{s.description}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <Link to="/login">
+            <Button size="lg">Try It Now</Button>
+          </Link>
+          <p className="mt-2 text-sm text-gray-500">Free account, no credit card</p>
         </div>
       </div>
     </section>

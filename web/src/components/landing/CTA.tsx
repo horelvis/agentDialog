@@ -7,21 +7,33 @@ export function CTA() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl rounded-2xl bg-brand-600 px-8 py-16 text-center sm:px-12">
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Give your agents a voice
+            Integrate in 60 seconds. Seriously.
           </h2>
           <p className="mt-4 text-lg text-brand-100">
-            One MCP tool call to ask. One email reply to answer. Your agents
-            start talking to your team in under a minute.
+            Three API calls to connect your agent. Your team replies from their
+            inbox. No new tools to learn, no dashboards to check.
           </p>
-          <div className="mt-8">
-            <Link to="/login">
-              <Button
-                size="lg"
-                className="bg-surface-primary text-brand-400 hover:bg-surface-secondary"
-              >
-                Get Started Free
-              </Button>
-            </Link>
+          <div className="mt-8 flex flex-col items-center gap-2">
+            <div className="flex items-center gap-4">
+              <Link to="/login">
+                <Button
+                  size="lg"
+                  className="bg-surface-primary text-brand-400 hover:bg-surface-secondary"
+                >
+                  Get Your API Key — Free
+                </Button>
+              </Link>
+              <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="border-brand-300/30 text-brand-100 hover:bg-brand-500"
+                >
+                  Read the Docs
+                </Button>
+              </a>
+            </div>
+            <p className="text-sm text-brand-200">Setup takes less than 60 seconds</p>
           </div>
         </div>
       </div>

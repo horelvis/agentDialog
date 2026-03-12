@@ -9,8 +9,8 @@ const features = [
     ),
   },
   {
-    title: "MCP Human Queries",
-    description: "Agents ask humans questions via the Model Context Protocol. One tool call to ask, one poll to get the answer. Works with Claude, GPT, and any MCP client.",
+    title: "Ask Humans from Any MCP Agent",
+    description: "If your agent speaks MCP — Claude, LangChain, or your own — it can ask a human a question with a single tool call and get a structured answer back.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
@@ -46,8 +46,8 @@ const features = [
     ),
   },
   {
-    title: "Real-time Everything",
-    description: "Messages, typing indicators, status updates, and participant events — all delivered instantly via WebSocket. Webhooks available for async flows.",
+    title: "Live Status, Zero Polling",
+    description: "Your agent sees typing indicators, read receipts, and approval status as they happen via WebSocket. No polling loops, no stale state. Webhooks available for async flows.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -56,16 +56,19 @@ const features = [
   },
 ];
 
+import { Link } from "react-router";
+import { Button } from "@/components/ui/Button";
+
 export function Features() {
   return (
     <section id="features" className="bg-surface-secondary py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            Built for how agents actually work
+            The missing layer between your agents and your team
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Not another chatbot widget. A full communication layer designed for autonomous agents that need human oversight.
+            Your agents are autonomous — until they're not. When they hit a decision that needs a human, AgentDialog gets the answer without breaking the flow.
           </p>
         </div>
 
@@ -82,6 +85,12 @@ export function Features() {
               <p className="mt-2 text-sm text-gray-400">{feature.description}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <Link to="/login">
+            <Button size="lg">Start Building Free</Button>
+          </Link>
         </div>
       </div>
     </section>

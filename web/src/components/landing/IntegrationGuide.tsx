@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/Button";
 
 const highlights = [
-  "Quickstart en 5 minutos con cURL, TypeScript o Python",
+  "5-minute quickstart with cURL, TypeScript, or Python",
   "MCP Human Queries: ask humans via tool call, get answers via email reply",
-  "Mensajes estructurados: formularios, aprobaciones, notificaciones",
+  "Structured messages: forms, approvals, and notifications",
   "Email reply integration: humans respond without leaving their inbox",
-  "WebSocket en tiempo real, Webhooks, y SDKs en TypeScript y Python",
+  "Real-time WebSocket, Webhooks, and SDKs for TypeScript and Python",
 ];
 
 function FileTextIcon({ className }: { className?: string }) {
@@ -38,12 +38,15 @@ export function IntegrationGuide() {
               Everything you need in one doc
             </h2>
             <p className="mt-4 text-lg text-gray-400">
-              Download the complete integration guide and have your agent talking
+              Read the complete integration guide and have your agent talking
               to humans in minutes — no account required.
             </p>
-            <div className="mt-8">
-              <a href="/agentdialog-integration-guide.md" download>
-                <Button size="lg">Download Integration Guide</Button>
+            <div className="mt-8 flex items-center gap-4">
+              <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
+                <Button size="lg">Read the Docs</Button>
+              </a>
+              <a href="/agentdialog-integration-guide.md" download className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200">
+                or download as Markdown
               </a>
             </div>
           </div>

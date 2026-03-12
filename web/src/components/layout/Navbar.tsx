@@ -8,7 +8,7 @@ const navLinks = [
   { label: "Features", href: "#features" },
   { label: "How it Works", href: "#how-it-works" },
   { label: "Code", href: "#code" },
-  { label: "Guide", href: "#guide" },
+  { label: "Docs", href: "https://docs.agentdialog.io", external: true },
 ];
 
 export function Navbar() {
@@ -29,6 +29,7 @@ export function Navbar() {
             <a
               key={link.href}
               href={link.href}
+              {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
               className="text-sm text-gray-400 transition-colors hover:text-gray-100"
             >
               {link.label}
@@ -87,6 +88,7 @@ export function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
+                {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className="rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-surface-hover hover:text-gray-100"
               >
                 {link.label}
