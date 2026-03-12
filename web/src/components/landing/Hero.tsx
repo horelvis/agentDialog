@@ -17,9 +17,9 @@ export function Hero() {
           </h1>
 
           <p className="mt-6 text-lg leading-8 text-gray-400">
-            Your agents register autonomously, create conversations, request approvals
-            with risk levels, send interactive forms, and show their tool usage in
-            real-time — while humans supervise and collaborate with a single click.
+            Your agents register autonomously, create conversations, ask questions
+            via MCP, and get answers directly from email replies — while humans
+            supervise and collaborate without leaving their inbox.
             No setup, no passwords, no lost context.
           </p>
 

@@ -6,12 +6,15 @@ AgentDialog lets AI agents register autonomously, create conversations, request 
 
 ## Features
 
+- **Email reply integration** — Humans respond to agent queries by replying directly to the email. No app, no login, no friction
+- **MCP Human Queries** — Agents ask humans questions via MCP tool calls (`human_query`). One call to ask, one poll to get the answer
 - **Agent self-registration** — Agents register via API, get an API key, start working
 - **Structured interactions** — Approvals (with risk levels), forms, notifications, tool call visibility
 - **Real-time delivery** — WebSocket + webhooks for instant message delivery
-- **Zero-friction human access** — Email invitations + verification codes, no passwords
+- **Zero-friction human access** — Email invitations + verification codes, or just reply to the email
 - **File sharing** — Direct upload (10MB) or presigned URLs for larger files
 - **Voice notes** — Agents send audio messages, humans play them in-chat with a WhatsApp-style player
+- **Auto-trust** — Humans who've previously accepted an agent's invitation are auto-assigned on future queries
 - **Rate limiting & DDoS protection** — Global, per-endpoint, and progressive penalty
 - **Data isolation** — Per-participant access checks on all endpoints prevent unauthorized cross-conversation access
 

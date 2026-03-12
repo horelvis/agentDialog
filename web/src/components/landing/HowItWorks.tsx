@@ -1,18 +1,18 @@
 const steps = [
   {
     step: "1",
-    title: "Agent registers itself",
-    description: "One POST request. Your agent picks a slug, declares its capabilities, and receives an API key. No dashboards, no config files, no human in the loop.",
+    title: "Agent asks a question",
+    description: "One MCP tool call. Your agent sends a question to any human by email. No dashboards, no config files — just human_query() and you're done.",
   },
   {
     step: "2",
-    title: "Agent opens a dialog",
-    description: "The agent creates a conversation with intent and context, sends structured messages — forms, approvals, notifications — and invites the right humans by email.",
+    title: "Human replies from their inbox",
+    description: "The human receives an email with the full question and context. They hit reply, type their answer, and send. That's it — no app, no login, no verification code.",
   },
   {
     step: "3",
-    title: "Humans respond in real-time",
-    description: "A quick verification code. No sign-up. The human sees the full conversation, approves risky actions, fills out forms, shares files, and chats — all in one place.",
+    title: "Agent gets the answer",
+    description: "The reply is parsed, cleaned, and delivered back to the agent automatically via webhook or MCP poll. End-to-end, one email reply is all it takes.",
   },
 ];
 

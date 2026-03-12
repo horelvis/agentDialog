@@ -4,6 +4,26 @@ import { cn } from "@/lib/cn";
 
 const tabs = [
   {
+    label: "MCP (Claude)",
+    language: "typescript",
+    code: `// In your MCP config, add AgentDialog as a server:
+// "agentdialog": { "url": "https://api.agentdialog.io/mcp" }
+
+// Then Claude can use human_query directly:
+// "Ask Sarah to validate this data before proceeding"
+
+// Behind the scenes, Claude calls:
+human_query({
+  query_type: "validation",
+  question: "Does this revenue data look correct?",
+  context: "Q4 revenue: $2.3M (+15% YoY)...",
+  target_human_email: "sarah@company.com",
+  timeout_minutes: 30,
+})
+// → Sarah gets an email, replies "Yes, confirmed"
+// → Agent polls get_query → gets the answer`,
+  },
+  {
     label: "cURL",
     language: "bash",
     code: `# 1. Register your agent
@@ -28,54 +48,29 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages
   -d '{ "type": "text", "content": "Review complete!" }'`,
   },
   {
-    label: "TypeScript",
-    language: "typescript",
-    code: `const agent = new AgentDialogClient("mge_ag_...");
-
-// Create conversation and invite human
-const { data: conv } = await agent.createConversation({
-  title: "Deploy v2.0 → Production",
-  intentType: "permission",
-});
-
-await agent.inviteHuman(conv.id, "dev@company.com");
-
-// Request approval
-await agent.sendMessage(conv.id, {
-  type: "approval",
-  content: "Ready to deploy. Approve?",
-  structuredData: {
-    approvalId: "deploy-v2",
-    action: "deploy-to-production",
-    riskLevel: "high",
-  },
-});`,
-  },
-  {
     label: "Python",
     language: "python",
-    code: `agent = AgentDialogClient("mge_ag_...")
+    code: `from agentdialog import AgentDialogClient
 
-# Create conversation
-conv = agent.create_conversation(
-    title="Data Analysis Complete",
-    intent_type="notification"
+agent = AgentDialogClient("mge_ag_...")
+
+# Ask a human via MCP human_query
+result = agent.human_query(
+    query_type="expert_query",
+    question="Should we use B-tree or hash index?",
+    context="Table: orders (50M rows), query: WHERE id = ?",
+    target_human_email="dba@company.com",
+    timeout_minutes=30,
 )
 
-# Send structured form
-agent.send_message(conv["data"]["id"],
-    msg_type="form",
-    structured_data={
-        "formId": "config-001",
-        "title": "Analysis Parameters",
-        "fields": [
-            {"name": "dataset", "type": "select",
-             "label": "Dataset", "options": ["prod", "staging"]},
-            {"name": "limit", "type": "number",
-             "label": "Row limit", "defaultValue": 1000},
-        ]
-    }
-)`,
+# Human replies via email → agent gets the answer
+import time
+while True:
+    query = agent.get_query(result["query_id"])
+    if query["status"] == "answered":
+        print(f"Answer: {query['answer']}")
+        break
+    time.sleep(15)`,
   },
 ];
 

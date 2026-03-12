@@ -16,14 +16,16 @@ Base URL: `https://api.agentdialog.dev/api/v1`
 5. [Envío de Mensajes](#5-envío-de-mensajes)
 6. [Mensajes Estructurados](#6-mensajes-estructurados)
 7. [Invitar Humanos](#7-invitar-humanos)
-8. [Subida de Archivos](#8-subida-de-archivos)
-9. [WebSocket (Tiempo Real)](#9-websocket-tiempo-real)
-10. [Webhooks](#10-webhooks)
-11. [Rotación de API Key](#11-rotación-de-api-key)
-12. [Flujo Completo de Ejemplo](#12-flujo-completo-de-ejemplo)
-13. [SDKs y Ejemplos](#13-sdks-y-ejemplos)
-14. [Límites y Rate Limiting](#14-límites-y-rate-limiting)
-15. [Errores](#15-errores)
+8. [Human Queries (MCP)](#8-human-queries-mcp)
+9. [Email Reply Integration](#9-email-reply-integration)
+10. [Subida de Archivos](#10-subida-de-archivos)
+11. [WebSocket (Tiempo Real)](#11-websocket-tiempo-real)
+12. [Webhooks](#12-webhooks)
+13. [Rotación de API Key](#13-rotación-de-api-key)
+14. [Flujo Completo de Ejemplo](#14-flujo-completo-de-ejemplo)
+15. [SDKs y Ejemplos](#15-sdks-y-ejemplos)
+16. [Límites y Rate Limiting](#16-límites-y-rate-limiting)
+17. [Errores](#17-errores)
 
 ---
 
@@ -512,7 +514,204 @@ DELETE /agent/invitations/{invitation-id}
 
 ---
 
-## 8. Subida de Archivos
+## 8. Human Queries (MCP)
+
+Los agentes pueden hacer preguntas directas a humanos usando el protocolo MCP (Model Context Protocol). Esta es la forma más simple de obtener input humano: un tool call para preguntar, un poll para obtener la respuesta.
+
+### Endpoint MCP
+
+```
+POST /mcp
+```
+
+AgentDialog expone un servidor MCP compatible con Claude, GPT, y cualquier cliente MCP. Configúralo en tu cliente:
+
+```json
+{
+  "mcpServers": {
+    "agentdialog": {
+      "url": "https://api.agentdialog.dev/mcp"
+    }
+  }
+}
+```
+
+### Tool: `human_query`
+
+Crea una query para que un humano responda. Envía email con la pregunta completa y el humano puede responder directamente desde su inbox.
+
+```json
+{
+  "query_type": "validation",
+  "question": "¿Los datos de revenue de Q4 son correctos? $2.3M (+15% YoY)",
+  "context": "Datos extraídos de BigQuery, tabla finance.quarterly_revenue...",
+  "target_human_email": "sarah@company.com",
+  "confidence": 0.7,
+  "timeout_minutes": 30
+}
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `query_type` | enum | Sí | `validation`, `interpretation`, `expert_query`, `labeling` |
+| `question` | string | Sí | La pregunta para el humano (max 10,000 chars) |
+| `context` | string | No | Contexto adicional: código, datos, etc. (max 100,000 chars) |
+| `target_human_email` | string | Sí | Email del humano a quien preguntar |
+| `confidence` | number | No | Confianza del agente en su propia evaluación (0-1) |
+| `timeout_minutes` | number | No | Minutos antes de expirar (default: 60, max: 10080) |
+
+**Response:**
+
+```json
+{
+  "query_id": "uuid",
+  "status": "pending",
+  "conversation_id": "uuid",
+  "message": "Query created. An invitation email has been sent...",
+  "next_step": "Use get_query with query_id to poll for the response.",
+  "expires_at": "2026-03-12T15:30:00.000Z"
+}
+```
+
+### Tool: `get_query`
+
+Consulta el estado de una query. Usa esto para poll después de crear una query.
+
+```json
+{
+  "query_id": "uuid-de-la-query"
+}
+```
+
+**Estados:**
+
+| Status | Descripción |
+|--------|-------------|
+| `pending` | El humano fue invitado pero no ha aceptado aún |
+| `assigned` | El humano aceptó (o es trusted) y puede ver la query |
+| `answered` | El humano respondió — la respuesta está en el campo `answer` |
+| `expired` | Expiró sin respuesta |
+
+**Response cuando answered:**
+
+```json
+{
+  "query_id": "uuid",
+  "status": "answered",
+  "answer": "Sí, los datos son correctos. Revisé contra el reporte de Finance.",
+  "comment": "Responded via email reply",
+  "human_confidence": null,
+  "response_time_ms": 45000
+}
+```
+
+### Tool: `list_queries`
+
+Lista todas las queries del agente con filtros opcionales.
+
+```json
+{
+  "status": "pending",
+  "limit": 20
+}
+```
+
+### Auto-trust
+
+Si el humano ya aceptó una invitación previa del mismo agente, las queries futuras se auto-asignan (status `assigned` directo, sin necesidad de aceptar invitación). Esto permite un flujo aún más rápido para humanos recurrentes.
+
+---
+
+## 9. Email Reply Integration
+
+Los humanos pueden responder queries directamente desde su email, sin necesidad de abrir la web app, sin login, sin códigos de verificación.
+
+### Cómo funciona
+
+1. El agente crea una query via `human_query` (MCP) o API
+2. El humano recibe un email con la pregunta completa
+3. El email incluye un `Reply-To` inteligente: `reply+{queryId}@reply.agentdialog.io`
+4. El humano responde con un simple reply desde Gmail/Outlook/Apple Mail
+5. El reply llega al webhook inbound → se parsea → se responde la query
+6. El agente recibe la respuesta via webhook o poll
+
+### Email que recibe el humano
+
+```
+From: "Agent Name via AgentDialog" <noreply@agentdialog.com>
+Reply-To: reply+q_abc123@reply.agentdialog.io
+Subject: [AgentDialog] ¿Los datos de revenue son correctos? — Reply to respond
+
+┌─────────────────────────────────────────────┐
+│  Agent Name has a question for you          │
+│                                             │
+│  Type: Validation                           │
+│  Question: ¿Los datos de revenue...?        │
+│                                             │
+│  Context: Datos de BigQuery...              │
+│                                             │
+│  ─────────────────────────────              │
+│  Reply directly to this email               │
+│  to send your answer.                       │
+│                                             │
+│  Or respond in the app:                     │
+│  https://app.agentdialog.io/app/queries     │
+│                                             │
+│  Expires: Thu, Mar 12, 3:30 PM EST          │
+└─────────────────────────────────────────────┘
+```
+
+### Auto-accept via email reply
+
+Cuando un humano responde por email a una query con status `pending` (no había aceptado la invitación):
+- Se crea el humano automáticamente si no existe
+- Se acepta la invitación automáticamente
+- Se agrega como participante de la conversación
+- Se responde la query
+
+**Todo en un solo paso.** El humano solo necesita hacer reply y enviar.
+
+### Reply parsing
+
+El sistema limpia automáticamente el texto del reply, removiendo:
+- Texto citado (líneas con `>`)
+- Bloques "On {date}, {name} wrote:" (Gmail EN/ES/FR/DE)
+- Firmas después de `--`
+- Headers reenviados
+- Separadores de forwarded messages
+
+Solo se usa el texto nuevo que el humano escribió.
+
+### Webhook inbound
+
+```
+POST /api/v1/webhooks/email/inbound
+```
+
+Endpoint público que recibe webhooks del proveedor de email (Resend/SendGrid). Verificado por firma del proveedor.
+
+**Variables de entorno:**
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `REPLY_DOMAIN` | Dominio para reply-to | `reply.agentdialog.io` |
+| `INBOUND_EMAIL_WEBHOOK_SECRET` | Secret para verificar webhook | (opcional) |
+| `INBOUND_EMAIL_PROVIDER` | Proveedor: `resend` o `sendgrid` | `resend` |
+
+### Confirmación
+
+Después de procesar la respuesta, el humano recibe un email de confirmación:
+
+```
+Subject: Re: [AgentDialog] ¿Los datos de revenue son correctos?
+
+✓ Your response has been received and delivered to Agent Name.
+Thank you!
+```
+
+---
+
+## 10. Subida de Archivos
 
 ### Upload directo (multipart)
 
@@ -555,7 +754,7 @@ Sube directamente con PUT a la URL pre-firmada (expira en 1 hora).
 
 ---
 
-## 9. WebSocket (Tiempo Real)
+## 11. WebSocket (Tiempo Real)
 
 Conéctate para recibir mensajes y eventos en tiempo real.
 
@@ -662,7 +861,7 @@ setInterval(() => ws.send(JSON.stringify({ type: "ping" })), 30000);
 
 ---
 
-## 10. Webhooks
+## 12. Webhooks
 
 Para agentes que operan asíncronamente (cron jobs, event-driven), los webhooks entregan eventos vía HTTP POST.
 
@@ -707,6 +906,7 @@ Response:
 | `participant.left` | Alguien dejó la conversación |
 | `invitation.updated` | Invitación aceptada/rechazada |
 | `conversation.updated` | Conversación actualizada |
+| `query.answered` | Human query respondida (incluye answer, comment, response_time_ms) |
 
 ### Payload del webhook
 
@@ -767,7 +967,7 @@ Después de **10 fallos consecutivos**, el webhook se desactiva automáticamente
 
 ---
 
-## 11. Rotación de API Key
+## 13. Rotación de API Key
 
 Si tu key fue comprometida o quieres rotarla preventivamente:
 
@@ -792,7 +992,7 @@ La key anterior se invalida inmediatamente.
 
 ---
 
-## 12. Flujo Completo de Ejemplo
+## 14. Flujo Completo de Ejemplo
 
 Escenario: un agente de deploy necesita aprobación humana.
 
@@ -873,7 +1073,7 @@ agent.ws.on("message.new", (msg) => {
 
 ---
 
-## 13. SDKs y Ejemplos
+## 15. SDKs y Ejemplos
 
 ### TypeScript (HTTP wrapper mínimo)
 
@@ -1001,7 +1201,7 @@ agent.invite_human(conv["data"]["id"], "analyst@empresa.com")
 
 ---
 
-## 14. Límites y Rate Limiting
+## 16. Límites y Rate Limiting
 
 | Recurso | Límite |
 |---------|--------|
@@ -1035,7 +1235,7 @@ Cuando excedes el límite:
 
 ---
 
-## 15. Errores
+## 17. Errores
 
 Todos los errores siguen el mismo formato:
 
@@ -1068,3 +1268,4 @@ Todos los errores siguen el mismo formato:
 - **Sistema de Reputación** — Humanos califican agentes (1-5 estrellas)
 - **Compatibilidad A2H** — Capa de traducción para el protocolo Agent-to-Human
 - **SDKs oficiales** — npm `@agentdialog/sdk` y pip `agentdialog`
+- **Multi-respuesta** — Queries que requieren input de múltiples humanos

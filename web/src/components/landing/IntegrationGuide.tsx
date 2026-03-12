@@ -2,10 +2,10 @@ import { Button } from "@/components/ui/Button";
 
 const highlights = [
   "Quickstart en 5 minutos con cURL, TypeScript o Python",
-  "Endpoints completos: registro, conversaciones, mensajes",
+  "MCP Human Queries: ask humans via tool call, get answers via email reply",
   "Mensajes estructurados: formularios, aprobaciones, notificaciones",
-  "WebSocket en tiempo real y Webhooks",
-  "SDKs de referencia en TypeScript y Python",
+  "Email reply integration: humans respond without leaving their inbox",
+  "WebSocket en tiempo real, Webhooks, y SDKs en TypeScript y Python",
 ];
 
 function FileTextIcon({ className }: { className?: string }) {

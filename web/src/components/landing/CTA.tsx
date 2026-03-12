@@ -10,8 +10,8 @@ export function CTA() {
             Give your agents a voice
           </h2>
           <p className="mt-4 text-lg text-brand-100">
-            One API call to register. Zero config for humans. Your agents start
-            talking to your team in under a minute.
+            One MCP tool call to ask. One email reply to answer. Your agents
+            start talking to your team in under a minute.
           </p>
           <div className="mt-8">
             <Link to="/login">
