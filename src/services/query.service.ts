@@ -1,4 +1,4 @@
-import { eq, and, lt, desc } from "drizzle-orm";
+import { eq, and, lt, desc, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { humanQueries } from "../db/schema/human-queries";
 import { conversations } from "../db/schema/conversations";
@@ -7,7 +7,7 @@ import { messages } from "../db/schema/messages";
 import { humans } from "../db/schema/humans";
 import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
-import { NotFoundError, ForbiddenError } from "../lib/errors";
+import { NotFoundError, ForbiddenError, ConflictError } from "../lib/errors";
 import { generateInvitationToken } from "../lib/crypto";
 import { dispatchWebhooks } from "./webhook.service";
 import { sendInvitationEmail } from "./email.service";
@@ -17,157 +17,163 @@ import type { CreateQueryInput, RespondQueryInput } from "../validators/query.va
 export async function createQuery(agentId: string, input: CreateQueryInput) {
   const db = getDb();
 
-  // 1. Create conversation for this query
-  const [conversation] = await db
-    .insert(conversations)
-    .values({
-      createdByAgentId: agentId,
-      title: `Query: ${input.question.slice(0, 80)}`,
-      description: `Human query (${input.query_type})`,
-      intentType: "solicitation",
-    })
-    .returning();
+  const result = await db.transaction(async (tx) => {
+    // 1. Create conversation for this query
+    const [conversation] = await tx
+      .insert(conversations)
+      .values({
+        createdByAgentId: agentId,
+        title: `Query: ${input.question.slice(0, 80)}`,
+        description: `Human query (${input.query_type})`,
+        intentType: "solicitation",
+      })
+      .returning();
 
-  // 2. Add agent as participant
-  await db.insert(conversationParticipants).values({
-    conversationId: conversation.id,
-    actorType: "agent",
-    agentId,
-    role: "owner",
-  });
-
-  // 3. Create invitation for the target human
-  const token = generateInvitationToken();
-  const invitationExpiresAt = new Date(Date.now() + input.timeout_minutes * 60 * 1000);
-
-  const [invitation] = await db
-    .insert(invitations)
-    .values({
+    // 2. Add agent as participant
+    await tx.insert(conversationParticipants).values({
       conversationId: conversation.id,
-      invitedByAgentId: agentId,
-      invitedHumanEmail: input.target_human_email,
-      token,
-      message: input.question,
-      expiresAt: invitationExpiresAt,
-    })
-    .returning();
+      actorType: "agent",
+      agentId,
+      role: "owner",
+    });
 
-  // 4. Try auto-accept if the human trusts this agent
-  let humanId: string | null = null;
-  let status: "pending" | "assigned" = "pending";
+    // 3. Create invitation for the target human
+    const token = generateInvitationToken();
+    const invitationExpiresAt = new Date(Date.now() + input.timeout_minutes * 60 * 1000);
 
-  const [human] = await db
-    .select()
-    .from(humans)
-    .where(eq(humans.email, input.target_human_email))
-    .limit(1);
+    const [invitation] = await tx
+      .insert(invitations)
+      .values({
+        conversationId: conversation.id,
+        invitedByAgentId: agentId,
+        invitedHumanEmail: input.target_human_email,
+        token,
+        message: input.question,
+        expiresAt: invitationExpiresAt,
+      })
+      .returning();
 
-  if (human) {
-    // Check for prior accepted invitation (trust)
-    const [priorAccepted] = await db
+    // 4. Try auto-accept if the human trusts this agent
+    let humanId: string | null = null;
+    let status: "pending" | "assigned" = "pending";
+
+    const [human] = await tx
       .select()
-      .from(invitations)
-      .where(
-        and(
-          eq(invitations.invitedByAgentId, agentId),
-          eq(invitations.invitedHumanEmail, input.target_human_email),
-          eq(invitations.status, "accepted"),
-        ),
-      )
+      .from(humans)
+      .where(eq(humans.email, input.target_human_email))
       .limit(1);
 
-    if (priorAccepted) {
-      // Check no revocation
-      const [revocation] = await db
+    if (human) {
+      // Check for prior accepted invitation (trust)
+      const [priorAccepted] = await tx
         .select()
-        .from(agentTrustRevocations)
+        .from(invitations)
         .where(
           and(
-            eq(agentTrustRevocations.agentId, agentId),
-            eq(agentTrustRevocations.humanId, human.id),
+            eq(invitations.invitedByAgentId, agentId),
+            eq(invitations.invitedHumanEmail, input.target_human_email),
+            eq(invitations.status, "accepted"),
           ),
         )
         .limit(1);
 
-      if (!revocation) {
-        // Auto-accept
-        await db
-          .update(invitations)
-          .set({ status: "accepted", updatedAt: new Date() })
-          .where(eq(invitations.id, invitation.id));
+      if (priorAccepted) {
+        // Check no revocation
+        const [revocation] = await tx
+          .select()
+          .from(agentTrustRevocations)
+          .where(
+            and(
+              eq(agentTrustRevocations.agentId, agentId),
+              eq(agentTrustRevocations.humanId, human.id),
+            ),
+          )
+          .limit(1);
 
-        await db.insert(conversationParticipants).values({
-          conversationId: conversation.id,
-          actorType: "human",
-          humanId: human.id,
-          role: "participant",
-        });
+        if (!revocation) {
+          // Auto-accept
+          await tx
+            .update(invitations)
+            .set({ status: "accepted", updatedAt: new Date() })
+            .where(eq(invitations.id, invitation.id));
 
-        humanId = human.id;
-        status = "assigned";
-        console.log(`[QUERY] Auto-accepted: ${input.target_human_email} trusts agent ${agentId}`);
+          await tx.insert(conversationParticipants).values({
+            conversationId: conversation.id,
+            actorType: "human",
+            humanId: human.id,
+            role: "participant",
+          });
+
+          humanId = human.id;
+          status = "assigned";
+          console.log(`[QUERY] Auto-accepted: ${input.target_human_email} trusts agent ${agentId}`);
+        } else {
+          console.log(`[QUERY] Trust revoked: ${input.target_human_email} revoked agent ${agentId}`);
+        }
       } else {
-        console.log(`[QUERY] Trust revoked: ${input.target_human_email} revoked agent ${agentId}`);
+        console.log(`[QUERY] No prior trust: ${input.target_human_email} has no accepted invitations from agent ${agentId}`);
       }
-    } else {
-      console.log(`[QUERY] No prior trust: ${input.target_human_email} has no accepted invitations from agent ${agentId}`);
     }
-  }
 
-  // 5. Send the query message
-  const [queryMessage] = await db
-    .insert(messages)
-    .values({
-      conversationId: conversation.id,
-      senderType: "agent",
-      senderAgentId: agentId,
-      type: "human_query",
-      content: input.question,
-      structuredData: {
+    // 5. Send the query message
+    const [queryMessage] = await tx
+      .insert(messages)
+      .values({
+        conversationId: conversation.id,
+        senderType: "agent",
+        senderAgentId: agentId,
+        type: "human_query",
+        content: input.question,
+        structuredData: {
+          queryType: input.query_type,
+          question: input.question,
+          context: input.context,
+          confidence: input.confidence,
+          timeoutMinutes: input.timeout_minutes,
+        },
+        metadata: input.metadata || {},
+      })
+      .returning();
+
+    // 6. Insert human_query record
+    const expiresAt = new Date(Date.now() + input.timeout_minutes * 60 * 1000);
+
+    const [query] = await tx
+      .insert(humanQueries)
+      .values({
+        agentId,
+        humanEmail: input.target_human_email,
+        humanId,
+        conversationId: conversation.id,
+        queryMessageId: queryMessage.id,
         queryType: input.query_type,
+        status,
         question: input.question,
         context: input.context,
         confidence: input.confidence,
         timeoutMinutes: input.timeout_minutes,
-      },
-      metadata: input.metadata || {},
-    })
-    .returning();
+        expiresAt,
+        metadata: input.metadata || {},
+      })
+      .returning();
 
-  // 6. Insert human_query record
-  const expiresAt = new Date(Date.now() + input.timeout_minutes * 60 * 1000);
+    // Update the query message structuredData with queryId
+    await tx
+      .update(messages)
+      .set({
+        structuredData: {
+          ...queryMessage.structuredData as Record<string, unknown>,
+          queryId: query.id,
+        },
+      })
+      .where(eq(messages.id, queryMessage.id));
 
-  const [query] = await db
-    .insert(humanQueries)
-    .values({
-      agentId,
-      humanEmail: input.target_human_email,
-      humanId,
-      conversationId: conversation.id,
-      queryMessageId: queryMessage.id,
-      queryType: input.query_type,
-      status,
-      question: input.question,
-      context: input.context,
-      confidence: input.confidence,
-      timeoutMinutes: input.timeout_minutes,
-      expiresAt,
-      metadata: input.metadata || {},
-    })
-    .returning();
+    return { conversation, query, token, status, humanId, expiresAt };
+  });
 
-  // Update the query message structuredData with queryId
-  await db
-    .update(messages)
-    .set({
-      structuredData: {
-        ...queryMessage.structuredData as Record<string, unknown>,
-        queryId: query.id,
-      },
-    })
-    .where(eq(messages.id, queryMessage.id));
+  const { conversation, query, token, status, expiresAt } = result;
 
-  // Send invitation email if not auto-accepted
+  // Send invitation email outside the transaction (side effect)
   if (status === "pending") {
     try {
       const agent = await getAgentById(agentId);
@@ -251,7 +257,7 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
 
   const responseTimeMs = Date.now() - query.createdAt.getTime();
 
-  // Update query
+  // Update query with optimistic lock — only update if still in "assigned" status
   const [updated] = await db
     .update(humanQueries)
     .set({
@@ -264,8 +270,12 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
       responseTimeMs,
       updatedAt: new Date(),
     })
-    .where(eq(humanQueries.id, queryId))
+    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "assigned")))
     .returning();
+
+  if (!updated) {
+    throw new ConflictError("Query was already answered or its status changed");
+  }
 
   // Dispatch webhook to agent
   console.log(`[QUERY] Answered: ${queryId} by human ${humanId} (response_time: ${responseTimeMs}ms)`);
@@ -374,8 +384,6 @@ export async function listHumanQueries(humanId: string) {
   const conversationIds = participantRows.map((r) => r.conversationId);
   if (conversationIds.length === 0) return [];
 
-  const { inArray } = await import("drizzle-orm");
-
   const rows = await db
     .select()
     .from(humanQueries)
@@ -387,22 +395,19 @@ export async function listHumanQueries(humanId: string) {
     )
     .orderBy(desc(humanQueries.createdAt));
 
-  // Lazy expire
+  // Batch expire in a single UPDATE instead of N individual queries
   const now = new Date();
-  const result = [];
-  for (const q of rows) {
-    if (now > q.expiresAt) {
-      await db
-        .update(humanQueries)
-        .set({ status: "expired", updatedAt: now })
-        .where(eq(humanQueries.id, q.id));
-      console.log(`[QUERY] Expired: ${q.id} (was ${q.status})`);
-      continue;
-    }
-    result.push(q);
+  const expiredIds = rows.filter((q) => now > q.expiresAt).map((q) => q.id);
+
+  if (expiredIds.length > 0) {
+    await db
+      .update(humanQueries)
+      .set({ status: "expired", updatedAt: now })
+      .where(inArray(humanQueries.id, expiredIds));
+    console.log(`[QUERY] Batch expired ${expiredIds.length} queries`);
   }
 
-  return result;
+  return rows.filter((q) => now <= q.expiresAt);
 }
 
 export async function getQueryForHuman(queryId: string, humanId: string) {

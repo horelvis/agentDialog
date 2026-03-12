@@ -213,11 +213,12 @@ export async function handleToken(body: Record<string, string>) {
   }
 
   const db = getDb();
+
+  // Atomically consume the code with DELETE...RETURNING to prevent race conditions
   const [authCode] = await db
-    .select()
-    .from(oauthCodes)
+    .delete(oauthCodes)
     .where(eq(oauthCodes.code, code))
-    .limit(1);
+    .returning();
 
   if (!authCode) {
     console.warn("[OAUTH] Token exchange failed: invalid or expired code");
@@ -228,11 +229,19 @@ export async function handleToken(body: Record<string, string>) {
   }
 
   if (authCode.expiresAt < new Date()) {
-    await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
     console.warn("[OAUTH] Token exchange failed: code expired");
     return {
       status: 400 as const,
       body: { error: "invalid_grant", error_description: "Authorization code expired" },
+    };
+  }
+
+  // Validate redirect_uri matches the one stored with the code
+  if (body.redirect_uri && body.redirect_uri !== authCode.redirectUri) {
+    console.warn("[OAUTH] Token exchange failed: redirect_uri mismatch");
+    return {
+      status: 400 as const,
+      body: { error: "invalid_grant", error_description: "redirect_uri does not match" },
     };
   }
 
@@ -245,9 +254,6 @@ export async function handleToken(body: Record<string, string>) {
       body: { error: "invalid_grant", error_description: "PKCE verification failed" },
     };
   }
-
-  // Consume the code
-  await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
 
   // Cleanup expired codes
   db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, new Date())).catch((err) => {

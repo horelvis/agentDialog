@@ -37,11 +37,11 @@ export function rateLimit(options: RateLimitOptions): MiddlewareHandler<AppEnv> 
     const key = `ratelimit:${options.keyPrefix}:${identifier}`;
 
     const windowSeconds = Math.ceil(options.windowMs / 1000);
-    const current = await redis.incr(key);
-
-    if (current === 1) {
-      await redis.expire(key, windowSeconds);
-    }
+    // Atomic INCR + EXPIRE via Lua to prevent TTL leak if process crashes between calls
+    const luaScript = `local c = redis.call('incr', KEYS[1])
+       if c == 1 then redis.call('expire', KEYS[1], ARGV[1]) end
+       return c`;
+    const current = await redis.eval(luaScript, 1, key, windowSeconds) as number;
 
     const remaining = Math.max(0, options.max - current);
     c.header("X-RateLimit-Limit", String(options.max));
@@ -104,10 +104,10 @@ export function globalRateLimit(): MiddlewareHandler<AppEnv> {
     const windowSeconds = penalty > 0 ? penalty : 60;
     const max = limits.globalRpm;
 
-    const current = await redis.incr(key);
-    if (current === 1) {
-      await redis.expire(key, windowSeconds);
-    }
+    const luaScript = `local c = redis.call('incr', KEYS[1])
+       if c == 1 then redis.call('expire', KEYS[1], ARGV[1]) end
+       return c`;
+    const current = await redis.eval(luaScript, 1, key, windowSeconds) as number;
 
     const remaining = Math.max(0, max - current);
     c.header("X-RateLimit-Limit", String(max));

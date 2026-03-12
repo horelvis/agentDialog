@@ -5,7 +5,12 @@ import { ValidationError } from "../lib/errors";
 
 export function validateBody(schema: ZodSchema): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const body = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch {
+      throw new ValidationError("Invalid JSON in request body");
+    }
     const result = schema.safeParse(body);
     if (!result.success) {
       const errors = result.error.flatten().fieldErrors;

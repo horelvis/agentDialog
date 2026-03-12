@@ -1,8 +1,27 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createMcpServer } from "./server";
 
-// Map of sessionId → transport for stateful sessions
-const sessions = new Map<string, WebStandardStreamableHTTPServerTransport>();
+// Map of sessionId → { transport, createdAt } for stateful sessions
+const MAX_SESSIONS = 1000;
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+interface SessionEntry {
+  transport: WebStandardStreamableHTTPServerTransport;
+  createdAt: number;
+}
+
+const sessions = new Map<string, SessionEntry>();
+
+// Periodic cleanup of expired sessions
+setInterval(() => {
+  const now = Date.now();
+  for (const [sid, entry] of sessions) {
+    if (now - entry.createdAt > SESSION_TTL_MS) {
+      sessions.delete(sid);
+      console.log(`[MCP] Session expired (TTL): ${sid} (active: ${sessions.size})`);
+    }
+  }
+}, 5 * 60 * 1000); // Every 5 minutes
 
 export async function handleMcpRequest(
   req: Request,
@@ -16,15 +35,21 @@ export async function handleMcpRequest(
 
     if (sessionId && sessions.has(sessionId)) {
       // Existing session — delegate
-      const transport = sessions.get(sessionId)!;
-      return transport.handleRequest(req);
+      const entry = sessions.get(sessionId)!;
+      return entry.transport.handleRequest(req);
+    }
+
+    // Reject if at capacity
+    if (sessions.size >= MAX_SESSIONS) {
+      console.warn(`[MCP] Session limit reached (${MAX_SESSIONS}), rejecting new session`);
+      return new Response("Too many active sessions", { status: 503 });
     }
 
     // New session or stateful initialization
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID(),
       onsessioninitialized: (sid) => {
-        sessions.set(sid, transport);
+        sessions.set(sid, { transport, createdAt: Date.now() });
         console.log(`[MCP] Session created: ${sid} for agent ${agentId} (active: ${sessions.size})`);
       },
       onsessionclosed: (sid) => {
@@ -73,7 +98,7 @@ export async function handleMcpRequest(
     // SSE stream for server-initiated messages
     const sessionId = req.headers.get("mcp-session-id");
     if (sessionId && sessions.has(sessionId)) {
-      return sessions.get(sessionId)!.handleRequest(req);
+      return sessions.get(sessionId)!.transport.handleRequest(req);
     }
     console.warn(`[MCP] GET session not found: ${sessionId}`);
     return new Response("Session not found", { status: 404 });
@@ -83,8 +108,8 @@ export async function handleMcpRequest(
     // Terminate session
     const sessionId = req.headers.get("mcp-session-id");
     if (sessionId && sessions.has(sessionId)) {
-      const transport = sessions.get(sessionId)!;
-      const response = await transport.handleRequest(req);
+      const entry = sessions.get(sessionId)!;
+      const response = await entry.transport.handleRequest(req);
       sessions.delete(sessionId);
       console.log(`[MCP] Session deleted via DELETE: ${sessionId} (active: ${sessions.size})`);
       return response;

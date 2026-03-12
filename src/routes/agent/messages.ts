@@ -15,6 +15,11 @@ const app = new Hono<AppEnv>();
 app.post("/:id/messages", validateBody(createMessageSchema), async (c) => {
   const conversationId = c.req.param("id");
   const agentId = c.get("agentId");
+
+  if (!(await isParticipant(conversationId, "agent", agentId))) {
+    throw new ForbiddenError("Not a participant in this conversation");
+  }
+
   const input = c.get("validatedBody");
 
   const message = await createMessage(conversationId, "agent", agentId, input);
