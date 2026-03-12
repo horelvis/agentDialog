@@ -10,8 +10,8 @@ import { agentTrustRevocations } from "../db/schema/trust-revocations";
 import { NotFoundError, ForbiddenError, ConflictError } from "../lib/errors";
 import { generateInvitationToken } from "../lib/crypto";
 import { dispatchWebhooks } from "./webhook.service";
-import { sendInvitationEmail } from "./email.service";
 import { getAgentById } from "./agent.service";
+import { sendQueryEmail } from "./query-email.service";
 import type { CreateQueryInput, RespondQueryInput } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
@@ -173,20 +173,23 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
 
   const { conversation, query, token, status, expiresAt } = result;
 
-  // Send invitation email outside the transaction (side effect)
-  if (status === "pending") {
-    try {
-      const agent = await getAgentById(agentId);
-      await sendInvitationEmail(
-        input.target_human_email,
-        token,
-        agent.displayName,
-        conversation.title || undefined,
-      );
-      console.log(`[QUERY] Email sent to ${input.target_human_email}`);
-    } catch (emailErr) {
-      console.error(`[QUERY] Email FAILED for ${input.target_human_email}:`, emailErr);
-    }
+  // Send query email outside the transaction (side effect)
+  // Send for both "pending" and "assigned" so trusted humans can reply via email too
+  try {
+    const agent = await getAgentById(agentId);
+    await sendQueryEmail({
+      queryId: query.id,
+      agentDisplayName: agent.displayName,
+      question: input.question,
+      context: input.context,
+      queryType: input.query_type,
+      targetEmail: input.target_human_email,
+      expiresAt,
+      invitationToken: token,
+    });
+    console.log(`[QUERY] Query email sent to ${input.target_human_email}`);
+  } catch (emailErr) {
+    console.error(`[QUERY] Email FAILED for ${input.target_human_email}:`, emailErr);
   }
 
   console.log(`[QUERY] Created ${query.id} for ${input.target_human_email} (status: ${status}, type: ${input.query_type}, agent: ${agentId})`);

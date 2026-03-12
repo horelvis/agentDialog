@@ -42,6 +42,10 @@ const envSchema = z.object({
 
   WEBHOOK_TIMEOUT_MS: z.coerce.number().default(10000),
   WEBHOOK_MAX_RETRIES: z.coerce.number().default(3),
+
+  REPLY_DOMAIN: z.string().default("reply.agentdialog.io"),
+  INBOUND_EMAIL_WEBHOOK_SECRET: z.string().optional(),
+  INBOUND_EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).default("resend"),
 });
 
 export type Env = z.infer<typeof envSchema>;

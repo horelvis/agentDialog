@@ -6,6 +6,7 @@ interface EmailOptions {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
 }
 
 let transporter: nodemailer.Transporter | null = null;
@@ -39,6 +40,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       subject: options.subject,
       html: options.html,
       text: options.text,
+      replyTo: options.replyTo,
     });
 
     console.log(`[EMAIL] Sent to ${options.to} | messageId: ${info.messageId}`);
