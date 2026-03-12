@@ -1,4 +1,3 @@
-import { Link } from "react-router";
 import { Button } from "@/components/ui/Button";
 
 export function Hero() {
@@ -24,9 +23,9 @@ export function Hero() {
 
           <div className="mt-10 flex flex-col items-center gap-3">
             <div className="flex items-center gap-4">
-              <Link to="/login">
-                <Button size="lg">Start Building Free</Button>
-              </Link>
+              <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
+                <Button size="lg">Start Building</Button>
+              </a>
               <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
                 <Button variant="secondary" size="lg">
                   Read the Docs

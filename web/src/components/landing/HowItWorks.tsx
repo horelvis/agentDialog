@@ -1,4 +1,3 @@
-import { Link } from "react-router";
 import { Button } from "@/components/ui/Button";
 
 const steps = [
@@ -45,10 +44,10 @@ export function HowItWorks() {
         </div>
 
         <div className="mt-12 text-center">
-          <Link to="/login">
-            <Button size="lg">Try It Now</Button>
-          </Link>
-          <p className="mt-2 text-sm text-gray-500">Free account, no credit card</p>
+          <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
+            <Button size="lg">Get Started</Button>
+          </a>
+          <p className="mt-2 text-sm text-gray-500">Free to use, no credit card</p>
         </div>
       </div>
     </section>

@@ -1,4 +1,3 @@
-import { Link } from "react-router";
 import { Button } from "@/components/ui/Button";
 
 export function CTA() {
@@ -15,14 +14,14 @@ export function CTA() {
           </p>
           <div className="mt-8 flex flex-col items-center gap-2">
             <div className="flex items-center gap-4">
-              <Link to="/login">
+              <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
                 <Button
                   size="lg"
                   className="bg-surface-primary text-brand-400 hover:bg-surface-secondary"
                 >
-                  Get Your API Key — Free
+                  Connect Your Agent
                 </Button>
-              </Link>
+              </a>
               <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
                 <Button
                   size="lg"
