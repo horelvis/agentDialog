@@ -15,72 +15,79 @@ const conversation: DemoMessage[] = [
     id: 1,
     sender: "system",
     type: "text",
-    content: "Deploy Bot created this conversation",
+    content: "Release Agent created this conversation",
     delay: 0,
   },
   {
     id: 2,
     sender: "agent",
-    type: "notification",
-    content: "Pre-deploy analysis started",
-    meta: { severity: "info", title: "Pipeline Initiated" },
-    delay: 600,
+    type: "tool_call",
+    content: "Checking staging environment health...",
+    meta: { toolName: "health_check", status: "running" },
+    delay: 800,
   },
   {
     id: 3,
     sender: "agent",
-    type: "tool_call",
-    content: "Running integration tests...",
-    meta: { toolName: "run_tests", status: "running" },
-    delay: 1200,
+    type: "tool_result",
+    content: "All services healthy. 0 errors in last 24h.",
+    meta: { toolName: "health_check", duration: "8s", status: "completed" },
+    delay: 1800,
   },
   {
     id: 4,
     sender: "agent",
-    type: "tool_result",
-    content: "847 passed, 0 failed",
-    meta: { toolName: "run_tests", duration: "3m 12s", status: "completed" },
-    delay: 2000,
+    type: "tool_call",
+    content: "Asking sarah@company.com to validate release...",
+    meta: { toolName: "human_query", status: "running" },
+    delay: 2800,
   },
   {
     id: 5,
     sender: "agent",
-    type: "tool_call",
-    content: "Scanning for vulnerabilities...",
-    meta: { toolName: "security_scan", status: "running" },
-    delay: 2600,
+    type: "tool_result",
+    content: "Email sent. Waiting for reply...",
+    meta: { toolName: "human_query", duration: "1.2s", status: "completed" },
+    delay: 3600,
   },
   {
     id: 6,
     sender: "agent",
-    type: "tool_result",
-    content: "0 critical, 0 high, 2 low",
-    meta: { toolName: "security_scan", duration: "1m 45s", status: "completed" },
-    delay: 3200,
+    type: "notification",
+    content: "Waiting for Sarah to reply via email",
+    meta: { severity: "info", title: "Human Input Requested" },
+    delay: 4400,
   },
   {
     id: 7,
-    sender: "agent",
-    type: "approval",
-    content: "All checks passed. Deploy v2.0 to production?",
-    meta: { riskLevel: "high", action: "deploy-to-production", details: "3 instances in us-east-1. Blue-green, zero downtime." },
-    delay: 3800,
+    sender: "human",
+    type: "text",
+    content: "Looks good — go ahead with the release. Skip the canary, we already validated on staging.",
+    delay: 5800,
   },
   {
     id: 8,
+    sender: "agent",
+    type: "approval",
+    content: "Release v3.1 to production? Skipping canary as instructed.",
+    meta: { riskLevel: "high", action: "release-to-production", details: "Direct deploy to 4 instances in us-east-1. Rolling update." },
+    delay: 7000,
+  },
+  {
+    id: 9,
     sender: "human",
     type: "approval_response",
     content: "Approved",
     meta: { decision: "approved" },
-    delay: 5000,
+    delay: 8400,
   },
   {
-    id: 9,
+    id: 10,
     sender: "agent",
     type: "notification",
-    content: "Deploy v2.0 completed successfully",
-    meta: { severity: "success", title: "Deploy Complete", details: "3 instances live. Total time: 4m 32s" },
-    delay: 6000,
+    content: "v3.1 is live across all instances",
+    meta: { severity: "success", title: "Release Complete", details: "4 instances updated. Zero downtime. Total time: 6m 18s" },
+    delay: 9400,
   },
 ];
 
@@ -205,7 +212,7 @@ function SystemBubble({ msg, animate }: { msg: DemoMessage; animate: boolean }) 
 function AgentAvatar() {
   return (
     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold text-white">
-      DB
+      RA
     </div>
   );
 }
@@ -213,7 +220,7 @@ function AgentAvatar() {
 function HumanAvatar() {
   return (
     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">
-      TL
+      SM
     </div>
   );
 }
@@ -306,10 +313,10 @@ export function ChatDemo() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            Watch an agent run a deploy
+            See the full loop in action
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Tool calls, security scans, risk-level approvals, and success notifications — happening live in a single conversation.
+            Agent runs tools, asks a human via email, gets the reply, requests approval — all in one conversation.
           </p>
         </div>
 
@@ -319,11 +326,11 @@ export function ChatDemo() {
             {/* Header */}
             <div className="flex items-center gap-3 border-b border-surface-border bg-surface-tertiary px-4 py-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-xs font-bold text-white">
-                DB
+                RA
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-100">Deploy v2.0 → Production</p>
-                <p className="text-xs text-gray-500">Deploy Bot &middot; Tech Lead</p>
+                <p className="text-sm font-semibold text-gray-100">Release v3.1 → Production</p>
+                <p className="text-xs text-gray-500">Release Agent &middot; Sarah (via email)</p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-green-500" />
