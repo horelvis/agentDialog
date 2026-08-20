@@ -31,6 +31,9 @@
     "postgres": "^3.4.5",
     "zod": "^3.24.1"
   },
+  "overrides": {
+    "zod": "$zod"
+  },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/bun": "^1.1.14",
