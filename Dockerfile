@@ -3,17 +3,17 @@ WORKDIR /app
 
 # Dev stage (for docker-compose.dev.yml)
 FROM base AS dev
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 
 # Install dependencies
 FROM base AS deps
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile --production
 
 # Build stage
 FROM base AS build
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run typecheck

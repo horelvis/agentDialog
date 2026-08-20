@@ -10,6 +10,16 @@
         "typescript": "^5.5.0",
         "zod": "^4.4.3",
       },
+      "peerDependencies": {
+        "@langchain/core": ">=0.3",
+        "ai": ">=5",
+        "zod": ">=3",
+      },
+      "optionalPeers": [
+        "@langchain/core",
+        "ai",
+        "zod",
+      ],
     },
   },
   "packages": {
