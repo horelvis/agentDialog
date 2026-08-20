@@ -1,6 +1,6 @@
-# Ingesta de correo entrante por Gmail
+# Ingesta de correo entrante
 
-**Fecha:** 2026-08-20
+**Fecha:** 2026-08-20, revisado el 2026-08-21
 **Estado:** aprobado, pendiente de plan de implementación
 
 ## Objetivo
@@ -22,6 +22,46 @@ infraestructura de correo entrante nunca se construyó.
   proveedor lo llama. Resend aparece solo como valor por defecto de
   `INBOUND_EMAIL_PROVIDER` en el código; no hay cuenta contratada.
 
+## Esto es un andamio, y el spec lo dice a propósito
+
+El proyecto está en fase de prueba, con posibilidad de pasar a producción según
+la acogida de la API. Esas dos fases quieren cosas distintas y conviene no
+confundirlas.
+
+**La arquitectura de producción ya está escrita.** `POST /api/v1/webhooks/email/inbound`
+implementa el patrón proveedor→webhook con verificación de firma. El día que haya
+un proveedor transaccional sobre un dominio propio, no hay que construir nada:
+hay que configurarlo.
+
+Y ese día llegará por razones que no tienen que ver con la ingesta. Enviar desde
+`@gmail.com` en nombre de `agentdialog.io` no alinea SPF ni DKIM, y en un producto
+cuyo flujo entero depende de que el humano *vea* el correo, la entregabilidad no
+es un detalle. A eso se suma el tope de ~500 envíos diarios de una cuenta
+gratuita, y un remitente visible que es una dirección personal.
+
+Lo que este spec construye es **el puente hasta entonces**: leer el buzón de
+Gmail directamente, con el mínimo de piezas, y de forma que quitarlo sea borrar
+dos ficheros y un job.
+
+### Criterio de salida
+
+Este andamio se retira cuando se cumpla cualquiera de estas condiciones:
+
+- se contrata un proveedor de correo entrante y se apuntan los MX de un dominio
+  propio;
+- el volumen se acerca al tope diario de Gmail;
+- alguien reporta que los emails de query llegan a spam.
+
+Retirarlo es: configurar el webhook del proveedor y su
+`INBOUND_EMAIL_WEBHOOK_SECRET`, borrar `src/lib/mailbox.ts`,
+`src/services/email-ingest.service.ts` y `src/routes/internal/email-poll.ts`,
+borrar el job de Cloud Scheduler, y devolver `REPLY_LOCAL_PART` y `REPLY_DOMAIN`
+a los valores del dominio propio. El resto del sistema no se entera, porque ambos
+caminos entran por la misma función.
+
+Escrito aquí para que dentro de seis meses no se haya vuelto permanente por
+inercia, que es como acaban casi todos los andamios.
+
 ## Decisiones tomadas
 
 **Una sola cuenta, `agentdialog.app@gmail.com`, para enviar y recibir.** Separa el
@@ -32,15 +72,26 @@ producto del correo personal, que hoy es el remitente visible.
 `Reply-To` pasa a ser `agentdialog.app+{queryId}@gmail.com` y **no hace falta
 tocar el DNS ni verificar dominios**.
 
-**Sondeo programado, no Pub/Sub.** Gmail puede notificar por Pub/Sub, pero lo que
-envía es un aviso con un `historyId`, no el mensaje: obliga a mantener un cursor
-persistente, a manejar el caso de que el cursor caduque, a deduplicar reintentos
-y a renovar el `watch` cada 7 días o deja de notificar en silencio. El sondeo no
-necesita nada de eso: el estado vive en Gmail, leído o no leído. A cambio, un
-minuto de latencia en un flujo donde el humano tarda minutos u horas.
+**IMAP con App Password, no la Gmail API con OAuth.** La API obligaría a habilitar
+servicios en GCP, crear un cliente OAuth, dar de alta test users y hacer un
+consentimiento — y su refresh token **caduca a los 7 días** mientras la app esté
+en modo *Testing*. Salir de ahí exige publicar la app, y `gmail.modify` es un
+scope restringido, lo que en la práctica significa pasar la verificación de
+Google. Desproporcionado para un puente.
 
-La ingesta queda aislada detrás de una función para que migrar a Pub/Sub más
-adelante sea escribir un disparador distinto, no reescribir el procesamiento.
+Una App Password es un único valor, no caduca, y no requiere ninguna
+configuración en GCP. Es además la misma clase de credencial que ya usa el envío:
+`SMTP_PASS` es exactamente eso. Se envía por SMTP y se lee por IMAP, con
+simetría.
+
+Lo que se acepta a cambio: dos dependencias nuevas, y que Google lleva años
+estrechando el cerco a las App Passwords. Hoy funcionan con 2FA activo, que la
+cuenta tiene.
+
+**Sondeo programado.** Cloud Scheduler llama a un endpoint cada cinco minutos. Un
+humano tarda minutos u horas en responder, así que la latencia es irrelevante, y
+cinco minutos en vez de uno reduce a una quinta parte tanto las conexiones IMAP
+como la exposición del endpoint.
 
 **Rechazar respuestas de un remitente que no es el destinatario.** Hoy
 `email-response.service.ts` registra la respuesta igualmente y solo deja un
@@ -52,35 +103,35 @@ dirigida a otra persona.
 ## Arquitectura
 
 ```
-Cloud Scheduler ──cada minuto──► POST /api/v1/internal/email/poll
-                                          │  (secreto en cabecera)
-                                          ▼
-                            ingestPendingReplies()
-                                          │
-                          ┌───────────────┴───────────────┐
-                          ▼                               ▼
-                  GmailClient                    processEmailReply()
-              (REST de Gmail, fetch)              (ya existe, sin cambios
-               list / get / markRead               salvo el remitente)
+Cloud Scheduler ──cada 5 min──► POST /api/v1/internal/email/poll
+                                         │  (secreto en cabecera)
+                                         ▼
+                              ingestPendingReplies()
+                                         │  (bajo cerrojo en Redis)
+                         ┌───────────────┴───────────────┐
+                         ▼                               ▼
+                  MailboxClient                 processEmailReply()
+                 (IMAP, imapflow)                (ya existe; solo cambia
+              list / fetch / markRead             la comprobación de remitente)
 ```
 
-### Piezas
+### Piezas nuevas
 
-**`src/lib/gmail.ts`** — cliente contra la API REST de Gmail con `fetch`, sin el
-SDK de Google. Cuatro operaciones: canjear el refresh token por un access token,
-listar mensajes sin leer, descargar uno, marcarlo como leído. Se define como
-interfaz para poder inyectar un doble en los tests.
+**`src/lib/mailbox.ts`** — interfaz `MailboxClient` y su implementación IMAP con
+`imapflow`, más `mailparser` para extraer del mensaje crudo el destinatario, el
+remitente y el cuerpo en texto plano. Tres operaciones: listar los no leídos,
+descargar uno, marcarlo como leído. Se llama `MailboxClient` y no `GmailClient`
+porque nada de lo que hace es específico de Gmail.
 
 **`src/services/email-ingest.service.ts`** — `ingestPendingReplies(client)`:
-recorre los mensajes sin leer, extrae de cada uno el `queryId`, el remitente y el
-texto, llama a `processEmailReply` y marca como leído. Devuelve un recuento por
-resultado. **Esta función es la costura**: el disparador de Pub/Sub del futuro
-llamará a `processEmailReply` igual, con un mensaje concreto en vez de una lista.
+recorre los no leídos, extrae de cada uno el `queryId`, el remitente y el texto,
+llama a `processEmailReply` y marca como leído. Devuelve un recuento por
+resultado.
 
 **`src/routes/internal/email-poll.ts`** — `POST /api/v1/internal/email/poll`,
 autenticado con un secreto compartido en cabecera comparado en tiempo constante.
-Devuelve el recuento. Cloud Scheduler no puede firmar como un proveedor de
-correo, así que un secreto compartido es lo que hay.
+Cloud Scheduler no puede firmar como un proveedor de correo, así que un secreto
+compartido es lo que hay.
 
 ### Cambios en lo que ya existe
 
@@ -90,11 +141,11 @@ correo, así que un secreto compartido es lo que hay.
 `agentdialog.app` y `gmail.com`. El día que exista un dominio propio se cambian
 dos variables, no código.
 
-**`src/routes/webhooks/email-inbound.ts`** — `extractQueryId` pasa de
-`/reply\+([^@]+)@/` a `/\+([^@]+)@/`, que sirve para ambos formatos. Con el regex
-actual una dirección de Gmail devolvería `null` y la respuesta se descartaría en
-silencio. La función se mueve a un módulo compartido, porque ahora la usan dos
-caminos.
+**`extractQueryId`** pasa de `/reply\+([^@]+)@/` a `/\+([^@]+)@/`, que sirve para
+ambos formatos. Con el regex actual una dirección de Gmail devolvería `null` y la
+respuesta se descartaría en silencio. Se mueve de
+`src/routes/webhooks/email-inbound.ts` a un módulo compartido, porque ahora la
+usan dos caminos.
 
 **`src/services/email-response.service.ts`** — la comprobación de remitente pasa
 de permisiva a estricta: si no coincide, devuelve `{ sender_mismatch: true }` sin
@@ -103,13 +154,19 @@ tocar la query.
 El aviso al remitente lo envía **el llamante**, no este servicio: aquí vive la
 lógica de dominio y enviar correo es un efecto que corresponde a la capa de
 arriba. En la práctica el único llamante que lo envía es la ingesta; el webhook
-de proveedor se limita a devolver el resultado, y hoy nadie lo invoca.
+de proveedor se limita a devolver el resultado.
 
 **`src/env.ts`** — variables nuevas: `REPLY_LOCAL_PART` (por defecto `reply`, para
-no romper el comportamiento actual), `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`,
-`GMAIL_REFRESH_TOKEN`, `INTERNAL_POLL_SECRET`. Las de Gmail son opcionales: sin
-ellas la ingesta no se activa y el endpoint responde 503, igual que el webhook
-entrante hace ahora sin su secreto.
+no cambiar el comportamiento actual), `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`,
+`IMAP_PASSWORD`, `INTERNAL_POLL_SECRET`. Las de IMAP son opcionales: sin ellas la
+ingesta no se activa y el endpoint responde 503, igual que hace el webhook
+entrante sin su secreto.
+
+### Dependencias nuevas
+
+`imapflow` y `mailparser`, ambas del autor de `nodemailer`, que el proyecto ya
+usa para enviar. `node-imap`, la alternativa obvia, lleva sin actualizarse desde
+2020.
 
 ## Manejo de errores
 
@@ -117,6 +174,11 @@ entrante hace ahora sin su secreto.
 la query ya tiene respuesta, así que procesar bien un mensaje y fallar al
 marcarlo como leído no causa daño: la siguiente pasada lo reprocesa y no pasa
 nada.
+
+**Sondeos solapados.** Si una pasada tarda más que el intervalo, la siguiente
+podría leer los mismos mensajes. Un cerrojo en Redis —que ya está en la
+infraestructura— evita el trabajo duplicado y, más importante, evita abrir
+conexiones IMAP de más: Gmail corta alrededor de 15 simultáneas.
 
 **Correo que no es una respuesta.** Solo se procesan los mensajes cuyo
 destinatario encaja con `+{uuid}@`. El resto **no se toca ni se marca como
@@ -131,19 +193,19 @@ tratamiento depende del tipo de fallo:
 | La query no existe | marcar leído |
 | La query ya estaba respondida o expiró | marcar leído |
 | El remitente no coincide | marcar leído y avisar al remitente |
-| La base de datos no responde | **dejar sin leer**, se reintenta al minuto |
+| La base de datos no responde | **dejar sin leer**, se reintenta en 5 minutos |
+| La conexión IMAP falla | abortar la pasada entera, sin marcar nada |
 
-Confundir las dos categorías da o un bucle infinito cada minuto, o una respuesta
-perdida para siempre.
+Confundir las dos primeras categorías da o un bucle cada cinco minutos, o una
+respuesta perdida para siempre.
 
-**Cuota de Gmail.** Una cuenta gratuita ronda los 500 envíos diarios. El sondeo
-solo lee, que consume unidades distintas y muy inferiores, pero los avisos de
-remitente incorrecto sí cuentan como envío.
+**Cuota de Gmail.** El sondeo solo lee, que no consume cuota de envío. Los avisos
+de remitente incorrecto sí, pero son excepcionales por definición.
 
 ## Pruebas
 
-El cliente de Gmail se inyecta, así que la ingesta se prueba entera con un doble,
-sin red y sin credenciales:
+`MailboxClient` es una interfaz, así que la ingesta se prueba entera con un
+doble, sin red y sin credenciales:
 
 - mensaje válido → procesado y marcado como leído
 - mensaje sin `queryId` extraíble → marcado como leído, no procesado
@@ -152,54 +214,49 @@ sin red y sin credenciales:
 - fallo transitorio de base de datos → **no** marcado como leído
 - mensaje ya procesado → `already_answered`, sin efectos
 - correo ajeno en el buzón → ignorado y sin marcar
+- una segunda pasada concurrente → no hace nada, el cerrojo la descarta
 
 Más unitarios de la extracción del `queryId` con ambos formatos de dirección, y
 un test de integración de que el endpoint rechaza sin el secreto.
 
+No hay test contra un servidor IMAP real. La implementación de `imapflow` se
+verifica a mano una vez, contra el buzón, durante la puesta en marcha.
+
 ## Lo que hay que configurar fuera del código
 
-Ninguno de estos pasos lo puede hacer el código. Van en este orden.
+Mucho más corto que con OAuth. Nada de esto toca GCP salvo el último paso.
 
-1. **Habilitar la Gmail API** en el proyecto `agentdialog`.
-2. **Crear un cliente OAuth** de tipo Desktop en ese proyecto.
-3. **Añadir `agentdialog.app@gmail.com` como test user** en la pantalla de
-   consentimiento. Sin esto el consentimiento falla con un error poco
-   descriptivo, y es el paso que más se olvida.
-4. **Dar el consentimiento** con la cuenta `agentdialog.app@gmail.com` y guardar
-   el refresh token. Scope `gmail.modify`, no `readonly`: hay que marcar como
-   leído.
-5. **Configurar en Cloud Run** `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`,
-   `GMAIL_REFRESH_TOKEN`, `INTERNAL_POLL_SECRET`, `REPLY_LOCAL_PART=agentdialog.app`
-   y `REPLY_DOMAIN=gmail.com`, con `--update-env-vars` — nunca `--set-env-vars`,
+1. **Comprobar que IMAP está habilitado** en la cuenta `agentdialog.app@gmail.com`
+   — Configuración → Reenvío y correo POP/IMAP.
+2. **Generar una App Password** para esa cuenta. Requiere 2FA activo, que ya lo
+   está.
+3. **Configurar en Cloud Run** `IMAP_HOST=imap.gmail.com`, `IMAP_PORT=993`,
+   `IMAP_USER=agentdialog.app@gmail.com`, `IMAP_PASSWORD`,
+   `INTERNAL_POLL_SECRET`, `REPLY_LOCAL_PART=agentdialog.app` y
+   `REPLY_DOMAIN=gmail.com`, con `--update-env-vars` — nunca `--set-env-vars`,
    que borraría las 19 existentes.
-6. **Crear el job de Cloud Scheduler**, cada minuto, con el secreto en cabecera.
+4. **Crear el job de Cloud Scheduler**, cada cinco minutos, con el secreto en
+   cabecera.
 
-El proyecto de GCP pertenece a una cuenta distinta de la del buzón. No es un
-obstáculo: el cliente OAuth vive en el proyecto y el consentimiento lo da la
-cuenta del buzón. Solo el paso 4 requiere la segunda cuenta.
-
-**Aviso sobre el refresh token:** con la app OAuth en modo *Testing*, el token
-caduca a los 7 días. Para que dure hay que publicarla, lo que con un scope
-sensible de Gmail normalmente implica verificación de Google. Con un único
-usuario que además es el dueño se puede publicar sin verificar, a cambio de que
-la pantalla de consentimiento avise de que la app no está verificada. Es feo una
-vez y funcional después.
+La `IMAP_PASSWORD` debería ir en Secret Manager y referenciarse como ya hace
+`SMTP_PASS`, no como variable plana.
 
 ## Criterios de aceptación
 
 1. Un agente crea una query; el humano responde desde su correo y el agente ve la
-   respuesta en `getQuery` en menos de dos minutos.
+   respuesta en `getQuery` en menos de seis minutos.
 2. Una respuesta desde una dirección distinta del destinatario no modifica la
    query, y el remitente recibe un aviso.
 3. Correo ajeno en el buzón no se procesa ni se marca como leído.
 4. Un fallo de base de datos no pierde la respuesta: se reintenta y entra.
 5. El endpoint de sondeo rechaza peticiones sin el secreto.
-6. Sin credenciales de Gmail configuradas, el endpoint responde 503 y nada más
-   del sistema cambia de comportamiento.
+6. Sin credenciales de IMAP configuradas, el endpoint responde 503 y nada más del
+   sistema cambia de comportamiento.
 
 ## Fuera de alcance
 
-- Migrar a Pub/Sub. El diseño lo deja preparado; hacerlo es otro trabajo.
-- Un dominio de correo propio con SPF y DKIM alineados. Es lo correcto a medio
-  plazo para la entregabilidad, y no bloquea esto.
+- Un dominio de correo propio con un proveedor transaccional. Es el destino, no
+  este trabajo, y está descrito arriba como criterio de salida.
 - Adjuntos en las respuestas. Solo se procesa el texto.
+- Notificaciones push por Pub/Sub. Con el sondeo funcionando y un andamio que se
+  va a retirar, no tiene sentido.
