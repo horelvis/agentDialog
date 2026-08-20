@@ -13,6 +13,11 @@ jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
+    # SDK releases (tag sdk-v*, cut via publish-sdk.yml's own tag trigger)
+    # must not deploy the API or run production migrations. Without this
+    # guard, publishing @agentdialog/sdk through a GitHub release fires
+    # this workflow too, since it triggers on every published release.
+    if: ${{ !startsWith(github.event.release.tag_name, 'sdk-v') }}
     permissions:
       contents: read
       id-token: write
