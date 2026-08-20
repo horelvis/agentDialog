@@ -1,0 +1,55 @@
+name: Publish SDK to npm
+
+on:
+  push:
+    tags:
+      - "sdk-v*"
+
+jobs:
+  publish:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test
+        run: bun test tests/unit
+
+      - name: Install SDK dependencies
+        working-directory: sdks/typescript
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck SDK
+        working-directory: sdks/typescript
+        run: bunx tsc --noEmit
+
+      - name: Test SDK
+        working-directory: sdks/typescript
+        run: bun test
+
+      - name: Build SDK
+        working-directory: sdks/typescript
+        run: bun run build
+
+      - name: Publish
+        working-directory: sdks/typescript
+        run: npm publish --provenance --access public
