@@ -13,3 +13,5 @@ coverage/
 # Build artifacts
 .next/
 *.tsbuildinfo
+MARKETING-AUDIT.md
+docs-site/out/
