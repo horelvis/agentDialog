@@ -42,3 +42,13 @@ export type {
   Webhook,
   WebhookWithSecret,
 } from "./types.js";
+
+export type {
+  CreateQueryInput,
+  CreatedQuery,
+  ListQueriesParams,
+  Query,
+  QueryStatus,
+  QuerySummary,
+  QueryType,
+} from "./queries.js";

@@ -28,8 +28,24 @@ import type {
   Webhook,
   WebhookWithSecret,
 } from "./types.js";
+import {
+  toCreateQueryBody,
+  fromCreatedQueryWire,
+  fromQueryWire,
+  fromQuerySummaryWire,
+} from "./queries.js";
+import type {
+  CreateQueryInput,
+  CreatedQuery,
+  CreatedQueryWire,
+  ListQueriesParams,
+  Query,
+  QuerySummary,
+  QuerySummaryWire,
+  QueryWire,
+} from "./queries.js";
 
-const DEFAULT_BASE_URL = "https://agentdialog.com";
+const DEFAULT_BASE_URL = "https://api.agentdialog.io";
 const MAX_RETRIES = 3;
 
 export class AgentDialog {
@@ -180,6 +196,32 @@ export class AgentDialog {
 
   async deleteWebhook(id: string): Promise<Webhook> {
     return this.request<Webhook>("DELETE", `/agent/webhooks/${id}`);
+  }
+
+  // ── Human queries ──
+
+  /** Ask a human a question. Returns immediately; the human answers by email. */
+  async createQuery(input: CreateQueryInput): Promise<CreatedQuery> {
+    const wire = await this.request<CreatedQueryWire>(
+      "POST",
+      "/agent/queries",
+      toCreateQueryBody(input),
+    );
+    return fromCreatedQueryWire(wire);
+  }
+
+  /** Read a query's current status and, once answered, the human's answer. */
+  async getQuery(queryId: string): Promise<Query> {
+    const wire = await this.request<QueryWire>("GET", `/agent/queries/${queryId}`);
+    return fromQueryWire(wire);
+  }
+
+  async listQueries(params?: ListQueriesParams): Promise<QuerySummary[]> {
+    const wire = await this.request<QuerySummaryWire[]>(
+      "GET",
+      `/agent/queries${buildQuery(params as Record<string, unknown> | undefined)}`,
+    );
+    return wire.map(fromQuerySummaryWire);
   }
 
   // ── Internal ──
