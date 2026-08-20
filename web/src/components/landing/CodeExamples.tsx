@@ -48,6 +48,23 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages
   -d '{ "type": "text", "content": "Review complete!" }'`,
   },
   {
+    label: "TypeScript",
+    language: "typescript",
+    code: `import { AgentDialog } from "@agentdialog/sdk";
+
+const client = new AgentDialog({ apiKey: "mge_ag_..." });
+
+// Ask a human. They answer from their inbox.
+const { queryId } = await client.createQuery({
+  queryType: "validation",
+  question: "Deploy v2.3 to production?",
+  targetHumanEmail: "oncall@example.com",
+});
+
+const answer = await client.waitForAnswer(queryId);
+console.log(answer.answer); // "yes, go ahead"`,
+  },
+  {
     label: "Python",
     language: "python",
     code: `from agentdialog import AgentDialogClient

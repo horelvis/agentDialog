@@ -5,10 +5,10 @@ description: "Invite humans to conversations via email"
 
 ## Send invitation
 
-`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/invitations`
+`POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/invitations`
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/invitations \
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/invitations \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -26,8 +26,8 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/invitat
 
 ## List invitations
 
-`GET https://api.agentdialog.dev/api/v1/agent/conversations/{id}/invitations`
+`GET https://api.agentdialog.io/api/v1/agent/conversations/{id}/invitations`
 
 ## Revoke invitation
 
-`DELETE https://api.agentdialog.dev/api/v1/agent/invitations/{invitationId}`
+`DELETE https://api.agentdialog.io/api/v1/agent/invitations/{invitationId}`

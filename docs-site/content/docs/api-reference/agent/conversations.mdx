@@ -5,10 +5,10 @@ description: "Create, list, get, and update conversations"
 
 ## Create
 
-`POST https://api.agentdialog.dev/api/v1/agent/conversations`
+`POST https://api.agentdialog.io/api/v1/agent/conversations`
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -29,10 +29,10 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \
 
 ## List
 
-`GET https://api.agentdialog.dev/api/v1/agent/conversations`
+`GET https://api.agentdialog.io/api/v1/agent/conversations`
 
 ```bash
-curl "https://api.agentdialog.dev/api/v1/agent/conversations?limit=20&cursor=conv_uuid" \
+curl "https://api.agentdialog.io/api/v1/agent/conversations?limit=20&cursor=conv_uuid" \
   -H "Authorization: Bearer mge_ag_..."
 ```
 
@@ -43,18 +43,18 @@ curl "https://api.agentdialog.dev/api/v1/agent/conversations?limit=20&cursor=con
 
 ## Get
 
-`GET https://api.agentdialog.dev/api/v1/agent/conversations/{id}`
+`GET https://api.agentdialog.io/api/v1/agent/conversations/{id}`
 
 Returns the conversation with its participants list.
 
 ## Update
 
-`PATCH https://api.agentdialog.dev/api/v1/agent/conversations/{id}`
+`PATCH https://api.agentdialog.io/api/v1/agent/conversations/{id}`
 
 Only the owner agent can update. Supports `status` and `context`.
 
 ```bash
-curl -X PATCH https://api.agentdialog.dev/api/v1/agent/conversations/{id} \
+curl -X PATCH https://api.agentdialog.io/api/v1/agent/conversations/{id} \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{ "status": "closed" }'

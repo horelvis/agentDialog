@@ -5,75 +5,184 @@ description: Reference SDK for TypeScript/Node.js
 
 import { Callout } from "fumadocs-ui/components/callout";
 
-<Callout type="info">Reference implementation. Install from npm when available, or copy the patterns below.</Callout>
+The official TypeScript SDK: zero dependencies, native `fetch()`, camelCase
+everywhere. It wraps the [REST API](/docs/api-reference/agent/register) so
+you don't hand-write `fetch` calls or juggle `snake_case` field names.
 
-## Quick example
+## Install
+
+```bash
+npm install @agentdialog/sdk
+```
+
+## Initialize
 
 ```typescript
-import { AgentDialogClient } from "agentdialog";
+import { AgentDialog } from "@agentdialog/sdk";
 
-const agent = new AgentDialogClient("mge_ag_...");
+const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+```
 
-const { data: conv } = await agent.createConversation({
-  title: "Deploy v2.0 → Production",
-  intentType: "permission",
+`apiKey` looks like `mge_ag_...`. Get one by registering an agent — see the
+[quickstart](/docs/quickstart) — or with `AgentDialog.register()`:
+
+```typescript
+const { agent } = await AgentDialog.register({
+  slug: "my-bot",
+  displayName: "My Bot",
+  capabilities: ["text", "tool_use"],
+});
+console.log("API key:", agent.apiKey); // Store securely — shown once
+```
+
+## Ask a human a question
+
+This is the core of the SDK: `createQuery` sends the question by email and
+returns immediately, and `waitForAnswer` polls until the human replies (or
+the query expires). See [Human queries](/docs/concepts/queries) for how the
+flow works end to end.
+
+```typescript
+import { AgentDialog } from "@agentdialog/sdk";
+
+const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+
+const { queryId } = await client.createQuery({
+  queryType: "validation",
+  question: "Deploy v2.3 to production?",
+  context: "12 commits since the last release. All checks green.",
+  targetHumanEmail: "oncall@example.com",
+  timeoutMinutes: 120,
 });
 
-await agent.inviteHuman(conv.id, "dev@company.com");
+const answer = await client.waitForAnswer(queryId);
+console.log(answer.status, answer.answer);
+```
 
-await agent.sendMessage(conv.id, {
-  type: "approval",
-  content: "Ready to deploy. Approve?",
-  structuredData: {
-    approvalId: "deploy-v2",
-    action: "deploy-to-production",
-    riskLevel: "high",
+`waitForAnswer` resolves once the query is `answered` or `expired` — it never
+throws for those. It only throws `QueryTimeoutError` if you pass your own
+`timeoutMs` and that budget runs out first:
+
+```typescript
+await client.waitForAnswer(queryId, {
+  pollIntervalMs: 5_000,   // start polling every 5s
+  maxPollIntervalMs: 30_000, // back off up to 30s between polls
+  timeoutMs: 60_000,       // give up after 1 minute, regardless of the query's own expiry
+});
+```
+
+If you'd rather manage the poll loop yourself, use `getQuery` and `listQueries`:
+
+```typescript
+const query = await client.getQuery(queryId);
+if (query.status === "answered") console.log(query.answer);
+
+const pending = await client.listQueries({ status: "pending", limit: 20 });
+```
+
+## Framework adapters
+
+The SDK ships tool adapters so an LLM can ask a human directly, without you
+wiring up `createQuery`/`getQuery` calls by hand. Both adapters expose the
+same two tools: `ask_human` (calls `createQuery`) and `check_answer` (calls
+`getQuery`) — the model creates a query, then checks back on it in a later
+turn.
+
+### Vercel AI SDK
+
+```bash
+npm install @agentdialog/sdk ai
+```
+
+```typescript
+import { AgentDialog } from "@agentdialog/sdk";
+import { askHumanTool, checkAnswerTool } from "@agentdialog/sdk/ai";
+import { generateText } from "ai";
+
+const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+
+await generateText({
+  model,
+  tools: {
+    ask_human: askHumanTool(client, { defaultEmail: "oncall@example.com" }),
+    check_answer: checkAnswerTool(client),
   },
+  prompt: "Check with the on-call engineer whether we can deploy.",
 });
+```
 
-agent.on("message.new", (msg) => {
-  if (msg.type === "approval_response") {
-    console.log(`Decision: ${msg.structuredData.decision}`);
+### LangChain.js
+
+```bash
+npm install @agentdialog/sdk @langchain/core
+```
+
+```typescript
+import { AgentDialog } from "@agentdialog/sdk";
+import { askHumanTool, checkAnswerTool } from "@agentdialog/sdk/langchain";
+
+const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+
+const tools = [
+  askHumanTool(client, { defaultEmail: "oncall@example.com" }),
+  checkAnswerTool(client),
+];
+// Pass `tools` to your LangChain agent executor as usual.
+```
+
+Both `askHumanTool` and `checkAnswerTool` take the same options:
+
+| Option | Type | Description |
+|--------|------|--------------|
+| `defaultEmail` | string | Used when the model's tool call doesn't include `targetHumanEmail` |
+| `timeoutMinutes` | number | Passed through to `createQuery` |
+
+<Callout type="info">`ask_human` does not wait for the answer — it returns a `queryId` immediately. The model needs to call `check_answer` again, usually on a later turn, once enough time has passed.</Callout>
+
+## Beyond queries
+
+The client also covers the rest of the API: conversations, messages,
+invitations, webhooks, and profile management.
+
+| Method | Description |
+|--------|--------------|
+| `createConversation(input)` | Create a conversation |
+| `listConversations(params?)` / `listAllConversations(params?)` | List conversations (paginated / auto-paginated) |
+| `sendMessage(conversationId, input)` | Send a message |
+| `listMessages(conversationId, params?)` / `listAllMessages(conversationId, params?)` | List messages (paginated / auto-paginated) |
+| `inviteHuman(conversationId, input)` | Invite a human to a conversation |
+| `createWebhook(input)` / `listWebhooks()` | Register and list webhooks |
+| `getProfile()` / `updateProfile(input)` | Read and update the agent's profile |
+| `rotateApiKey()` | Rotate the API key |
+
+See the [API reference](/docs/api-reference/agent/register) for the
+underlying endpoints.
+
+## Errors
+
+Every error thrown by the client extends `AgentDialogError` and carries a
+`status` and `code`.
+
+```typescript
+import { AgentDialog, RateLimitError, NotFoundError } from "@agentdialog/sdk";
+
+try {
+  await client.getQuery("nonexistent");
+} catch (err) {
+  if (err instanceof NotFoundError) {
+    console.log("Not found");
+  } else if (err instanceof RateLimitError) {
+    console.log(`Retry after ${err.retryAfter}s`);
   }
-});
-```
-
-## Using fetch directly
-
-```typescript
-const BASE = "https://api.agentdialog.dev/api/v1";
-const API_KEY = process.env.AGENTDIALOG_API_KEY!;
-
-async function agentFetch(path: string, options: RequestInit = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-  return res.json();
 }
-
-const conv = await agentFetch("/agent/conversations", {
-  method: "POST",
-  body: JSON.stringify({ title: "Code Review", intentType: "clarification" }),
-});
 ```
 
-## WebSocket
-
-```typescript
-const ws = new WebSocket(`wss://api.agentdialog.dev/ws?token=${API_KEY}`);
-
-ws.onopen = () => {
-  ws.send(JSON.stringify({ type: "subscribe", conversationId: conv.data.id }));
-};
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.type === "message.new") console.log("New:", data.message);
-};
-```
+| Error | Status | Description |
+|-------|--------|--------------|
+| `AuthenticationError` | 401 | Invalid or missing API key |
+| `ForbiddenError` | 403 | Not authorized for this resource |
+| `NotFoundError` | 404 | Resource not found |
+| `ValidationError` | 422 | Invalid input (check `.details`) |
+| `RateLimitError` | 429 | Rate limited (auto-retried up to 3 times) |
+| `ServerError` | 500 | Server error |
+| `QueryTimeoutError` | 408 | `waitForAnswer`'s own `timeoutMs` elapsed before the query was answered or expired |

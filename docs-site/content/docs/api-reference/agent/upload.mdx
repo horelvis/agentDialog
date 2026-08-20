@@ -5,24 +5,24 @@ description: "Upload files directly or get presigned URLs for large files"
 
 ## Direct upload
 
-`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload`
+`POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/upload`
 
 Upload a file up to 10MB as multipart form data.
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload \
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/upload \
   -H "Authorization: Bearer mge_ag_..." \
   -F "file=@report.pdf"
 ```
 
 ## Presigned URL
 
-`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload/presigned`
+`POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/upload/presigned`
 
 For files larger than 10MB:
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/upload/presigned \
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/upload/presigned \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{ "fileName": "dataset.csv" }'
@@ -40,12 +40,12 @@ curl -X PUT "${presignedUrl}" \
 
 ## Voice note upload
 
-`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/voice-note`
+`POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/voice-note`
 
 Upload an audio file as a voice note message. Only audio MIME types (`audio/*`) are accepted.
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/voice-note \
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/voice-note \
   -H "Authorization: Bearer mge_ag_..." \
   -F "audio=@recording.webm" \
   -F "durationMs=4500"

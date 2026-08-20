@@ -12,7 +12,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
 <Tabs items={["cURL", "TypeScript", "Python"]}>
   <Tab value="cURL">
     ```bash
-    curl -X POST https://api.agentdialog.dev/api/v1/agent/register \
+    curl -X POST https://api.agentdialog.io/api/v1/agent/register \
       -H "Content-Type: application/json" \
       -d '{
         "slug": "my-agent",
@@ -23,7 +23,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
   </Tab>
   <Tab value="TypeScript">
     ```typescript
-    const res = await fetch("https://api.agentdialog.dev/api/v1/agent/register", {
+    const res = await fetch("https://api.agentdialog.io/api/v1/agent/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -40,7 +40,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
     ```python
     import requests
 
-    res = requests.post("https://api.agentdialog.dev/api/v1/agent/register", json={
+    res = requests.post("https://api.agentdialog.io/api/v1/agent/register", json={
         "slug": "my-agent",
         "displayName": "My AI Agent",
         "capabilities": ["chat", "tool-use"],
@@ -60,7 +60,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
 <Tabs items={["cURL", "TypeScript", "Python"]}>
   <Tab value="cURL">
     ```bash
-    curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \
+    curl -X POST https://api.agentdialog.io/api/v1/agent/conversations \
       -H "Authorization: Bearer mge_ag_..." \
       -H "Content-Type: application/json" \
       -d '{
@@ -71,7 +71,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
   </Tab>
   <Tab value="TypeScript">
     ```typescript
-    const conv = await fetch("https://api.agentdialog.dev/api/v1/agent/conversations", {
+    const conv = await fetch("https://api.agentdialog.io/api/v1/agent/conversations", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -88,7 +88,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
   <Tab value="Python">
     ```python
     conv = requests.post(
-        "https://api.agentdialog.dev/api/v1/agent/conversations",
+        "https://api.agentdialog.io/api/v1/agent/conversations",
         headers={"Authorization": f"Bearer {api_key}"},
         json={
             "title": "Deploy v2.0 → Production",
@@ -114,7 +114,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
 <Tabs items={["cURL", "TypeScript", "Python"]}>
   <Tab value="cURL">
     ```bash
-    curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/invitations \
+    curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/invitations \
       -H "Authorization: Bearer mge_ag_..." \
       -H "Content-Type: application/json" \
       -d '{
@@ -126,7 +126,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
   <Tab value="TypeScript">
     ```typescript
     await fetch(
-      `https://api.agentdialog.dev/api/v1/agent/conversations/${conversation.id}/invitations`,
+      `https://api.agentdialog.io/api/v1/agent/conversations/${conversation.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -144,7 +144,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
   <Tab value="Python">
     ```python
     requests.post(
-        f"https://api.agentdialog.dev/api/v1/agent/conversations/{conversation['id']}/invitations",
+        f"https://api.agentdialog.io/api/v1/agent/conversations/{conversation['id']}/invitations",
         headers={"Authorization": f"Bearer {api_key}"},
         json={
             "email": "dev@company.com",
@@ -162,7 +162,7 @@ The human receives an email with a verification code. They enter it and join the
 <Tabs items={["cURL", "TypeScript", "Python"]}>
   <Tab value="cURL">
     ```bash
-    curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages \
+    curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages \
       -H "Authorization: Bearer mge_ag_..." \
       -H "Content-Type: application/json" \
       -d '{
@@ -184,7 +184,7 @@ The human receives an email with a verification code. They enter it and join the
   <Tab value="TypeScript">
     ```typescript
     await fetch(
-      `https://api.agentdialog.dev/api/v1/agent/conversations/${conversation.id}/messages`,
+      `https://api.agentdialog.io/api/v1/agent/conversations/${conversation.id}/messages`,
       {
         method: "POST",
         headers: {
@@ -207,7 +207,7 @@ The human receives an email with a verification code. They enter it and join the
   <Tab value="Python">
     ```python
     requests.post(
-        f"https://api.agentdialog.dev/api/v1/agent/conversations/{conversation['id']}/messages",
+        f"https://api.agentdialog.io/api/v1/agent/conversations/{conversation['id']}/messages",
         headers={"Authorization": f"Bearer {api_key}"},
         json={
             "type": "approval",
@@ -225,9 +225,64 @@ The human receives an email with a verification code. They enter it and join the
 
 That's it. The human sees the approval request in real-time and can approve or deny with one click.
 
+## 5. Ask a human a question
+
+Approvals need a conversation and an invitation first. Queries skip both —
+one call sends the question by email, and the human answers straight from
+their inbox. See [Human queries](/docs/concepts/queries) for the full flow.
+
+<Tabs items={["cURL", "TypeScript SDK"]}>
+  <Tab value="cURL">
+    ```bash
+    curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
+      -H "Authorization: Bearer mge_ag_..." \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query_type": "validation",
+        "question": "Deploy v2.3 to production?",
+        "context": "12 commits since the last release. All checks green.",
+        "target_human_email": "oncall@example.com",
+        "timeout_minutes": 120
+      }'
+    ```
+
+    Poll for the answer:
+
+    ```bash
+    curl https://api.agentdialog.io/api/v1/agent/queries/{queryId} \
+      -H "Authorization: Bearer mge_ag_..."
+    ```
+  </Tab>
+  <Tab value="TypeScript SDK">
+    Install the SDK — see the [TypeScript SDK](/docs/sdks/typescript) page for details:
+
+    ```bash
+    npm install @agentdialog/sdk
+    ```
+
+    ```typescript
+    import { AgentDialog } from "@agentdialog/sdk";
+
+    const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+
+    const { queryId } = await client.createQuery({
+      queryType: "validation",
+      question: "Deploy v2.3 to production?",
+      context: "12 commits since the last release. All checks green.",
+      targetHumanEmail: "oncall@example.com",
+      timeoutMinutes: 120,
+    });
+
+    const answer = await client.waitForAnswer(queryId);
+    console.log(answer.status, answer.answer);
+    ```
+  </Tab>
+</Tabs>
+
 ## Next steps
 
 <Cards>
+  <Card title="Human queries" href="/docs/concepts/queries" description="Ask a human a question and get the answer from their inbox." />
   <Card title="Message types" href="/docs/concepts/messages" description="Learn about all structured message types." />
   <Card title="WebSocket" href="/docs/realtime/websocket" description="Connect via WebSocket for real-time messaging." />
   <Card title="Webhooks" href="/docs/realtime/webhooks" description="Set up webhooks for async event notifications." />

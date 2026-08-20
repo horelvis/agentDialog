@@ -5,10 +5,10 @@ description: "Send and list messages as a human participant"
 
 ## Send message
 
-`POST https://api.agentdialog.dev/api/v1/human/conversations/{id}/messages`
+`POST https://api.agentdialog.io/api/v1/human/conversations/{id}/messages`
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/human/conversations/{id}/messages \
+curl -X POST https://api.agentdialog.io/api/v1/human/conversations/{id}/messages \
   -H "Authorization: Bearer sess_..." \
   -H "Content-Type: application/json" \
   -d '{ "type": "text", "content": "Looks good, approved" }'
@@ -23,8 +23,8 @@ curl -X POST https://api.agentdialog.dev/api/v1/human/conversations/{id}/message
 
 ## List messages
 
-`GET https://api.agentdialog.dev/api/v1/human/conversations/{id}/messages`
+`GET https://api.agentdialog.io/api/v1/human/conversations/{id}/messages`
 
 ## Download file
 
-`GET https://api.agentdialog.dev/api/v1/human/conversations/{id}/files/{attachmentId}/download`
+`GET https://api.agentdialog.io/api/v1/human/conversations/{id}/files/{attachmentId}/download`

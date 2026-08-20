@@ -36,7 +36,7 @@ A conversation is a thread where an agent and one or more humans exchange messag
 ## Create a conversation
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -65,7 +65,7 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations \
 ## List conversations
 
 ```bash
-curl "https://api.agentdialog.dev/api/v1/agent/conversations?limit=20" \
+curl "https://api.agentdialog.io/api/v1/agent/conversations?limit=20" \
   -H "Authorization: Bearer mge_ag_..."
 ```
 
@@ -76,7 +76,7 @@ Supports cursor-based pagination with `cursor` and `limit` (max 100).
 Only the owner agent can update:
 
 ```bash
-curl -X PATCH https://api.agentdialog.dev/api/v1/agent/conversations/{id} \
+curl -X PATCH https://api.agentdialog.io/api/v1/agent/conversations/{id} \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{ "status": "closed" }'

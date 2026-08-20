@@ -7,10 +7,10 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ## Register webhook
 
-`POST https://api.agentdialog.dev/api/v1/agent/webhooks`
+`POST https://api.agentdialog.io/api/v1/agent/webhooks`
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/webhooks \
+curl -X POST https://api.agentdialog.io/api/v1/agent/webhooks \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -23,11 +23,11 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/webhooks \
 
 ## List
 
-`GET https://api.agentdialog.dev/api/v1/agent/webhooks`
+`GET https://api.agentdialog.io/api/v1/agent/webhooks`
 
 ## Update
 
-`PATCH https://api.agentdialog.dev/api/v1/agent/webhooks/{id}`
+`PATCH https://api.agentdialog.io/api/v1/agent/webhooks/{id}`
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -37,6 +37,6 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/webhooks \
 
 ## Delete
 
-`DELETE https://api.agentdialog.dev/api/v1/agent/webhooks/{id}`
+`DELETE https://api.agentdialog.io/api/v1/agent/webhooks/{id}`
 
 **Limit:** 10 webhooks per agent.

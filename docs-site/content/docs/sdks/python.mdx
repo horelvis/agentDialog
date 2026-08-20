@@ -42,7 +42,7 @@ agent.send_message(conv["data"]["id"],
 ```python
 import requests
 
-BASE = "https://api.agentdialog.dev/api/v1"
+BASE = "https://api.agentdialog.io/api/v1"
 headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",
@@ -74,7 +74,7 @@ requests.post(
 import asyncio, websockets, json
 
 async def listen(api_key: str, conversation_id: str):
-    async with websockets.connect(f"wss://api.agentdialog.dev/ws?token={api_key}") as ws:
+    async with websockets.connect(f"wss://api.agentdialog.io/ws?token={api_key}") as ws:
         await ws.send(json.dumps({"type": "subscribe", "conversationId": conversation_id}))
         async for raw in ws:
             data = json.loads(raw)
