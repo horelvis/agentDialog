@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { env } from "../../env";
-import { verifyResendWebhook, verifySendGridWebhook } from "../../lib/email-webhook-verify";
+import {
+  signatureRequirement,
+  verifyResendWebhook,
+  verifySendGridWebhook,
+} from "../../lib/email-webhook-verify";
 import { processEmailReply } from "../../services/email-response.service";
 
 const app = new Hono();
@@ -15,8 +19,38 @@ app.post("/inbound", async (c) => {
   const e = env();
   const rawBody = await c.req.text();
 
-  // 1. Verify webhook signature (if secret is configured)
-  if (e.INBOUND_EMAIL_WEBHOOK_SECRET) {
+  // 1. Verify webhook signature.
+  //
+  // This decides verify / skip / refuse rather than testing the secret inline,
+  // because the inline version failed OPEN: with no secret configured every
+  // unsigned request was accepted, and this endpoint records a human's answer
+  // and auto-accepts their invitation. Env validation should stop a production
+  // deploy without a secret from starting at all; this is the second lock.
+  const secret = e.INBOUND_EMAIL_WEBHOOK_SECRET;
+  const requirement = signatureRequirement(e.NODE_ENV, secret);
+
+  if (requirement === "refuse") {
+    console.error(
+      "[EMAIL-INBOUND] Refusing request: no INBOUND_EMAIL_WEBHOOK_SECRET configured in production",
+    );
+    return c.json(
+      {
+        error: {
+          code: "WEBHOOK_NOT_CONFIGURED",
+          message: "Inbound email webhook is not configured",
+        },
+      },
+      503,
+    );
+  }
+
+  if (requirement === "skip") {
+    console.warn(
+      "[EMAIL-INBOUND] No signing secret configured — signature verification skipped (non-production)",
+    );
+  }
+
+  if (secret) {
     const provider = e.INBOUND_EMAIL_PROVIDER;
     let valid = false;
 
@@ -28,17 +62,20 @@ app.post("/inbound", async (c) => {
           "svix-signature": c.req.header("svix-signature"),
         },
         rawBody,
-        e.INBOUND_EMAIL_WEBHOOK_SECRET,
+        secret,
       );
     } else if (provider === "sendgrid") {
       const headers: Record<string, string> = {};
       c.req.raw.headers.forEach((v, k) => { headers[k] = v; });
-      valid = verifySendGridWebhook(headers, rawBody, e.INBOUND_EMAIL_WEBHOOK_SECRET);
+      valid = verifySendGridWebhook(headers, rawBody, secret);
     }
 
     if (!valid) {
       console.warn("[EMAIL-INBOUND] Invalid webhook signature");
-      return c.json({ error: "Invalid signature" }, 401);
+      return c.json(
+        { error: { code: "INVALID_SIGNATURE", message: "Invalid webhook signature" } },
+        401,
+      );
     }
   }
 
@@ -48,7 +85,10 @@ app.post("/inbound", async (c) => {
     payload = JSON.parse(rawBody);
   } catch {
     console.warn("[EMAIL-INBOUND] Invalid JSON payload");
-    return c.json({ error: "Invalid payload" }, 400);
+    return c.json(
+      { error: { code: "INVALID_PAYLOAD", message: "Invalid JSON payload" } },
+      400,
+    );
   }
 
   // Resend inbound webhook payload structure:
