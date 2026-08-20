@@ -235,7 +235,7 @@ contraseña): **limpio**. Ningún `.env` se ha versionado nunca; solo los
 
 Antes de cambiar la visibilidad, tres limpiezas:
 
-1. `scripts/cleanup-secrets.sh` imprime `hcastillo.mendoza@gmail.com` como
+1. `scripts/cleanup-secrets.sh` imprime una cuenta de correo personal como
    `SMTP_USER` y `SMTP_FROM`. Sustituir por un placeholder: al abrir el repo
    queda indexable para scrapers y revela la cuenta que envía el correo de
    producción.
