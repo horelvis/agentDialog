@@ -551,14 +551,20 @@ POST /agent/queries
 
 ```json
 {
-  "query_id": "uuid",
-  "status": "pending",
-  "conversation_id": "uuid",
-  "expires_at": "2026-08-20T18:30:00.000Z"
+  "data": {
+    "query_id": "uuid",
+    "status": "pending",
+    "conversation_id": "uuid",
+    "message": "Query created. An invitation email has been sent to the human. Replying to that email automatically accepts the invitation and lets them see and respond to your query.",
+    "next_step": "Use get_query with query_id \"uuid\" to poll for the response. Wait at least 10-30 seconds between polls.",
+    "expires_at": "2026-08-20T18:30:00.000Z"
+  }
 }
 ```
 
-`status` viene `pending` o `assigned` directamente — ver [auto-trust](#auto-trust) más abajo.
+Todas las respuestas REST van envueltas en un objeto `data` de nivel superior.
+
+`status` viene `pending` o `assigned` directamente — ver [auto-trust](#auto-trust) más abajo. `message` describe en texto qué pasa después según el `status`; `next_step` indica qué llamar a continuación.
 
 #### Consultar una query
 
@@ -570,18 +576,20 @@ GET /agent/queries/{id}
 
 ```json
 {
-  "query_id": "uuid",
-  "status": "answered",
-  "query_type": "validation",
-  "question": "...",
-  "context": "...",
-  "confidence": 0.7,
-  "answer": "Sí, los datos son correctos. Revisé contra el reporte de Finance.",
-  "comment": "Responded via email reply",
-  "human_confidence": null,
-  "response_time_ms": 45000,
-  "created_at": "2026-08-20T16:30:00.000Z",
-  "expires_at": "2026-08-20T18:30:00.000Z"
+  "data": {
+    "query_id": "uuid",
+    "status": "answered",
+    "query_type": "validation",
+    "question": "...",
+    "context": "...",
+    "confidence": 0.7,
+    "answer": "Sí, los datos son correctos. Revisé contra el reporte de Finance.",
+    "comment": "Responded via email reply",
+    "human_confidence": null,
+    "response_time_ms": 45000,
+    "created_at": "2026-08-20T16:30:00.000Z",
+    "expires_at": "2026-08-20T18:30:00.000Z"
+  }
 }
 ```
 
