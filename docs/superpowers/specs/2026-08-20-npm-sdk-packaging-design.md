@@ -214,12 +214,19 @@ Versión inicial: `0.1.0`, la que ya declara el `package.json`.
 
 ### Pasos manuales previos
 
-Los hace el usuario desde la cuenta `agentdialog.app@gmail.com`. Sin ellos el
-workflow falla en el primer intento:
+La cuenta de npm es `agentdialog.app@gmail.com`, cuyo nombre de usuario es
+`agentdialog`. Como el scope coincide con el nombre de usuario, `@agentdialog/sdk`
+cae en el scope propio de esa cuenta: **no hace falta crear ninguna
+organización**, basta con `--access public` al publicar.
 
-1. Crear la organización / scope `@agentdialog` en npmjs.com.
-2. Dar de alta el trusted publisher: repositorio `horelvis/agentDialog`,
-   workflow `publish-sdk.yml`.
+Queda un único paso manual, que hace el usuario y sin el cual el workflow falla
+en el primer intento:
+
+1. Dar de alta el trusted publisher en npmjs.com: repositorio
+   `horelvis/agentDialog`, workflow `publish-sdk.yml`.
+
+No se usa `NPM_TOKEN`. Un token de publicación de larga duración guardado en los
+secrets del repositorio es exactamente el riesgo que evita OIDC.
 
 ## Prerequisito: abrir el repositorio
 
