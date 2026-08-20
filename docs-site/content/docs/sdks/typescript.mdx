@@ -114,7 +114,7 @@ await generateText({
 ### LangChain.js
 
 ```bash
-npm install @agentdialog/sdk @langchain/core
+npm install @agentdialog/sdk @langchain/core zod
 ```
 
 ```typescript
@@ -130,9 +130,9 @@ const tools = [
 // Pass `tools` to your LangChain agent executor as usual.
 ```
 
-Both `askHumanTool` and `checkAnswerTool` take the same options:
+`askHumanTool` takes an options object; `checkAnswerTool` takes only the client — there's nothing to configure since it just polls a `queryId`.
 
-| Option | Type | Description |
+| `askHumanTool` option | Type | Description |
 |--------|------|--------------|
 | `defaultEmail` | string | Used when the model's tool call doesn't include `targetHumanEmail` |
 | `timeoutMinutes` | number | Passed through to `createQuery` |

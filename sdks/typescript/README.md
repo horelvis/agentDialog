@@ -110,7 +110,7 @@ await generateText({
 ### LangChain.js
 
 ```bash
-npm install @agentdialog/sdk @langchain/core
+npm install @agentdialog/sdk @langchain/core zod
 ```
 
 ```typescript
