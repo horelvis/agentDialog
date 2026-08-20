@@ -56,3 +56,14 @@ export class ServerError extends AgentDialogError {
     this.name = "ServerError";
   }
 }
+
+export class QueryTimeoutError extends AgentDialogError {
+  constructor(queryId: string, timeoutMs: number) {
+    super(
+      408,
+      "QUERY_TIMEOUT",
+      `Query ${queryId} was not answered within ${timeoutMs}ms`,
+    );
+    this.name = "QueryTimeoutError";
+  }
+}

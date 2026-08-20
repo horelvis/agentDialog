@@ -8,6 +8,7 @@ export {
   ValidationError,
   RateLimitError,
   ServerError,
+  QueryTimeoutError,
 } from "./errors.js";
 
 export type {

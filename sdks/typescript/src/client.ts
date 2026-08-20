@@ -6,6 +6,7 @@ import {
   ValidationError,
   RateLimitError,
   ServerError,
+  QueryTimeoutError,
 } from "./errors.js";
 import type {
   Agent,
@@ -225,6 +226,48 @@ export class AgentDialog {
     return wire.map(fromQuerySummaryWire);
   }
 
+  /**
+   * Poll a query until a human answers it or it expires.
+   *
+   * Backs off from pollIntervalMs up to maxPollIntervalMs, because humans
+   * answer on human timescales and tight polling only burns rate limit.
+   * An expired query resolves rather than throwing: expiry is an answer of
+   * sorts, and the caller usually wants to branch on it.
+   */
+  async waitForAnswer(
+    queryId: string,
+    options: {
+      pollIntervalMs?: number;
+      maxPollIntervalMs?: number;
+      timeoutMs?: number;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<Query> {
+    const {
+      pollIntervalMs = 10_000,
+      maxPollIntervalMs = 60_000,
+      timeoutMs,
+      signal,
+    } = options;
+
+    const startedAt = Date.now();
+    let interval = pollIntervalMs;
+
+    for (;;) {
+      if (signal?.aborted) throw signal.reason ?? new Error("Aborted");
+
+      const query = await this.getQuery(queryId);
+      if (query.status === "answered" || query.status === "expired") return query;
+
+      if (timeoutMs !== undefined && Date.now() - startedAt >= timeoutMs) {
+        throw new QueryTimeoutError(queryId, timeoutMs);
+      }
+
+      await sleep(interval, signal);
+      interval = Math.min(interval * 2, maxPollIntervalMs);
+    }
+  }
+
   // ── Internal ──
 
   private async request<T>(
@@ -318,8 +361,19 @@ function parseRetryAfter(res: Response): number {
   return 1;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason ?? new Error("Aborted"));
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(signal!.reason ?? new Error("Aborted"));
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function buildQuery(params?: object): string {
