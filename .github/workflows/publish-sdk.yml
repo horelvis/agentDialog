@@ -54,11 +54,23 @@ jobs:
 
       - name: Test SDK
         working-directory: sdks/typescript
-        run: bun test
+        run: bun test tests
 
       - name: Build SDK
         working-directory: sdks/typescript
         run: bun run build
+
+      # The suite above imports from src/, so it says nothing about the artifact
+      # we are one step away from publishing. These two check the built output
+      # and then the packed tarball, because an npm version cannot be replaced
+      # once it is out — the release has to fail here or not at all.
+      - name: Test built output
+        working-directory: sdks/typescript
+        run: bun test packaged
+
+      - name: Smoke-test the packed tarball
+        working-directory: sdks/typescript
+        run: bash scripts/smoke-pack.sh
 
       - name: Publish
         working-directory: sdks/typescript
