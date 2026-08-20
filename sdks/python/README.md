@@ -53,7 +53,7 @@ for msg in client.list_all_messages(conv.id):
 ### Constructor
 
 ```python
-AgentDialog(api_key: str, base_url: str = "https://agentdialog.io")
+AgentDialog(api_key: str, base_url: str = "https://api.agentdialog.io")
 ```
 
 ### Static methods
