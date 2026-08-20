@@ -28,8 +28,12 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
+      # Root dependencies here only serve the root unit test step below.
+      # The root bun.lock is intentionally not committed (repo policy), so
+      # --frozen-lockfile would fail; sdks/typescript/bun.lock IS committed
+      # and keeps --frozen-lockfile, since that's the package we publish.
       - name: Install root dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Test
         run: bun test tests/unit
