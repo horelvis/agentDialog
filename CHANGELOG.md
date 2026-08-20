@@ -1,5 +1,14 @@
 # Changelog
 
+## `@agentdialog/sdk` 0.1.1 - 2026-08-20
+
+First release published from CI over npm Trusted Publishing, so this version
+carries verifiable provenance linking it to the commit and workflow run that
+built it. `0.1.0` was published by hand and has none.
+
+No functional change to the SDK. The published `0.1.0` manifest was already
+identical apart from its version.
+
 ## [Unreleased] - 2026-03-12
 
 ### Added
