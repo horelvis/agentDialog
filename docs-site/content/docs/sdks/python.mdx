@@ -5,24 +5,39 @@ description: Reference SDK for Python
 
 import { Callout } from "fumadocs-ui/components/callout";
 
-<Callout type="info">Reference implementation. Install from PyPI when available, or copy the patterns below.</Callout>
+<Callout type="warn">
+  Not published to PyPI. Copy `sdks/python/` from the repository, or use the
+  plain `requests` examples below — they need nothing beyond `requests`.
+</Callout>
+
+<Callout type="info">
+  The Python SDK does **not** yet cover human queries. `createQuery`,
+  `waitForAnswer` and the framework adapters exist only in the
+  [TypeScript SDK](/docs/sdks/typescript). To ask a human a question from
+  Python today, call the REST endpoints directly — see
+  [Using the API directly](#using-the-api-directly) below.
+</Callout>
 
 ## Quick example
 
+The client class is `AgentDialog`. Methods take snake_case keyword arguments and
+return typed dataclasses, not dictionaries.
+
 ```python
-from agentdialog import AgentDialogClient
+from agentdialog import AgentDialog
 
-agent = AgentDialogClient("mge_ag_...")
+client = AgentDialog("mge_ag_...")
 
-conv = agent.create_conversation(
+conv = client.create_conversation(
     title="Data Analysis Complete",
     intent_type="notification",
 )
 
-agent.invite_human(conv["data"]["id"], "analyst@company.com")
+client.invite_human(conv.id, email="analyst@company.com", role="reviewer")
 
-agent.send_message(conv["data"]["id"],
-    msg_type="form",
+client.send_message(
+    conv.id,
+    type="form",
     content="Configure analysis parameters",
     structured_data={
         "formId": "config-001",
@@ -37,10 +52,33 @@ agent.send_message(conv["data"]["id"],
 )
 ```
 
-## Using requests directly
+Registering a new agent returns a client already holding the credentials:
 
 ```python
-import requests
+client = AgentDialog.register(slug="my-bot", display_name="My Bot")
+print(client.agent.api_key)   # shown once — store it
+```
+
+## What the client covers
+
+| Area | Methods |
+|------|---------|
+| Profile | `get_profile`, `update_profile`, `rotate_api_key` |
+| Conversations | `create_conversation`, `get_conversation`, `update_conversation`, `list_conversations`, `list_all_conversations` |
+| Messages | `send_message`, `list_messages`, `list_all_messages` |
+| Invitations | `invite_human`, `list_invitations`, `revoke_invitation` |
+| Webhooks | `create_webhook`, `list_webhooks`, `update_webhook`, `delete_webhook` |
+
+`list_all_conversations` and `list_all_messages` are generators that page through
+results for you.
+
+## Using the API directly
+
+Everything the SDK does is a REST call, and human queries — which the SDK does
+not wrap yet — are three endpoints:
+
+```python
+import requests, time
 
 BASE = "https://api.agentdialog.io/api/v1"
 headers = {
@@ -48,13 +86,44 @@ headers = {
     "Content-Type": "application/json",
 }
 
+# Ask a human. Returns immediately; they answer by replying to the email.
+created = requests.post(f"{BASE}/agent/queries",
+    headers=headers,
+    json={
+        "query_type": "validation",
+        "question": "Deploy v2.3 to production?",
+        "context": "12 commits since the last release. All checks green.",
+        "target_human_email": "oncall@example.com",
+        "timeout_minutes": 120,
+    },
+).json()["data"]
+
+query_id = created["query_id"]
+
+# Poll for the answer. Wait 10-30 seconds between checks.
+while True:
+    query = requests.get(f"{BASE}/agent/queries/{query_id}", headers=headers).json()["data"]
+    if query["status"] in ("answered", "expired"):
+        break
+    time.sleep(15)
+
+print(query["status"], query["answer"])
+```
+
+The queries resource is snake_case on the wire. See the
+[queries API reference](/docs/api-reference/agent/queries) for every field, and
+[human queries](/docs/concepts/queries) for how the flow works.
+
+An approval, using the same pattern:
+
+```python
 conv = requests.post(f"{BASE}/agent/conversations",
     headers=headers,
     json={"title": "Security Scan", "intentType": "permission"},
-).json()
+).json()["data"]
 
 requests.post(
-    f"{BASE}/agent/conversations/{conv['data']['id']}/messages",
+    f"{BASE}/agent/conversations/{conv['id']}/messages",
     headers=headers,
     json={
         "type": "approval",
@@ -67,6 +136,9 @@ requests.post(
     },
 )
 ```
+
+Note the difference: `/agent/queries` uses snake_case, while the older
+conversations and messages endpoints use camelCase.
 
 ## WebSocket
 

@@ -150,20 +150,142 @@ gcloud logging read \
 Every request line carries the request ID attached by the middleware, so an
 error can be traced back through the request that caused it.
 
-## Where the pieces are hosted
+## Infrastructure
 
-| Piece | Where |
-|---|---|
-| API | Cloud Run, `us-central1`, service `agentdialog-api` |
-| Database | Neon (PostgreSQL) |
-| Cache and rate limiting | Upstash (Redis) |
-| Landing page and docs | Cloudflare Pages, built from source |
-| DNS and CDN | Cloudflare |
-| Container images | Artifact Registry, repo `agentdialog` |
-| SDK | npm, `@agentdialog/sdk` |
+### The shape of it
 
-`docs-site/out/` and `docs-site/.next/` are build artifacts and are gitignored.
+```
+                       ┌──────────────────────────────────┐
+   agentdialog.io ────►│ Cloudflare                       │
+   docs.agentdialog.io │  DNS, CDN, Pages (landing + docs)│
+                       └───────────────┬──────────────────┘
+                                       │
+   api.agentdialog.io ─────────────────┤ domain mapping
+                                       ▼
+                       ┌──────────────────────────────────┐
+                       │ Google Cloud                     │
+                       │                                  │
+                       │  Cloud Run   agentdialog-api     │
+                       │      ▲       :8080, us-central1  │
+                       │      │                           │
+                       │  Artifact Registry               │
+                       │      repo: agentdialog           │
+                       │      ▲                           │
+                       │      │ Workload Identity         │
+                       │      │ Federation (no keys)      │
+                       └──────┼───────────────────────────┘
+                              │                │        │
+                     GitHub Actions            │        │
+                                               ▼        ▼
+                                          Neon        Upstash
+                                       (PostgreSQL)   (Redis)
+```
+
+Only two things live in Google Cloud: the container image registry and the
+service that runs the container. The database and Redis are managed elsewhere,
+reached over the network with credentials supplied as environment variables. The
+static sites never touch GCP at all.
+
+### Google Cloud
+
+**Cloud Run**, service `agentdialog-api` in `us-central1`, is the whole backend —
+API, WebSocket server and MCP server in one container. It serves the built
+landing page as static files too, which is why `Dockerfile.cloudrun` builds both
+the backend and `web/` into a single image.
+
+The service configuration, as `deploy.yml` sets it on every deploy:
+
+| Setting | Value | Why |
+|---|---|---|
+| `--port` | 8080 | Cloud Run's expected port |
+| `--cpu` / `--memory` | 1 / 512Mi | |
+| `--min-instances` | **1** | Keeps one instance warm. MCP sessions are stateful and a cold start drops them |
+| `--max-instances` | 10 | |
+| `--timeout` | 300s | WebSocket connections need a long request timeout |
+| `--concurrency` | 80 | |
+| `--session-affinity` | on | Routes a client back to the same instance, which the WebSocket registry assumes |
+| `--allow-unauthenticated` | on | The API does its own auth |
+
+`--min-instances=1` and `--session-affinity` are not tuning knobs, they are
+correctness requirements: the WebSocket connection registry lives in the
+instance's memory, and MCP sessions are stateful. Dropping either breaks live
+connections in ways that look like intermittent bugs.
+
+**Artifact Registry**, repository `agentdialog` in the same region, holds the
+images. Every deploy pushes two tags: the release tag and `latest`.
+
+**Workload Identity Federation** authenticates GitHub Actions. No service account
+key is stored anywhere — the workflow exchanges its OIDC token for short-lived
+credentials, the same mechanism the npm publish uses. The three GitHub secrets
+(`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`)
+identify the federation, they are not credentials.
+
+### Outside Google Cloud
+
+| Piece | Where | Notes |
+|---|---|---|
+| PostgreSQL | Neon | Reached via `DATABASE_URL` |
+| Redis | Upstash | Sessions, rate limiting, MCP session state |
+| Landing page and docs | Cloudflare Pages | Built from source on push |
+| DNS and CDN | Cloudflare | Also fronts `api.agentdialog.io` |
+| SDK | npm | `@agentdialog/sdk` |
+
+`docs-site/out/` and `docs-site/.next/` are build artifacts and gitignored.
 Cloudflare Pages builds them from source; do not commit them.
+
+### Configuration and secrets
+
+Runtime configuration is **environment variables on the Cloud Run service**, not
+Secret Manager. `scripts/cleanup-secrets.sh` exists to tear down the Secret
+Manager entries from an earlier setup and prints the `gcloud run services update`
+command that replaces them.
+
+The trade-off is worth knowing rather than rediscovering: environment variables
+are simpler and cost nothing, but they are visible to anyone with
+`run.services.get` on the project, they are not versioned, and rotating one
+requires a service update. For the current scale that is an acceptable trade;
+for a team it would not be.
+
+`src/env.ts` validates everything at startup with zod and exits if a variable is
+missing or malformed, so a misconfigured deploy fails immediately and loudly
+rather than at the first request that needs the value.
+
+### Three ways to deploy, and only one that is current
+
+| Path | Used | min-instances |
+|---|---|---|
+| `.github/workflows/deploy.yml` | **yes**, on a published release | 1 |
+| `scripts/deploy.sh` | fallback, by hand | 1 |
+| `cloudbuild.yaml` | not wired to a trigger | 1 |
+
+All three now agree. They did not: the two fallbacks passed `--min-instances=0`,
+so either one would have silently reverted the warm instance and broken MCP
+sessions. If you add a fourth path, keep it in step.
+
+`cloudbuild.yaml` is a Cloud Build pipeline that no trigger currently invokes. It
+is kept as an escape hatch for building inside GCP if GitHub Actions is
+unavailable; it needs `_REGION` and `_SERVICE_NAME` substitutions.
+
+### What is not in this repository
+
+These live only in the Google Cloud and Cloudflare consoles, and nothing here
+reproduces them:
+
+- the domain mapping from `api.agentdialog.io` to the Cloud Run service
+- the Workload Identity pool and provider, and the service account's IAM bindings
+- the actual environment variable values on the service
+- the Cloudflare Pages projects, their build commands and output directories
+- the Neon and Upstash instances
+
+If the project ever needs rebuilding from scratch, that list is the gap. Writing
+it down as Terraform is the obvious next step and has not been done.
+
+### File storage
+
+`src/config/storage.ts` and the `MINIO_*` variables target an S3-compatible
+store; development uses MinIO from `docker-compose.dev.yml`. **What backs this in
+production is not recorded anywhere in the repository** — verify against the
+Cloud Run service's environment variables before relying on it.
 
 ## Things that have bitten, and how to recognise them
 

@@ -67,25 +67,26 @@ console.log(answer.answer); // "yes, go ahead"`,
   {
     label: "Python",
     language: "python",
-    code: `from agentdialog import AgentDialogClient
+    code: `import requests, time
 
-agent = AgentDialogClient("mge_ag_...")
+BASE = "https://api.agentdialog.io/api/v1"
+headers = {"Authorization": "Bearer mge_ag_..."}
 
-# Ask a human via MCP human_query
-result = agent.human_query(
-    query_type="expert_query",
-    question="Should we use B-tree or hash index?",
-    context="Table: orders (50M rows), query: WHERE id = ?",
-    target_human_email="dba@company.com",
-    timeout_minutes=30,
-)
+# Ask a human. Returns right away — they answer from their inbox.
+created = requests.post(f"{BASE}/agent/queries", headers=headers, json={
+    "query_type": "expert_query",
+    "question": "Should we use a B-tree or a hash index?",
+    "context": "Table: orders (50M rows), query: WHERE id = ?",
+    "target_human_email": "dba@company.com",
+    "timeout_minutes": 30,
+}).json()["data"]
 
-# Human replies via email → agent gets the answer
-import time
 while True:
-    query = agent.get_query(result["query_id"])
-    if query["status"] == "answered":
-        print(f"Answer: {query['answer']}")
+    query = requests.get(
+        f"{BASE}/agent/queries/{created['query_id']}", headers=headers
+    ).json()["data"]
+    if query["status"] in ("answered", "expired"):
+        print(query["answer"])
         break
     time.sleep(15)`,
   },
