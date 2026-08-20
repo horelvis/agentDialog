@@ -11,9 +11,27 @@ export function Footer() {
             </div>
             <span className="text-sm font-semibold text-gray-100">AgentDialog</span>
           </div>
-          <p className="text-sm text-gray-400">
-            Agent-first messaging platform. Built for the AI era.
-          </p>
+          <div className="flex items-center gap-6">
+            <p className="text-sm text-gray-400">
+              Agent-first messaging platform. Built for the AI era.
+            </p>
+            <a
+              href="https://github.com/horelvis/agentDialog"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
+            >
+              GitHub
+            </a>
+            <a
+              href="https://docs.agentdialog.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
+            >
+              Docs
+            </a>
+          </div>
         </div>
       </div>
     </footer>
