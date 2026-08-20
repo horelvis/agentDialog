@@ -76,6 +76,27 @@ describe("waitForAnswer", () => {
     expect(Date.now() - startedAt).toBeLessThan(2_000);
   });
 
+  it("cuts a hung request short instead of waiting out the OS timeout", async () => {
+    // fetch that never resolves on its own — simulates a cold start or a
+    // blackholed connection. Like real fetch, it only settles if the
+    // request's AbortSignal fires; if waitForAnswer stopped forwarding a
+    // signal to fetch, nothing would ever reject this and the test (and a
+    // real caller) would hang far past timeoutMs.
+    globalThis.fetch = ((_url: unknown, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal) {
+          signal.addEventListener("abort", () => reject(signal.reason ?? new Error("aborted")), {
+            once: true,
+          });
+        }
+      })) as typeof fetch;
+
+    await expect(
+      client.waitForAnswer("q1", { pollIntervalMs: 1, timeoutMs: 30 }),
+    ).rejects.toBeInstanceOf(QueryTimeoutError);
+  }, 2_000);
+
   it("backs off between polls, widening the gap over successive attempts", async () => {
     const state = mockSequence(["pending", "pending", "pending", "pending", "answered"]);
     await client.waitForAnswer("q1", { pollIntervalMs: 20, maxPollIntervalMs: 200 });
