@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { agentRegisterSchema } from "../../src/validators/agent.validators";
 import { createMessageSchema } from "../../src/validators/message.validators";
 import { createInvitationSchema } from "../../src/validators/invitation.validators";
+import { listQueriesQuerySchema } from "../../src/validators/query.validators";
 
 describe("agent validators", () => {
   it("validates a correct registration", () => {
@@ -94,5 +95,25 @@ describe("invitation validators", () => {
       email: "not-an-email",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("listQueriesQuerySchema", () => {
+  it("coerces limit from a query string into a number", () => {
+    const result = listQueriesQuerySchema.parse({ limit: "50" });
+    expect(result.limit).toBe(50);
+  });
+
+  it("defaults limit to 20 when absent", () => {
+    const result = listQueriesQuerySchema.parse({});
+    expect(result.limit).toBe(20);
+  });
+
+  it("rejects a limit above 100", () => {
+    expect(() => listQueriesQuerySchema.parse({ limit: "101" })).toThrow();
+  });
+
+  it("rejects an unknown status", () => {
+    expect(() => listQueriesQuerySchema.parse({ status: "bogus" })).toThrow();
   });
 });
