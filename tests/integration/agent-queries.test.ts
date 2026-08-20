@@ -73,4 +73,45 @@ describe("Agent queries REST API", () => {
     });
     expect(res.status).toBe(404);
   });
+
+  it("does not leak another agent's query in the list route", async () => {
+    const agentA = await createTestAgent();
+    const agentB = await createTestAgent();
+
+    const createA = await app.request("/api/v1/agent/queries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: agentA.authHeader },
+      body: JSON.stringify({
+        query_type: "expert_query",
+        question: "Question from agent A",
+        target_human_email: `list-isolation-a-${Date.now()}@example.com`,
+      }),
+    });
+    const { data: queryA } = await createA.json();
+
+    const createB = await app.request("/api/v1/agent/queries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: agentB.authHeader },
+      body: JSON.stringify({
+        query_type: "expert_query",
+        question: "Question from agent B",
+        target_human_email: `list-isolation-b-${Date.now()}@example.com`,
+      }),
+    });
+    const { data: queryB } = await createB.json();
+
+    const listA = await app.request("/api/v1/agent/queries?limit=100", {
+      headers: { Authorization: agentA.authHeader },
+    });
+    const { data: listAData } = await listA.json();
+    expect(listAData.some((q: any) => q.query_id === queryA.query_id)).toBe(true);
+    expect(listAData.some((q: any) => q.query_id === queryB.query_id)).toBe(false);
+
+    const listB = await app.request("/api/v1/agent/queries?limit=100", {
+      headers: { Authorization: agentB.authHeader },
+    });
+    const { data: listBData } = await listB.json();
+    expect(listBData.some((q: any) => q.query_id === queryB.query_id)).toBe(true);
+    expect(listBData.some((q: any) => q.query_id === queryA.query_id)).toBe(false);
+  });
 });

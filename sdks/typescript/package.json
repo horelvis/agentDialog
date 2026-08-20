@@ -19,7 +19,7 @@
       "import": "./dist/langchain/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "LICENSE"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/horelvis/agentDialog.git",

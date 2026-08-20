@@ -64,10 +64,30 @@ describe("query methods", () => {
     expect(query.answer).toBe("yes");
   });
 
-  it("passes list filters as query parameters", async () => {
-    const calls = mockFetch({ data: [] });
+  it("passes list filters as query parameters and maps the response", async () => {
+    const calls = mockFetch({
+      data: [
+        {
+          query_id: "q1", status: "answered", query_type: "validation",
+          question: "Ship it?", human_email: "someone@example.com",
+          answer: "yes", created_at: "2026-08-20T10:00:00.000Z",
+          expires_at: "2026-08-20T12:00:00.000Z",
+        },
+      ],
+    });
     const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
-    await client.listQueries({ status: "answered", limit: 5 });
+    const queries = await client.listQueries({ status: "answered", limit: 5 });
     expect(calls[0].url).toBe("https://example.test/api/v1/agent/queries?status=answered&limit=5");
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toEqual({
+      queryId: "q1",
+      status: "answered",
+      queryType: "validation",
+      question: "Ship it?",
+      humanEmail: "someone@example.com",
+      answer: "yes",
+      createdAt: "2026-08-20T10:00:00.000Z",
+      expiresAt: "2026-08-20T12:00:00.000Z",
+    });
   });
 });

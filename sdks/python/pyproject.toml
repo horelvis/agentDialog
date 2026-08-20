@@ -13,4 +13,4 @@ dependencies = ["httpx>=0.27"]
 
 [project.urls]
 Homepage = "https://agentdialog.io"
-Repository = "https://github.com/agentdialog/agentdialog"
+Repository = "https://github.com/horelvis/agentDialog"
