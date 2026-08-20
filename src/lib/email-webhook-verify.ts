@@ -69,3 +69,24 @@ export function verifySendGridWebhook(
   // If we reach this point, the URL matched, so it's valid.
   return true;
 }
+
+/**
+ * Decide how to treat an inbound webhook given the environment and the
+ * configured secret.
+ *
+ * This exists as its own function because the decision is security-critical and
+ * the previous version of it was a bare `if (secret)`, which fails OPEN: with no
+ * secret configured, every unsigned request was accepted. The endpoint creates
+ * humans, auto-accepts invitations and records answers to agent queries, so an
+ * unauthenticated caller who knows a query id can forge a human's approval —
+ * and query ids travel in the Reply-To address of every query email.
+ *
+ * Production with no secret is a misconfiguration, not a mode. Refuse.
+ */
+export function signatureRequirement(
+  nodeEnv: string,
+  secret: string | undefined,
+): "verify" | "skip" | "refuse" {
+  if (secret) return "verify";
+  return nodeEnv === "production" ? "refuse" : "skip";
+}

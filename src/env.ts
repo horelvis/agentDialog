@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const envSchema = z.object({
+export const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   HOST: z.string().default("0.0.0.0"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -46,6 +46,21 @@ const envSchema = z.object({
   REPLY_DOMAIN: z.string().default("reply.agentdialog.io"),
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().optional(),
   INBOUND_EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).default("resend"),
+}).superRefine((env, ctx) => {
+  // The inbound email webhook records a human's answer to an agent's query and
+  // auto-accepts their invitation. Without a signing secret the endpoint has no
+  // authentication at all, so a caller who knows a query id can forge an
+  // approval. Fail at startup rather than serve an open endpoint.
+  if (env.NODE_ENV === "production" && !env.INBOUND_EMAIL_WEBHOOK_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["INBOUND_EMAIL_WEBHOOK_SECRET"],
+      message:
+        "INBOUND_EMAIL_WEBHOOK_SECRET is required in production: without it the " +
+        "inbound email webhook accepts unsigned requests and a human's answer " +
+        "can be forged.",
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

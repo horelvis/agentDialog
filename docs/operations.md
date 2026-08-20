@@ -150,20 +150,181 @@ gcloud logging read \
 Every request line carries the request ID attached by the middleware, so an
 error can be traced back through the request that caused it.
 
-## Where the pieces are hosted
+## Infrastructure
 
-| Piece | Where |
-|---|---|
-| API | Cloud Run, `us-central1`, service `agentdialog-api` |
-| Database | Neon (PostgreSQL) |
-| Cache and rate limiting | Upstash (Redis) |
-| Landing page and docs | Cloudflare Pages, built from source |
-| DNS and CDN | Cloudflare |
-| Container images | Artifact Registry, repo `agentdialog` |
-| SDK | npm, `@agentdialog/sdk` |
+### The shape of it
 
-`docs-site/out/` and `docs-site/.next/` are build artifacts and are gitignored.
+```
+                       ┌──────────────────────────────────┐
+   agentdialog.io ────►│ Cloudflare                       │
+   docs.agentdialog.io │  DNS, CDN, Pages (landing + docs)│
+                       └───────────────┬──────────────────┘
+                                       │
+   api.agentdialog.io ─────────────────┤ domain mapping
+                                       ▼
+                       ┌──────────────────────────────────┐
+                       │ Google Cloud                     │
+                       │                                  │
+                       │  Cloud Run   agentdialog-api     │
+                       │      ▲       :8080, us-central1  │
+                       │      │                           │
+                       │  Artifact Registry               │
+                       │      repo: agentdialog           │
+                       │      ▲                           │
+                       │      │ Workload Identity         │
+                       │      │ Federation (no keys)      │
+                       └──────┼───────────────────────────┘
+                              │                │        │
+                     GitHub Actions            │        │
+                                               ▼        ▼
+                                          Neon        Upstash
+                                       (PostgreSQL)   (Redis)
+```
+
+Three things live in Google Cloud: the container image registry, the service that
+runs the container, and the Cloud Storage bucket behind the `MINIO_*` variables.
+The database and Redis are managed elsewhere, reached over the network with
+credentials supplied as environment variables. The static sites never touch GCP.
+
+The project is `agentdialog`, owned by a different Google account than the one
+that owns the product's Gmail address. That split is normal and only matters when
+setting up OAuth, where the client lives in the project and the consent is given
+by the mailbox's own account.
+
+### Google Cloud
+
+**Cloud Run**, service `agentdialog-api` in `us-central1`, is the whole backend —
+API, WebSocket server and MCP server in one container. It serves the built
+landing page as static files too, which is why `Dockerfile.cloudrun` builds both
+the backend and `web/` into a single image.
+
+The service configuration, as `deploy.yml` sets it on every deploy:
+
+| Setting | Value | Why |
+|---|---|---|
+| `--port` | 8080 | Cloud Run's expected port |
+| `--cpu` / `--memory` | 1 / 512Mi | |
+| `--min-instances` | **1** | Keeps one instance warm. MCP sessions are stateful and a cold start drops them |
+| `--max-instances` | 10 | |
+| `--timeout` | 300s | WebSocket connections need a long request timeout |
+| `--concurrency` | 80 | |
+| `--session-affinity` | on | Routes a client back to the same instance, which the WebSocket registry assumes |
+| `--allow-unauthenticated` | on | The API does its own auth |
+
+`--min-instances=1` and `--session-affinity` are not tuning knobs, they are
+correctness requirements: the WebSocket connection registry lives in the
+instance's memory, and MCP sessions are stateful. Dropping either breaks live
+connections in ways that look like intermittent bugs.
+
+**Artifact Registry**, repository `agentdialog` in the same region, holds the
+images. Every deploy pushes two tags: the release tag and `latest`.
+
+**Workload Identity Federation** authenticates GitHub Actions. No service account
+key is stored anywhere — the workflow exchanges its OIDC token for short-lived
+credentials, the same mechanism the npm publish uses. The three GitHub secrets
+(`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`)
+identify the federation, they are not credentials.
+
+### Outside Google Cloud
+
+| Piece | Where | Notes |
+|---|---|---|
+| PostgreSQL | Neon | Reached via `DATABASE_URL` |
+| Redis | Upstash | Sessions, rate limiting, MCP session state |
+| Landing page and docs | Cloudflare Pages | Built from source on push |
+| DNS and CDN | Cloudflare | Also fronts `api.agentdialog.io` |
+| SDK | npm | `@agentdialog/sdk` |
+
+`docs-site/out/` and `docs-site/.next/` are build artifacts and gitignored.
 Cloudflare Pages builds them from source; do not commit them.
+
+### Configuration and secrets
+
+Configuration is a **hybrid**, which is worth knowing before you touch either half:
+
+- `SMTP_PASS` is a **Secret Manager reference** (`valueFrom`), backed by the
+  secret `smtp-password`.
+- Every other variable is a **plain environment variable** on the service.
+
+Four further secrets exist in Secret Manager — `SMTP_FROM`, `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_USER` — that nothing references. They are leftovers from the
+original setup and none of them is sensitive.
+
+The trade-off of plain environment variables is worth knowing rather than
+rediscovering: they are simpler and cost nothing, but they are visible to anyone
+with `run.services.get` on the project, they are not versioned, and rotating one
+requires a service update. For the current scale that is acceptable; for a team
+it would not be.
+
+<!-- DANGER -->
+**`scripts/cleanup-secrets.sh` will break outbound email if you run it today.**
+It calls `gcloud run services update --clear-secrets`, which removes *every*
+secret reference from the service — including the live `SMTP_PASS`. Its hardcoded
+list of secrets to delete (`database-url`, `redis-url`, `session-secret`) does not
+match what actually exists, and omits the four that do. The script was written for
+a configuration this project no longer has. Do not run it without rewriting it.
+
+`src/env.ts` validates everything at startup with zod and exits if a variable is
+missing or malformed, so a misconfigured deploy fails immediately and loudly
+rather than at the first request that needs the value.
+
+### Three ways to deploy, and only one that is current
+
+| Path | Used | min-instances |
+|---|---|---|
+| `.github/workflows/deploy.yml` | **yes**, on a published release | 1 |
+| `scripts/deploy.sh` | fallback, by hand | 1 |
+| `cloudbuild.yaml` | not wired to a trigger | 1 |
+
+All three now agree. They did not: the two fallbacks passed `--min-instances=0`,
+so either one would have silently reverted the warm instance and broken MCP
+sessions. If you add a fourth path, keep it in step.
+
+`cloudbuild.yaml` is a Cloud Build pipeline that no trigger currently invokes. It
+is kept as an escape hatch for building inside GCP if GitHub Actions is
+unavailable; it needs `_REGION` and `_SERVICE_NAME` substitutions.
+
+### What is not in this repository
+
+These live only in the Google Cloud and Cloudflare consoles, and nothing here
+reproduces them:
+
+- the domain mapping from `api.agentdialog.io` to the Cloud Run service
+- the Workload Identity pool and provider, and the service account's IAM bindings
+- the actual environment variable values on the service
+- the Cloudflare Pages projects, their build commands and output directories
+- the Neon and Upstash instances
+
+If the project ever needs rebuilding from scratch, that list is the gap. Writing
+it down as Terraform is the obvious next step and has not been done.
+
+### File storage
+
+The `MINIO_*` variables are a misnomer in production: they point at
+`storage.googleapis.com`, so file storage is **Google Cloud Storage** through its
+S3-compatible API, bucket `agentdialog-files`. Development uses real MinIO from
+`docker-compose.dev.yml`. The variable names come from the development setup and
+were never renamed.
+
+### Email
+
+Outbound email goes through **Gmail SMTP** (`smtp.gmail.com:465`), not through
+Resend or any transactional provider. Resend appears in the codebase only as the
+default value of `INBOUND_EMAIL_PROVIDER` and in the changelog; no Resend account
+is configured.
+
+Two consequences worth knowing:
+
+- A consumer Gmail account caps at roughly 500 messages a day, and messages sent
+  from a `@gmail.com` address on behalf of `agentdialog.io` have no aligned SPF
+  or DKIM, which costs deliverability.
+- **Inbound email does not work at all.** Query emails carry a `Reply-To` of
+  `reply+{queryId}@reply.agentdialog.io`, but neither `agentdialog.io` nor
+  `reply.agentdialog.io` has an MX record — confirmed against two resolvers — so
+  a human's reply bounces and reaches nothing. `POST /api/v1/webhooks/email/inbound`
+  is deployed and reachable, but no provider ever calls it. The feature the
+  landing page sells is not operational: the code is complete, the mail
+  infrastructure was never built.
 
 ## Things that have bitten, and how to recognise them
 

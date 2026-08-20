@@ -180,11 +180,21 @@ working directory.
 
 ## Known debt
 
+**Nothing verifies a pull request.** There is no CI workflow on `pull_request` at
+all, and `deploy.yml` runs no tests, no typecheck and no lint before it migrates
+production and deploys. The repository's 59 tests execute only when someone
+publishes the SDK — the one path that needs them least. A branch with a red suite
+can be merged and shipped with nothing objecting. This is the largest gap in the
+project and the fix is a `ci.yml` running the suites on `pull_request`, with
+`deploy.yml` depending on it.
+
 - `src/mcp/server.ts` fails the root typecheck and has no test coverage.
-- The integration suite is not hermetic: the registration rate limit lives in
-  Redis and survives between runs.
-- `sdks/typescript` declares no `engines`, though `AbortSignal.any` requires
-  Node 20.3 or newer.
-- The Dockerfiles use the floating `oven/bun:1` tag.
+- The Python SDK has no query methods, so it is one feature behind the TypeScript
+  one. Deferred to a future release; its documentation now describes the API that
+  actually exists rather than one that does not.
 - Nothing asserts that `docs/api/README.md` and its generated copy stay identical.
-- The landing page's Python tab describes an API the Python SDK does not have.
+  This needs the CI workflow above to have somewhere to live.
+- No infrastructure as code: the domain mapping, Workload Identity bindings,
+  Cloud Run environment variables and Cloudflare Pages projects exist only in
+  their consoles. See `docs/operations.md`.
+- What backs file storage in production is not recorded anywhere.

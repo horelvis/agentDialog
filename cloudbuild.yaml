@@ -49,7 +49,7 @@ steps:
       - "--memory"
       - "512Mi"
       - "--min-instances"
-      - "0"
+      - "1"
       - "--max-instances"
       - "10"
       - "--timeout"
