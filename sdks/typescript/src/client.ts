@@ -16,6 +16,7 @@ import type {
   Invitation,
   InviteHumanInput,
   Message,
+  Pagination,
   PaginatedResponse,
   PaginationParams,
   RegisteredAgent,
@@ -70,10 +71,10 @@ export class AgentDialog {
       body: JSON.stringify(input),
     });
 
-    const body = await res.json();
+    const body = await res.json() as { data: RegisteredAgent };
     if (!res.ok) throw errorFromResponse(res.status, body);
 
-    const agent = body.data as RegisteredAgent;
+    const agent = body.data;
     const client = new AgentDialog({ apiKey: agent.apiKey, baseUrl }) as AgentDialog & {
       agent: RegisteredAgent;
     };
@@ -219,7 +220,7 @@ export class AgentDialog {
   async listQueries(params?: ListQueriesParams): Promise<QuerySummary[]> {
     const wire = await this.request<QuerySummaryWire[]>(
       "GET",
-      `/agent/queries${buildQuery(params as Record<string, unknown> | undefined)}`,
+      `/agent/queries${buildQuery(params)}`,
     );
     return wire.map(fromQuerySummaryWire);
   }
@@ -252,10 +253,10 @@ export class AgentDialog {
       return this.request<T>(method, path, body, retries + 1);
     }
 
-    const json = await res.json();
+    const json = await res.json() as { data: T };
     if (!res.ok) throw errorFromResponse(res.status, json);
 
-    return json.data as T;
+    return json.data;
   }
 
   private async requestPaginated<T>(
@@ -274,11 +275,11 @@ export class AgentDialog {
       return this.requestPaginated<T>(method, path);
     }
 
-    const json = await res.json();
+    const json = await res.json() as { data: T[]; pagination: Pagination };
     if (!res.ok) throw errorFromResponse(res.status, json);
 
     return {
-      data: json.data as T[],
+      data: json.data,
       pagination: json.pagination,
     };
   }
@@ -321,7 +322,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function buildQuery(params?: Record<string, unknown>): string {
+function buildQuery(params?: object): string {
   if (!params) return "";
   const entries = Object.entries(params).filter(([, v]) => v !== undefined);
   if (entries.length === 0) return "";
