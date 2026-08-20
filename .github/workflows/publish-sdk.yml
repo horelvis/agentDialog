@@ -25,8 +25,14 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      # Trusted Publishing over OIDC needs npm >= 11.5.1. Node 24 bundles npm 11.x
+      # already; pin it explicitly so a runner image change cannot silently regress
+      # us to a version that has no OIDC support and fails with ENEEDAUTH.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
 
       # Root dependencies here only serve the root unit test step below.
       # The root bun.lock is intentionally not committed (repo policy), so
