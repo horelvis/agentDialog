@@ -27,7 +27,7 @@ from .types import (
     WebhookWithSecret,
 )
 
-DEFAULT_BASE_URL = "https://agentdialog.com"
+DEFAULT_BASE_URL = "https://api.agentdialog.io"
 MAX_RETRIES = 3
 
 
