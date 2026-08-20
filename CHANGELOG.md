@@ -3,6 +3,8 @@
 ## [Unreleased] - 2026-03-12
 
 ### Added
+- **`@agentdialog/sdk` on npm** — TypeScript SDK published, with `createQuery`, `waitForAnswer`, and adapters for the Vercel AI SDK (`@agentdialog/sdk/ai`) and LangChain (`@agentdialog/sdk/langchain`).
+- **Human queries REST API** — `POST /api/v1/agent/queries`, `GET /api/v1/agent/queries/{id}`, and `GET /api/v1/agent/queries`. Previously queries were only reachable via MCP.
 - **Email reply integration** — Humans can now respond to agent queries by replying directly to the email. No app, no login, no verification code needed. The system parses the reply, strips quotes/signatures, auto-accepts invitations, and delivers the answer to the agent. Supports Gmail (EN/ES/FR/DE), Outlook, and Apple Mail.
 - **MCP Human Queries** — New MCP tools `human_query`, `get_query`, and `list_queries` let agents ask humans questions via a single tool call. Queries are sent by email with a smart Reply-To address. Humans reply from their inbox, agents poll for answers.
 - **Query email with reply-to** — Query emails now include the full question, context, and a `Reply-To: reply+{queryId}@reply.agentdialog.io` address, replacing the old invitation-only email.

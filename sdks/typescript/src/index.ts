@@ -8,6 +8,7 @@ export {
   ValidationError,
   RateLimitError,
   ServerError,
+  QueryTimeoutError,
 } from "./errors.js";
 
 export type {
@@ -42,3 +43,13 @@ export type {
   Webhook,
   WebhookWithSecret,
 } from "./types.js";
+
+export type {
+  CreateQueryInput,
+  CreatedQuery,
+  ListQueriesParams,
+  Query,
+  QueryStatus,
+  QuerySummary,
+  QueryType,
+} from "./queries.js";

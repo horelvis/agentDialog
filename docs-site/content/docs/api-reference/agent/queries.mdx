@@ -1,0 +1,123 @@
+---
+title: Queries
+description: "Ask a human a question and poll for their answer"
+---
+
+Queries are the fastest way to get a human's input: one call to create the
+question, then poll (or use the SDK's `waitForAnswer`) until they reply. The
+human never has to open the app — they answer by replying to an email. See
+[Human queries](/docs/concepts/queries) for the full flow.
+
+## Create a query
+
+`POST https://api.agentdialog.io/api/v1/agent/queries`
+
+```bash
+curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query_type": "validation",
+    "question": "Deploy v2.3 to production?",
+    "context": "12 commits since the last release. All checks green.",
+    "target_human_email": "oncall@example.com",
+    "confidence": 0.8,
+    "timeout_minutes": 120
+  }'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query_type` | string | Yes | `validation`, `interpretation`, `expert_query`, or `labeling` |
+| `question` | string | Yes | The question for the human (max 10,000 chars) |
+| `target_human_email` | string | Yes | Email of the human to ask |
+| `context` | string | No | Extra context — code, data, anything that helps them answer (max 100,000 chars) |
+| `confidence` | number | No | The agent's own confidence in its assessment (0–1) |
+| `timeout_minutes` | number | No | Minutes before the query expires (default 60, max 10080) |
+| `metadata` | object | No | Arbitrary metadata stored with the query |
+
+**Response `201`:**
+
+```json
+{
+  "data": {
+    "query_id": "uuid",
+    "status": "pending",
+    "conversation_id": "uuid",
+    "message": "Query created. An invitation email has been sent to the human. Replying to that email automatically accepts the invitation and lets them see and respond to your query.",
+    "next_step": "Use get_query with query_id \"uuid\" to poll for the response. Wait at least 10-30 seconds between polls.",
+    "expires_at": "2026-08-20T18:30:00.000Z"
+  }
+}
+```
+
+All responses are wrapped in a top-level `data` object.
+
+| Field | Type | Description |
+|-------|------|--------------|
+| `query_id` | string | Id used to poll for the answer with `GET /agent/queries/{id}` |
+| `status` | string | `pending` or `assigned` — see [status table](#statuses) below |
+| `conversation_id` | string | The conversation created behind this query |
+| `message` | string | Human-readable summary of what happens next, varies by `status` |
+| `next_step` | string | What to call next to get the answer |
+| `expires_at` | string | ISO timestamp; after this the query moves to `expired` |
+
+## Get a query
+
+`GET https://api.agentdialog.io/api/v1/agent/queries/{id}`
+
+```bash
+curl https://api.agentdialog.io/api/v1/agent/queries/{id} \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "query_id": "uuid",
+    "status": "answered",
+    "query_type": "validation",
+    "question": "Deploy v2.3 to production?",
+    "context": "12 commits since the last release. All checks green.",
+    "confidence": 0.8,
+    "answer": "yes, go ahead",
+    "comment": "Checked the changelog, looks good.",
+    "human_confidence": null,
+    "response_time_ms": 184000,
+    "created_at": "2026-08-20T16:30:00.000Z",
+    "expires_at": "2026-08-20T18:30:00.000Z"
+  }
+}
+```
+
+`answer`, `comment`, and `human_confidence` are `null` until `status` is
+`answered`.
+
+## List queries
+
+`GET https://api.agentdialog.io/api/v1/agent/queries`
+
+```bash
+curl "https://api.agentdialog.io/api/v1/agent/queries?status=pending&limit=20" \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `status` | string | — | Filter by `pending`, `assigned`, `answered`, or `expired` |
+| `limit` | number | 20 | Max items (1–100) |
+
+## Statuses
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | The human has been invited but hasn't accepted the invitation yet. They need to check their email and reply to it — replying automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again. |
+| `assigned` | The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again. |
+| `answered` | The human has responded. Their answer is in the `answer` field below. No further polling needed. |
+| `expired` | The query has expired without a response. The human did not answer in time. You may create a new query if needed. |
+
+A query starts `assigned` instead of `pending` when the target human already
+trusts this agent — see [auto-trust](/docs/concepts/queries#pending-vs-assigned)
+for how that's decided.

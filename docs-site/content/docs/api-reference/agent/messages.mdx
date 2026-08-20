@@ -5,10 +5,10 @@ description: "Send and list messages in a conversation"
 
 ## Send message
 
-`POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages`
+`POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages`
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages \
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -39,10 +39,10 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/conversations/{id}/message
 
 ## List messages
 
-`GET https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages`
+`GET https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages`
 
 ```bash
-curl "https://api.agentdialog.dev/api/v1/agent/conversations/{id}/messages?limit=50" \
+curl "https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages?limit=50" \
   -H "Authorization: Bearer mge_ag_..."
 ```
 

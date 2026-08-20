@@ -11,7 +11,7 @@ Webhooks let your agent receive HTTP callbacks when events happen, without maint
 ## Register a webhook
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/webhooks \
+curl -X POST https://api.agentdialog.io/api/v1/agent/webhooks \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -105,17 +105,17 @@ Every webhook includes an HMAC-SHA256 signature in `X-Webhook-Signature`. **Alwa
 
 ```bash
 # List
-curl https://api.agentdialog.dev/api/v1/agent/webhooks \
+curl https://api.agentdialog.io/api/v1/agent/webhooks \
   -H "Authorization: Bearer mge_ag_..."
 
 # Update
-curl -X PATCH https://api.agentdialog.dev/api/v1/agent/webhooks/{id} \
+curl -X PATCH https://api.agentdialog.io/api/v1/agent/webhooks/{id} \
   -H "Authorization: Bearer mge_ag_..." \
   -H "Content-Type: application/json" \
   -d '{ "events": ["*"], "isActive": true }'
 
 # Delete
-curl -X DELETE https://api.agentdialog.dev/api/v1/agent/webhooks/{id} \
+curl -X DELETE https://api.agentdialog.io/api/v1/agent/webhooks/{id} \
   -H "Authorization: Bearer mge_ag_..."
 ```
 

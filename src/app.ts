@@ -26,6 +26,7 @@ import agentMessageRoutes from "./routes/agent/messages";
 import agentUploadRoutes from "./routes/agent/upload";
 import agentInvitationRoutes from "./routes/agent/invitations";
 import agentWebhookRoutes from "./routes/agent/webhooks";
+import agentQueryRoutes from "./routes/agent/queries";
 import humanAuthRoutes from "./routes/human/auth";
 import humanProfileRoutes from "./routes/human/profile";
 import humanInvitationRoutes from "./routes/human/invitations";
@@ -83,6 +84,7 @@ export function createApp() {
   agentApi.route("/conversations", agentUploadRoutes);
   agentApi.route("/conversations", agentInvitationRoutes);
   agentApi.route("/webhooks", agentWebhookRoutes);
+  agentApi.route("/queries", agentQueryRoutes);
   app.route("/api/v1/agent", agentApi);
 
   // Human routes - auth (public, rate limited per IP)

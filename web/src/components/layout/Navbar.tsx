@@ -40,7 +40,9 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           {/* GitHub link */}
           <a
-            href="#"
+            href="https://github.com/horelvis/agentDialog"
+            target="_blank"
+            rel="noopener noreferrer"
             className="hidden md:flex items-center justify-center rounded-lg p-2 text-gray-400 transition-colors hover:text-gray-100"
             aria-label="GitHub"
           >
@@ -95,7 +97,10 @@ export function Navbar() {
               </a>
             ))}
             <a
-              href="#"
+              href="https://github.com/horelvis/agentDialog"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMobileOpen(false)}
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-surface-hover hover:text-gray-100"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">

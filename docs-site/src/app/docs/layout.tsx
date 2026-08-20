@@ -20,8 +20,8 @@ export default function Layout({ children }: { children: ReactNode }) {
         ),
       }}
       links={[
-        { text: "Home", url: "https://agentdialog.dev" },
-        { text: "GitHub", url: "#", external: true },
+        { text: "Home", url: "https://agentdialog.io" },
+        { text: "GitHub", url: "https://github.com/horelvis/agentDialog", external: true },
       ]}
     >
       {children}

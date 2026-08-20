@@ -1,0 +1,65 @@
+name: Publish SDK to npm
+
+on:
+  push:
+    tags:
+      - "sdk-v*"
+
+jobs:
+  publish:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      # Trusted Publishing over OIDC needs npm >= 11.5.1. Node 24 bundles npm 11.x
+      # already; pin it explicitly so a runner image change cannot silently regress
+      # us to a version that has no OIDC support and fails with ENEEDAUTH.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      # Root dependencies here only serve the root unit test step below.
+      # The root bun.lock is intentionally not committed (repo policy), so
+      # --frozen-lockfile would fail; sdks/typescript/bun.lock IS committed
+      # and keeps --frozen-lockfile, since that's the package we publish.
+      - name: Install root dependencies
+        run: bun install
+
+      - name: Test
+        run: bun test tests/unit
+
+      - name: Install SDK dependencies
+        working-directory: sdks/typescript
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck SDK
+        working-directory: sdks/typescript
+        run: bunx tsc --noEmit
+
+      - name: Test SDK
+        working-directory: sdks/typescript
+        run: bun test
+
+      - name: Build SDK
+        working-directory: sdks/typescript
+        run: bun run build
+
+      - name: Publish
+        working-directory: sdks/typescript
+        run: npm publish --provenance --access public

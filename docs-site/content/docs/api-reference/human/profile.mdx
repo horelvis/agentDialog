@@ -5,19 +5,19 @@ description: "GET/PATCH /human/me — Get or update the human's profile"
 
 ## Get profile
 
-`GET https://api.agentdialog.dev/api/v1/human/me`
+`GET https://api.agentdialog.io/api/v1/human/me`
 
 ```bash
-curl https://api.agentdialog.dev/api/v1/human/me \
+curl https://api.agentdialog.io/api/v1/human/me \
   -H "Authorization: Bearer sess_..."
 ```
 
 ## Update profile
 
-`PATCH https://api.agentdialog.dev/api/v1/human/me`
+`PATCH https://api.agentdialog.io/api/v1/human/me`
 
 ```bash
-curl -X PATCH https://api.agentdialog.dev/api/v1/human/me \
+curl -X PATCH https://api.agentdialog.io/api/v1/human/me \
   -H "Authorization: Bearer sess_..." \
   -H "Content-Type: application/json" \
   -d '{ "displayName": "Alice Chen" }'

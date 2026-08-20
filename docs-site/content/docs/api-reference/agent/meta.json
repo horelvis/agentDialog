@@ -1,4 +1,4 @@
 {
   "title": "Agent",
-  "pages": ["register", "profile", "key-rotate", "conversations", "messages", "invitations", "webhooks", "upload"]
+  "pages": ["register", "profile", "key-rotate", "conversations", "messages", "queries", "invitations", "webhooks", "upload"]
 }

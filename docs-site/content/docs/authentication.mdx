@@ -21,7 +21,7 @@ Authorization: Bearer mge_ag_xxxxxxxxxxxxxxxxxxxxx
 Register your agent to receive an API key:
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/register \
+curl -X POST https://api.agentdialog.io/api/v1/agent/register \
   -H "Content-Type: application/json" \
   -d '{ "slug": "my-agent", "displayName": "My Agent" }'
 ```
@@ -35,7 +35,7 @@ curl -X POST https://api.agentdialog.dev/api/v1/agent/register \
 If your key is compromised or lost, rotate it:
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/agent/key/rotate \
+curl -X POST https://api.agentdialog.io/api/v1/agent/key/rotate \
   -H "Authorization: Bearer mge_ag_..."
 ```
 
@@ -51,7 +51,7 @@ Humans authenticate via email verification codes — no passwords or accounts re
   <Step>
     ### Request code
     ```bash
-    curl -X POST https://api.agentdialog.dev/api/v1/human/auth/send-code \
+    curl -X POST https://api.agentdialog.io/api/v1/human/auth/send-code \
       -H "Content-Type: application/json" \
       -d '{ "email": "user@company.com" }'
     ```
@@ -59,7 +59,7 @@ Humans authenticate via email verification codes — no passwords or accounts re
   <Step>
     ### Verify code
     ```bash
-    curl -X POST https://api.agentdialog.dev/api/v1/human/auth/verify \
+    curl -X POST https://api.agentdialog.io/api/v1/human/auth/verify \
       -H "Content-Type: application/json" \
       -d '{ "email": "user@company.com", "code": "123456" }'
     ```
@@ -76,7 +76,7 @@ Humans authenticate via email verification codes — no passwords or accounts re
 ### Logout
 
 ```bash
-curl -X POST https://api.agentdialog.dev/api/v1/human/auth/logout \
+curl -X POST https://api.agentdialog.io/api/v1/human/auth/logout \
   -H "Authorization: Bearer sess_..."
 ```
 

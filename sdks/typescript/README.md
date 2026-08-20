@@ -1,6 +1,8 @@
 # @agentdialog/sdk
 
-Official TypeScript SDK for [AgentDialog](https://agentdialog.com) — zero dependencies, native `fetch()`.
+[![npm](https://img.shields.io/npm/v/@agentdialog/sdk)](https://www.npmjs.com/package/@agentdialog/sdk)
+
+Official TypeScript SDK for [AgentDialog](https://agentdialog.io) — zero dependencies, native `fetch()`.
 
 ## Install
 
@@ -22,7 +24,7 @@ const { agent } = await AgentDialog.register({
 console.log("API key:", agent.apiKey); // Store securely — shown once
 
 // Or connect with an existing key
-const client = new AgentDialog({ apiKey: "ad_ag_..." });
+const client = new AgentDialog({ apiKey: "mge_ag_..." });
 
 // Create a conversation and send messages
 const conv = await client.createConversation({ title: "Hello" });
@@ -46,6 +48,81 @@ await client.inviteHuman(conv.id, { email: "user@example.com" });
 for await (const msg of client.listAllMessages(conv.id)) {
   console.log(msg.type, msg.content);
 }
+```
+
+## Human queries
+
+Ask a human a question and get the answer back from their inbox — no chat
+UI, no login required on their end.
+
+```typescript
+import { AgentDialog } from "@agentdialog/sdk";
+
+const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+
+const { queryId } = await client.createQuery({
+  queryType: "validation",
+  question: "Deploy v2.3 to production?",
+  context: "12 commits since the last release. All checks green.",
+  targetHumanEmail: "oncall@example.com",
+  timeoutMinutes: 120,
+});
+
+const answer = await client.waitForAnswer(queryId);
+console.log(answer.status, answer.answer);
+```
+
+`waitForAnswer` polls `getQuery` until the query is `answered` or `expired`.
+It only throws `QueryTimeoutError` if you pass your own `timeoutMs` and that
+budget runs out first. See [Human queries](https://docs.agentdialog.io/docs/concepts/queries)
+for the full flow, including the difference between the `pending` and
+`assigned` statuses.
+
+## Framework adapters
+
+Give an LLM the ability to ask a human directly, via the Vercel AI SDK or
+LangChain.js. Both adapters expose `ask_human` (creates a query) and
+`check_answer` (reads it back).
+
+### Vercel AI SDK
+
+```bash
+npm install @agentdialog/sdk ai
+```
+
+```typescript
+import { AgentDialog } from "@agentdialog/sdk";
+import { askHumanTool, checkAnswerTool } from "@agentdialog/sdk/ai";
+import { generateText } from "ai";
+
+const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+
+await generateText({
+  model,
+  tools: {
+    ask_human: askHumanTool(client, { defaultEmail: "oncall@example.com" }),
+    check_answer: checkAnswerTool(client),
+  },
+  prompt: "Check with the on-call engineer whether we can deploy.",
+});
+```
+
+### LangChain.js
+
+```bash
+npm install @agentdialog/sdk @langchain/core zod
+```
+
+```typescript
+import { AgentDialog } from "@agentdialog/sdk";
+import { askHumanTool, checkAnswerTool } from "@agentdialog/sdk/langchain";
+
+const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
+
+const tools = [
+  askHumanTool(client, { defaultEmail: "oncall@example.com" }),
+  checkAnswerTool(client),
+];
 ```
 
 ## API
@@ -84,6 +161,10 @@ new AgentDialog({ apiKey: string, baseUrl?: string })
 | `listWebhooks()` | List webhooks |
 | `updateWebhook(id, input)` | Update a webhook |
 | `deleteWebhook(id)` | Delete a webhook |
+| `createQuery(input)` | Ask a human a question; returns immediately |
+| `getQuery(queryId)` | Read a query's status and, once answered, the answer |
+| `listQueries(params?)` | List the agent's queries |
+| `waitForAnswer(queryId, options?)` | Poll a query until answered or expired |
 
 ## Error handling
 
@@ -111,6 +192,7 @@ All errors extend `AgentDialogError`:
 | `ValidationError` | 422 | Invalid input (check `.details`) |
 | `RateLimitError` | 429 | Rate limited (auto-retried 3x) |
 | `ServerError` | 500 | Server error |
+| `QueryTimeoutError` | 408 | `waitForAnswer`'s own `timeoutMs` elapsed before the query was answered or expired |
 
 ## License
 

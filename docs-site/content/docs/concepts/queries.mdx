@@ -1,0 +1,82 @@
+---
+title: Human queries
+description: How an agent asks a human a question and gets the answer back from their inbox
+---
+
+import { Steps, Step } from "fumadocs-ui/components/steps";
+import { Callout } from "fumadocs-ui/components/callout";
+
+A query is the fastest way for an agent to get a human's input: no chat UI,
+no login, no app to open. The agent asks a question through the API; the
+human answers by replying to an email.
+
+## Flow
+
+<Steps>
+  <Step>
+    ### Agent creates the query
+    The agent calls `POST /agent/queries` (or the SDK's `client.createQuery()`) with a `question`, a `target_human_email`, and how long to wait before giving up.
+  </Step>
+  <Step>
+    ### Human receives an email
+    AgentDialog creates a conversation behind the scenes and emails the human the question and context. The email's `Reply-To` header is set to `reply+{queryId}@reply.agentdialog.io` — a per-query address.
+  </Step>
+  <Step>
+    ### Human replies from their inbox
+    The human answers like any other email — no verification code, no web app. If this is their first query from this agent, the email doubles as an invitation and replying accepts it.
+  </Step>
+  <Step>
+    ### The inbound webhook processes the reply
+    AgentDialog's mail handler receives the reply, matches it to the query by the `reply+{queryId}` address, strips the quoted thread, accepts the invitation if it wasn't already accepted, and records the answer.
+  </Step>
+  <Step>
+    ### Agent reads the answer
+    The agent polls `GET /agent/queries/{id}` (or the SDK's `client.getQuery()` / `client.waitForAnswer()`) until `status` is `answered`, then reads `answer`.
+  </Step>
+</Steps>
+
+## `pending` vs `assigned`
+
+Every query has one of four statuses: `pending`, `assigned`, `answered`, or
+`expired`. The distinction that trips people up is between the first two,
+and it comes down to **auto-trust**.
+
+When an agent creates a query, AgentDialog checks whether the target human
+has previously **accepted an invitation from that same agent** and not since
+revoked it:
+
+- **No prior accepted invitation** → the query starts as `pending`. The human
+  still has to open the invitation (their first reply doubles as accepting
+  it) before they can answer.
+- **Prior accepted invitation, not revoked** → the human already trusts this
+  agent, so the query is created directly as `assigned`. There's nothing for
+  the human to accept — they can answer immediately.
+
+In both cases the human gets the same email and can reply the same way; the
+status only changes how the agent should read "no answer yet". A `pending`
+query might be waiting on the human to notice the invitation at all, while
+an `assigned` query means they've seen it and simply haven't answered.
+
+Once a human answers, `answered` is terminal — the SDK's `waitForAnswer`
+stops polling there. If no one answers before `timeout_minutes` elapses, the
+query becomes `expired`, which is also terminal: the agent should treat it
+as "no answer" and, if it still needs input, create a new query.
+
+<Callout type="info">
+  Trust is per agent, not global. A human who trusts Agent A starts fresh at
+  `pending` with Agent B until they accept an invitation from B too.
+</Callout>
+
+## Why email instead of the app
+
+Most AgentDialog concepts — [conversations](/docs/concepts/conversations),
+[messages](/docs/concepts/messages) — assume the human has the web app open.
+Queries are built for the opposite case: an agent needs one quick answer from
+someone who is not watching a dashboard. Routing the whole exchange through
+email means the only thing the human needs is the inbox they already check.
+
+## See also
+
+- [Queries API reference](/docs/api-reference/agent/queries) for the exact request and response shapes.
+- [TypeScript SDK](/docs/sdks/typescript) for `createQuery` and `waitForAnswer`.
+- [Invitations](/docs/concepts/invitations) for how the underlying accept/decline mechanism works outside of queries.

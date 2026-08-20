@@ -6,6 +6,7 @@ import {
   ValidationError,
   RateLimitError,
   ServerError,
+  QueryTimeoutError,
 } from "./errors.js";
 import type {
   Agent,
@@ -16,6 +17,7 @@ import type {
   Invitation,
   InviteHumanInput,
   Message,
+  Pagination,
   PaginatedResponse,
   PaginationParams,
   RegisteredAgent,
@@ -28,8 +30,24 @@ import type {
   Webhook,
   WebhookWithSecret,
 } from "./types.js";
+import {
+  toCreateQueryBody,
+  fromCreatedQueryWire,
+  fromQueryWire,
+  fromQuerySummaryWire,
+} from "./queries.js";
+import type {
+  CreateQueryInput,
+  CreatedQuery,
+  CreatedQueryWire,
+  ListQueriesParams,
+  Query,
+  QuerySummary,
+  QuerySummaryWire,
+  QueryWire,
+} from "./queries.js";
 
-const DEFAULT_BASE_URL = "https://agentdialog.com";
+const DEFAULT_BASE_URL = "https://api.agentdialog.io";
 const MAX_RETRIES = 3;
 
 export class AgentDialog {
@@ -54,10 +72,10 @@ export class AgentDialog {
       body: JSON.stringify(input),
     });
 
-    const body = await res.json();
+    const body = await res.json() as { data: RegisteredAgent };
     if (!res.ok) throw errorFromResponse(res.status, body);
 
-    const agent = body.data as RegisteredAgent;
+    const agent = body.data;
     const client = new AgentDialog({ apiKey: agent.apiKey, baseUrl }) as AgentDialog & {
       agent: RegisteredAgent;
     };
@@ -182,6 +200,109 @@ export class AgentDialog {
     return this.request<Webhook>("DELETE", `/agent/webhooks/${id}`);
   }
 
+  // ── Human queries ──
+
+  /** Ask a human a question. Returns immediately; the human answers by email. */
+  async createQuery(input: CreateQueryInput): Promise<CreatedQuery> {
+    const wire = await this.request<CreatedQueryWire>(
+      "POST",
+      "/agent/queries",
+      toCreateQueryBody(input),
+    );
+    return fromCreatedQueryWire(wire);
+  }
+
+  /** Read a query's current status and, once answered, the human's answer. */
+  async getQuery(queryId: string, signal?: AbortSignal): Promise<Query> {
+    const wire = await this.request<QueryWire>(
+      "GET",
+      `/agent/queries/${queryId}`,
+      undefined,
+      0,
+      signal,
+    );
+    return fromQueryWire(wire);
+  }
+
+  async listQueries(params?: ListQueriesParams): Promise<QuerySummary[]> {
+    const wire = await this.request<QuerySummaryWire[]>(
+      "GET",
+      `/agent/queries${buildQuery(params)}`,
+    );
+    return wire.map(fromQuerySummaryWire);
+  }
+
+  /**
+   * Poll a query until a human answers it or it expires.
+   *
+   * Backs off from pollIntervalMs up to maxPollIntervalMs, because humans
+   * answer on human timescales and tight polling only burns rate limit.
+   * An expired query resolves rather than throwing: expiry is an answer of
+   * sorts, and the caller usually wants to branch on it.
+   */
+  async waitForAnswer(
+    queryId: string,
+    options: {
+      pollIntervalMs?: number;
+      maxPollIntervalMs?: number;
+      timeoutMs?: number;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<Query> {
+    const {
+      pollIntervalMs = 10_000,
+      maxPollIntervalMs = 60_000,
+      timeoutMs,
+      signal,
+    } = options;
+
+    const startedAt = Date.now();
+    let interval = pollIntervalMs;
+
+    for (;;) {
+      if (signal?.aborted) throw signal.reason ?? new Error("Aborted");
+
+      // Bound the in-flight request itself, not just the between-request
+      // checks above: without this, a single hung getQuery (cold start,
+      // blackholed connection) waits out the OS TCP timeout regardless of
+      // timeoutMs or an aborted `signal`.
+      const remainingForRequest =
+        timeoutMs !== undefined ? timeoutMs - (Date.now() - startedAt) : undefined;
+      if (remainingForRequest !== undefined && remainingForRequest <= 0) {
+        throw new QueryTimeoutError(queryId, timeoutMs!);
+      }
+
+      let query: Query;
+      try {
+        query = await this.getQuery(queryId, combineSignals(signal, remainingForRequest));
+      } catch (err) {
+        if (timeoutMs !== undefined && isTimeoutAbort(err)) {
+          throw new QueryTimeoutError(queryId, timeoutMs);
+        }
+        throw err;
+      }
+      if (query.status === "answered" || query.status === "expired") return query;
+
+      if (timeoutMs !== undefined && Date.now() - startedAt >= timeoutMs) {
+        throw new QueryTimeoutError(queryId, timeoutMs);
+      }
+
+      // Never sleep past the caller's deadline: cap the sleep at the
+      // remaining budget so a large pollIntervalMs can't delay the
+      // timeout. The call still returns within roughly timeoutMs plus one
+      // getQuery round-trip, because the loop always gives the query one
+      // last chance to have been answered before throwing.
+      if (timeoutMs !== undefined) {
+        const remaining = timeoutMs - (Date.now() - startedAt);
+        if (remaining <= 0) throw new QueryTimeoutError(queryId, timeoutMs);
+        await sleep(Math.min(interval, remaining), signal);
+      } else {
+        await sleep(interval, signal);
+      }
+      interval = Math.min(interval * 2, maxPollIntervalMs);
+    }
+  }
+
   // ── Internal ──
 
   private async request<T>(
@@ -189,6 +310,7 @@ export class AgentDialog {
     path: string,
     body?: unknown,
     retries = 0,
+    signal?: AbortSignal,
   ): Promise<T> {
     const url = `${this.baseUrl}/api/v1${path}`;
     const headers: Record<string, string> = {
@@ -202,18 +324,19 @@ export class AgentDialog {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
     });
 
     if (res.status === 429 && retries < MAX_RETRIES) {
       const retryAfter = parseRetryAfter(res);
-      await sleep(retryAfter * 1000);
-      return this.request<T>(method, path, body, retries + 1);
+      await sleep(retryAfter * 1000, signal);
+      return this.request<T>(method, path, body, retries + 1, signal);
     }
 
-    const json = await res.json();
+    const json = await res.json() as { data: T };
     if (!res.ok) throw errorFromResponse(res.status, json);
 
-    return json.data as T;
+    return json.data;
   }
 
   private async requestPaginated<T>(
@@ -232,11 +355,11 @@ export class AgentDialog {
       return this.requestPaginated<T>(method, path);
     }
 
-    const json = await res.json();
+    const json = await res.json() as { data: T[]; pagination: Pagination };
     if (!res.ok) throw errorFromResponse(res.status, json);
 
     return {
-      data: json.data as T[],
+      data: json.data,
       pagination: json.pagination,
     };
   }
@@ -275,11 +398,45 @@ function parseRetryAfter(res: Response): number {
   return 1;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Combine the caller's abort signal (if any) with a per-request timeout
+ * derived from the remaining `waitForAnswer` budget (if any), so a single
+ * fetch can never outlive either. Returns undefined when there's nothing
+ * to bound the request with.
+ */
+function combineSignals(
+  signal: AbortSignal | undefined,
+  remainingMs: number | undefined,
+): AbortSignal | undefined {
+  const signals: AbortSignal[] = [];
+  if (signal) signals.push(signal);
+  if (remainingMs !== undefined) signals.push(AbortSignal.timeout(remainingMs));
+  if (signals.length === 0) return undefined;
+  if (signals.length === 1) return signals[0];
+  return AbortSignal.any(signals);
 }
 
-function buildQuery(params?: Record<string, unknown>): string {
+/** True if `err` is the abort produced by AbortSignal.timeout() firing. */
+function isTimeoutAbort(err: unknown): boolean {
+  return err instanceof Error && err.name === "TimeoutError";
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason ?? new Error("Aborted"));
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(signal!.reason ?? new Error("Aborted"));
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function buildQuery(params?: object): string {
   if (!params) return "";
   const entries = Object.entries(params).filter(([, v]) => v !== undefined);
   if (entries.length === 0) return "";
