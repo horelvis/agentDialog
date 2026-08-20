@@ -181,10 +181,15 @@ error can be traced back through the request that caused it.
                                        (PostgreSQL)   (Redis)
 ```
 
-Only two things live in Google Cloud: the container image registry and the
-service that runs the container. The database and Redis are managed elsewhere,
-reached over the network with credentials supplied as environment variables. The
-static sites never touch GCP at all.
+Three things live in Google Cloud: the container image registry, the service that
+runs the container, and the Cloud Storage bucket behind the `MINIO_*` variables.
+The database and Redis are managed elsewhere, reached over the network with
+credentials supplied as environment variables. The static sites never touch GCP.
+
+The project is `agentdialog`, owned by a different Google account than the one
+that owns the product's Gmail address. That split is normal and only matters when
+setting up OAuth, where the client lives in the project and the consent is given
+by the mailbox's own account.
 
 ### Google Cloud
 
@@ -235,16 +240,29 @@ Cloudflare Pages builds them from source; do not commit them.
 
 ### Configuration and secrets
 
-Runtime configuration is **environment variables on the Cloud Run service**, not
-Secret Manager. `scripts/cleanup-secrets.sh` exists to tear down the Secret
-Manager entries from an earlier setup and prints the `gcloud run services update`
-command that replaces them.
+Configuration is a **hybrid**, which is worth knowing before you touch either half:
 
-The trade-off is worth knowing rather than rediscovering: environment variables
-are simpler and cost nothing, but they are visible to anyone with
-`run.services.get` on the project, they are not versioned, and rotating one
-requires a service update. For the current scale that is an acceptable trade;
-for a team it would not be.
+- `SMTP_PASS` is a **Secret Manager reference** (`valueFrom`), backed by the
+  secret `smtp-password`.
+- Every other variable is a **plain environment variable** on the service.
+
+Four further secrets exist in Secret Manager — `SMTP_FROM`, `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_USER` — that nothing references. They are leftovers from the
+original setup and none of them is sensitive.
+
+The trade-off of plain environment variables is worth knowing rather than
+rediscovering: they are simpler and cost nothing, but they are visible to anyone
+with `run.services.get` on the project, they are not versioned, and rotating one
+requires a service update. For the current scale that is acceptable; for a team
+it would not be.
+
+<!-- DANGER -->
+**`scripts/cleanup-secrets.sh` will break outbound email if you run it today.**
+It calls `gcloud run services update --clear-secrets`, which removes *every*
+secret reference from the service — including the live `SMTP_PASS`. Its hardcoded
+list of secrets to delete (`database-url`, `redis-url`, `session-secret`) does not
+match what actually exists, and omits the four that do. The script was written for
+a configuration this project no longer has. Do not run it without rewriting it.
 
 `src/env.ts` validates everything at startup with zod and exits if a variable is
 missing or malformed, so a misconfigured deploy fails immediately and loudly
@@ -282,10 +300,31 @@ it down as Terraform is the obvious next step and has not been done.
 
 ### File storage
 
-`src/config/storage.ts` and the `MINIO_*` variables target an S3-compatible
-store; development uses MinIO from `docker-compose.dev.yml`. **What backs this in
-production is not recorded anywhere in the repository** — verify against the
-Cloud Run service's environment variables before relying on it.
+The `MINIO_*` variables are a misnomer in production: they point at
+`storage.googleapis.com`, so file storage is **Google Cloud Storage** through its
+S3-compatible API, bucket `agentdialog-files`. Development uses real MinIO from
+`docker-compose.dev.yml`. The variable names come from the development setup and
+were never renamed.
+
+### Email
+
+Outbound email goes through **Gmail SMTP** (`smtp.gmail.com:465`), not through
+Resend or any transactional provider. Resend appears in the codebase only as the
+default value of `INBOUND_EMAIL_PROVIDER` and in the changelog; no Resend account
+is configured.
+
+Two consequences worth knowing:
+
+- A consumer Gmail account caps at roughly 500 messages a day, and messages sent
+  from a `@gmail.com` address on behalf of `agentdialog.io` have no aligned SPF
+  or DKIM, which costs deliverability.
+- **Inbound email does not work at all.** Query emails carry a `Reply-To` of
+  `reply+{queryId}@reply.agentdialog.io`, but neither `agentdialog.io` nor
+  `reply.agentdialog.io` has an MX record — confirmed against two resolvers — so
+  a human's reply bounces and reaches nothing. `POST /api/v1/webhooks/email/inbound`
+  is deployed and reachable, but no provider ever calls it. The feature the
+  landing page sells is not operational: the code is complete, the mail
+  infrastructure was never built.
 
 ## Things that have bitten, and how to recognise them
 
