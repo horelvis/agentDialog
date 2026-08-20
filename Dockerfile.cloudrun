@@ -5,7 +5,7 @@
 # ============================================
 
 # --- Base ---
-FROM oven/bun:1 AS base
+FROM oven/bun:1.4 AS base
 WORKDIR /app
 
 # --- Install backend dependencies (prod only) ---
