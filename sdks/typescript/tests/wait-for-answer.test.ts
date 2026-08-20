@@ -19,11 +19,12 @@ function queryPayload(status: string, answer: string | null = null) {
 /** Serves the given statuses in order, repeating the last one forever. */
 function mockSequence(statuses: string[]) {
   let i = 0;
-  const state = { calls: 0 };
+  const state = { calls: 0, timestamps: [] as number[] };
   globalThis.fetch = (async () => {
     const status = statuses[Math.min(i, statuses.length - 1)];
     i++;
     state.calls++;
+    state.timestamps.push(Date.now());
     const answer = status === "answered" ? "yes" : null;
     return new Response(JSON.stringify(queryPayload(status, answer)), {
       status: 200,
@@ -64,5 +65,21 @@ describe("waitForAnswer", () => {
     await expect(
       client.waitForAnswer("q1", { pollIntervalMs: 1, signal: controller.signal }),
     ).rejects.toThrow("caller gave up");
+  });
+
+  it("throws promptly when timeoutMs is shorter than pollIntervalMs", async () => {
+    mockSequence(["pending"]);
+    const startedAt = Date.now();
+    await expect(
+      client.waitForAnswer("q1", { pollIntervalMs: 10_000, timeoutMs: 50 }),
+    ).rejects.toBeInstanceOf(QueryTimeoutError);
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+  });
+
+  it("backs off between polls, widening the gap over successive attempts", async () => {
+    const state = mockSequence(["pending", "pending", "pending", "pending", "answered"]);
+    await client.waitForAnswer("q1", { pollIntervalMs: 20, maxPollIntervalMs: 200 });
+    const gaps = state.timestamps.slice(1).map((t, i) => t - state.timestamps[i]);
+    expect(gaps[2]).toBeGreaterThan(gaps[0]);
   });
 });

@@ -263,7 +263,18 @@ export class AgentDialog {
         throw new QueryTimeoutError(queryId, timeoutMs);
       }
 
-      await sleep(interval, signal);
+      // Never sleep past the caller's deadline: cap the sleep at the
+      // remaining budget so a large pollIntervalMs can't delay the
+      // timeout. The call still returns within roughly timeoutMs plus one
+      // getQuery round-trip, because the loop always gives the query one
+      // last chance to have been answered before throwing.
+      if (timeoutMs !== undefined) {
+        const remaining = timeoutMs - (Date.now() - startedAt);
+        if (remaining <= 0) throw new QueryTimeoutError(queryId, timeoutMs);
+        await sleep(Math.min(interval, remaining), signal);
+      } else {
+        await sleep(interval, signal);
+      }
       interval = Math.min(interval * 2, maxPollIntervalMs);
     }
   }
