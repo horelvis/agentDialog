@@ -9,7 +9,7 @@ describe("stripReplyQuotes", () => {
   it("strips Gmail English quoted text", () => {
     const text = `Yes, I approve this.
 
-On Mon, Mar 10, 2026 at 3:15 PM Agent via AgentDialog <noreply@agentdialog.com> wrote:
+On Mon, Mar 10, 2026 at 3:15 PM Agent via AgentDialog <noreply@agentdialog.io> wrote:
 > Please review the data.
 > Thanks.`;
     expect(stripReplyQuotes(text)).toBe("Yes, I approve this.");

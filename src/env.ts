@@ -27,7 +27,7 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(1025),
   SMTP_USER: z.string().default(""),
   SMTP_PASS: z.string().default(""),
-  SMTP_FROM: z.string().default("noreply@agentdialog.dev"),
+  SMTP_FROM: z.string().default("noreply@agentdialog.io"),
   SMTP_SECURE: z.string().default("false").transform((v) => v === "true"),
 
   APP_URL: z.string().url().default("http://localhost:3000"),
