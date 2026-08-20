@@ -10,5 +10,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$ROOT/docs/api/README.md"
 DEST="$ROOT/web/public/agentdialog-integration-guide.md"
 
+# In the frontend-only Docker build context, docs/ is not copied in (it's
+# excluded by .dockerignore) so $SRC won't exist. The committed copy at
+# $DEST is already correct for that build, so just skip regenerating it.
+if [ ! -f "$SRC" ]; then
+  echo "Skipping sync: $SRC not found (expected in the frontend-only Docker build)"
+  exit 0
+fi
+
 cp "$SRC" "$DEST"
 echo "Synced $SRC -> $DEST"

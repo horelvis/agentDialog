@@ -25,6 +25,10 @@ RUN bun run typecheck
 
 # --- Build frontend ---
 FROM base AS build-frontend
+# The build script shells out to ../scripts/sync-integration-guide.sh; that
+# script no-ops if its docs/ source isn't present (excluded by .dockerignore
+# here), but it still needs to exist to be invoked at all.
+COPY scripts ./scripts
 WORKDIR /app/web
 COPY web/package.json web/bun.lockb* ./
 RUN bun install --frozen-lockfile
