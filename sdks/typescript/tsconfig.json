@@ -10,7 +10,12 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2022"]
+    // DOM supplies fetch, Response, AbortSignal and the timer functions. The SDK
+    // uses no DOM nodes — it needs the web platform globals that both browsers
+    // and modern Node/Bun provide. Without this the package only compiles when
+    // it happens to inherit @types/bun from the monorepo root, which is not a
+    // guarantee a published package can rely on.
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src"]
 }
