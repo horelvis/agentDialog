@@ -200,6 +200,21 @@ GCP_PROJECT_ID=your-project ./scripts/deploy.sh
 
 See [`.env.example`](.env.example) for all configuration options.
 
+## Documentation
+
+| Document | For |
+|----------|-----|
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Setting the project up, running the tests, opening a PR |
+| [`docs/architecture.md`](docs/architecture.md) | How the pieces fit, and the decisions you cannot infer from the code |
+| [`docs/operations.md`](docs/operations.md) | Workflows, deploys, releases, rollback, logs |
+| [`docs/api/README.md`](docs/api/README.md) | The complete API guide |
+| [`CLAUDE.md`](CLAUDE.md) | The same ground rules, condensed for AI agents working in the repo |
+| [docs.agentdialog.io](https://docs.agentdialog.io) | Published documentation for integrators |
+
+Two release paths, easy to confuse and expensive to get wrong: a GitHub Release
+deploys the API **and migrates the production database**, while an `sdk-v*` tag
+publishes the SDK. Both are documented in [`docs/operations.md`](docs/operations.md).
+
 ## License
 
 MIT
