@@ -1,7 +1,7 @@
 {
   "name": "@agentdialog/sdk",
   "version": "0.1.0",
-  "description": "Official TypeScript SDK for AgentDialog — ask humans, get answers by email",
+  "description": "Official TypeScript SDK for AgentDialog \u2014 ask humans, get answers by email",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,7 +19,10 @@
       "import": "./dist/langchain/index.js"
     }
   },
-  "files": ["dist", "LICENSE"],
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -29,12 +32,25 @@
     "directory": "sdks/typescript"
   },
   "homepage": "https://agentdialog.io",
-  "bugs": { "url": "https://github.com/horelvis/agentDialog/issues" },
-  "keywords": ["agentdialog", "agent", "sdk", "api", "human-in-the-loop", "mcp", "ai"],
+  "bugs": {
+    "url": "https://github.com/horelvis/agentDialog/issues"
+  },
+  "keywords": [
+    "agentdialog",
+    "agent",
+    "sdk",
+    "api",
+    "human-in-the-loop",
+    "mcp",
+    "ai"
+  ],
   "license": "MIT",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "bun test tests",
+    "test:dist": "bun run build && bun test packaged",
+    "test:pack": "bun run build && bash scripts/smoke-pack.sh"
   },
   "peerDependencies": {
     "ai": ">=5",
@@ -42,9 +58,15 @@
     "zod": ">=3"
   },
   "peerDependenciesMeta": {
-    "ai": { "optional": true },
-    "@langchain/core": { "optional": true },
-    "zod": { "optional": true }
+    "ai": {
+      "optional": true
+    },
+    "@langchain/core": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "typescript": "^5.5.0",
