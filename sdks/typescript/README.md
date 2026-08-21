@@ -58,10 +58,10 @@ chat — there's no password to create, no signup form, just the code and the
 app.
 
 A query is not free text in either direction. You declare a `subject` (what
-this is about, with something the human can actually look at) and an
-`answerSpace` (the closed shape the answer must take — boolean, choice,
-scalar, date, text, or fields), and the human's `answer` comes back typed to
-match it:
+this is about, with something the human can actually look at — a `uri` or an
+inline `body`) and an `answerSpace` (the closed shape the answer must take —
+boolean, choice, scalar, date, text, or fields), and the human's `answer`
+comes back typed to match it:
 
 ```typescript
 import { AgentDialog } from "@agentdialog/sdk";
@@ -70,7 +70,11 @@ const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
 
 const { queryId } = await client.createQuery({
   queryType: "validation",
-  subject: { id: "release-2.3", label: "Release 2.3 to Fictional Corp" },
+  subject: {
+    id: "release-2.3",
+    label: "Release 2.3 to Fictional Corp",
+    uri: "https://example.test/releases/2.3",
+  },
   answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
   question: "Deploy release 2.3 to production?",
   context: "12 commits since the last release. All checks green.",
@@ -82,6 +86,28 @@ const query = await client.waitForAnswer(queryId);
 if (query.status === "answered" && query.answer?.kind === "boolean") {
   console.log(query.answer.value ? "Ship it" : "Hold");
 }
+```
+
+A subject with no referent at all is refused with `422 missing_referent`, at
+any risk level. If the question genuinely isn't about an artefact — a
+judgement call, a standing preference — say so instead of inventing one:
+
+```typescript
+await client.createQuery({
+  queryType: "expert_query",
+  subject: { id: "late-refund-policy-2026", label: "Refunds outside the return window" },
+  selfContained: true,
+  answerSpace: {
+    kind: "choice",
+    select: "one",
+    options: [
+      { id: "refund", label: "Refund anyway" },
+      { id: "decline", label: "Decline" },
+    ],
+  },
+  question: "As a general rule, do we refund outside the window when the customer called ahead?",
+  targetHumanEmail: "oncall@example.com",
+});
 ```
 
 A question above `low` risk needs more than a subject and a shape — see

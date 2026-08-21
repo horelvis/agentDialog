@@ -534,19 +534,46 @@ POST /agent/queries
   "risk": "low",
   "subject": {
     "id": "q4-revenue-figure",
-    "label": "Cifra de revenue de Q4"
+    "label": "Cifra de revenue de Q4",
+    "body": "Q4 revenue: 2.300.000 EUR (+15% YoY). Fuente: finance.quarterly_revenue, corte del 2026-01-05."
   },
   "answer_space": {
     "kind": "boolean",
     "labels": { "t": "Correcto", "f": "Incorrecto" }
   },
-  "question": "¿Los datos de revenue de Q4 son correctos? $2.3M (+15% YoY)",
+  "question": "¿Los datos de revenue de Q4 son correctos? 2,3M EUR (+15% YoY)",
   "context": "Datos extraídos de BigQuery, tabla finance.quarterly_revenue...",
   "target_human_email": "sarah@example.com",
   "confidence": 0.7,
   "timeout_minutes": 30
 }
 ```
+
+El `subject` de arriba lleva el referente en `body`. **Sin referente y sin `self_contained: true` la petición se rechaza con `422 missing_referent`** — a cualquier riesgo. Si la pregunta de verdad no trata sobre ningún artefacto (un juicio, una preferencia), esa es la válvula de escape:
+
+```json
+{
+  "query_type": "expert_query",
+  "subject": {
+    "id": "politica-reembolsos-2026",
+    "label": "Criterio de reembolso fuera de plazo"
+  },
+  "self_contained": true,
+  "answer_space": {
+    "kind": "choice",
+    "select": "one",
+    "options": [
+      { "id": "reembolsar", "label": "Reembolsar igualmente" },
+      { "id": "denegar", "label": "Denegar" }
+    ]
+  },
+  "question": "Como criterio general, ¿reembolsamos fuera de plazo cuando el cliente avisó por teléfono?",
+  "target_human_email": "sarah@example.com",
+  "timeout_minutes": 120
+}
+```
+
+`self_contained` no es un atajo: si hay algo que mirar, hay que mandarlo.
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
@@ -571,10 +598,9 @@ POST /agent/queries
 |-------|------|-----------|-------------|
 | `id` | string | Sí | Id estable, reutilizado entre queries sobre lo mismo |
 | `label` | string | Sí | Etiqueta legible |
-| `uri` | string | No | Enlace al referente |
+| `uri` | string | No | Enlace `http(s)` al referente. Otros esquemas se rechazan |
 | `body` | string | No | El referente inline, si no hay una URI estable |
-| `attachments` | array | No | Ids de attachments subidos de antemano |
-| `sha256` | string | No | Hash del referente — obligatorio por encima de `medium` risk cuando el referente es autoalojado (`body`/`attachments`) |
+| `sha256` | string | No | Hash del referente — obligatorio por encima de `medium` risk, donde además el referente tiene que ser `body`: no se puede hashear lo que no se tiene |
 
 ##### Answer spaces
 
@@ -616,10 +642,10 @@ Todas las respuestas REST van envueltas en un objeto `data` de nivel superior.
 {
   "error": {
     "code": "UNDECIDABLE_QUERY",
-    "message": "This subject has no referent for the human to look at.",
+    "message": "The subject 'q4-revenue-figure' carries no uri or body, so the human has nothing to look at.",
     "reason": "missing_referent",
-    "detail": "This subject has no referent for the human to look at.",
-    "remedy": "Add a uri, body, or attachments to subject, or set self_contained to true."
+    "detail": "The subject 'q4-revenue-figure' carries no uri or body, so the human has nothing to look at.",
+    "remedy": "Link the artefact with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing."
   }
 }
 ```
@@ -734,13 +760,14 @@ Crea una query para que un humano responda una pregunta que de verdad pueda deci
   "risk": "low",
   "subject": {
     "id": "q4-revenue-figure",
-    "label": "Cifra de revenue de Q4"
+    "label": "Cifra de revenue de Q4",
+    "body": "Q4 revenue: 2.300.000 EUR (+15% YoY). Fuente: finance.quarterly_revenue, corte del 2026-01-05."
   },
   "answer_space": {
     "kind": "boolean",
     "labels": { "t": "Correcto", "f": "Incorrecto" }
   },
-  "question": "¿Los datos de revenue de Q4 son correctos? $2.3M (+15% YoY)",
+  "question": "¿Los datos de revenue de Q4 son correctos? 2,3M EUR (+15% YoY)",
   "context": "Datos extraídos de BigQuery, tabla finance.quarterly_revenue...",
   "target_human_email": "sarah@example.com",
   "confidence": 0.7,
@@ -748,11 +775,37 @@ Crea una query para que un humano responda una pregunta que de verdad pueda deci
 }
 ```
 
+El `subject` de arriba lleva el referente en `body`. **Sin referente y sin `self_contained: true` la petición se rechaza con `422 missing_referent`** — a cualquier riesgo. Si la pregunta de verdad no trata sobre ningún artefacto (un juicio, una preferencia), esa es la válvula de escape:
+
+```json
+{
+  "query_type": "expert_query",
+  "subject": {
+    "id": "politica-reembolsos-2026",
+    "label": "Criterio de reembolso fuera de plazo"
+  },
+  "self_contained": true,
+  "answer_space": {
+    "kind": "choice",
+    "select": "one",
+    "options": [
+      { "id": "reembolsar", "label": "Reembolsar igualmente" },
+      { "id": "denegar", "label": "Denegar" }
+    ]
+  },
+  "question": "Como criterio general, ¿reembolsamos fuera de plazo cuando el cliente avisó por teléfono?",
+  "target_human_email": "sarah@example.com",
+  "timeout_minutes": 120
+}
+```
+
+`self_contained` no es un atajo: si hay algo que mirar, hay que mandarlo.
+
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
 | `query_type` | enum | Sí | `validation`, `interpretation`, `expert_query`, `labeling` |
 | `risk` | enum | No | `low` (default), `medium`, `high`, `critical` — un piso; el servidor puede subirlo, nunca bajarlo |
-| `subject` | object | Sí | De qué trata: un id, una label, y un referente (uri, body o attachments) |
+| `subject` | object | Sí | De qué trata: un id, una label, y un referente (`uri` o `body`) |
 | `self_contained` | boolean | No | `true` solo si la pregunta de verdad no necesita referente |
 | `answer_space` | object | Sí | La forma cerrada de la respuesta: `boolean`, `choice`, `scalar`, `date`, `text` o `fields` — ver la sección REST arriba para el catálogo completo |
 | `question` | string | Sí | La pregunta para el humano (max 10,000 chars) |
@@ -779,10 +832,10 @@ Una pregunta que la puerta de admisión juzga indecidible viene rechazada como e
 
 ```json
 {
-  "error": "This subject has no referent for the human to look at.",
+  "error": "The subject 'q4-revenue-figure' carries no uri or body, so the human has nothing to look at.",
   "code": "UNDECIDABLE_QUERY",
   "reason": "missing_referent",
-  "remedy": "Add a uri, body, or attachments to subject, or set self_contained to true."
+  "remedy": "Link the artefact with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing."
 }
 ```
 

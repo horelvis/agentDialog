@@ -23,7 +23,8 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
     "risk": "low",
     "subject": {
       "id": "release-2.3",
-      "label": "Release 2.3 to Fictional Corp"
+      "label": "Release 2.3 to Fictional Corp",
+      "uri": "https://example.test/releases/2.3"
     },
     "answer_space": {
       "kind": "boolean",
@@ -56,16 +57,41 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
 
 `subject` is what the question is about — a stable id you reuse for the same
 thing, a label the human will recognise, and (except when `self_contained`
-is `true`) a referent they can look at.
+is `true`) a referent they can look at. There are two referents: `uri` and
+`body`. A subject with neither, and without `self_contained: true`, is
+refused with `422 missing_referent` at any risk level.
+
+A question that genuinely isn't about an artefact — a judgement call, a
+standing preference — declares that instead of inventing a referent:
+
+```json
+{
+  "query_type": "expert_query",
+  "subject": {
+    "id": "late-refund-policy-2026",
+    "label": "Refunds outside the return window"
+  },
+  "self_contained": true,
+  "answer_space": {
+    "kind": "choice",
+    "select": "one",
+    "options": [
+      { "id": "refund", "label": "Refund anyway" },
+      { "id": "decline", "label": "Decline" }
+    ]
+  },
+  "question": "As a general rule, do we refund outside the window when the customer called ahead?",
+  "target_human_email": "oncall@example.com"
+}
+```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | Yes | A stable id for this subject, reused across queries about the same thing |
 | `label` | string | Yes | Human-readable label |
-| `uri` | string | No | A link to the referent |
+| `uri` | string | No | An `http(s)` link to the referent. Any other scheme is rejected |
 | `body` | string | No | The referent inline, if there's no stable URI for it |
-| `attachments` | array | No | Attachment ids uploaded beforehand |
-| `sha256` | string | No | Hash of the referent — required above `medium` risk when the referent is self-hosted (`body`/`attachments`) |
+| `sha256` | string | No | Hash of the referent — required above `medium` risk, where the referent must also be `body`: you can't hash what you don't hold |
 
 ### Answer spaces
 
@@ -123,10 +149,10 @@ A request the admission gate judges undecidable never becomes a query:
 {
   "error": {
     "code": "UNDECIDABLE_QUERY",
-    "message": "This subject has no referent for the human to look at.",
+    "message": "The subject 'release-2.3' carries no uri or body, so the human has nothing to look at.",
     "reason": "missing_referent",
-    "detail": "This subject has no referent for the human to look at.",
-    "remedy": "Add a uri, body, or attachments to subject, or set self_contained to true."
+    "detail": "The subject 'release-2.3' carries no uri or body, so the human has nothing to look at.",
+    "remedy": "Link the artefact with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing."
   }
 }
 ```

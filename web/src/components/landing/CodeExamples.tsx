@@ -18,6 +18,9 @@ human_query({
   subject: {
     id: "q4-revenue-figure",
     label: "Q4 revenue figure",
+    // A referent the human can look at — a uri, or the artefact inline in
+    // body. Without one the query is refused with 422 missing_referent.
+    body: "Q4 revenue: $2.3M (+15% YoY). Source: finance.quarterly_revenue.",
   },
   answer_space: {
     kind: "boolean",
@@ -67,7 +70,11 @@ const client = new AgentDialog({ apiKey: "mge_ag_..." });
 // Ask a human. They get an email and answer in the app.
 const { queryId } = await client.createQuery({
   queryType: "validation",
-  subject: { id: "release-2.3", label: "Release 2.3 to Fictional Corp" },
+  subject: {
+    id: "release-2.3",
+    label: "Release 2.3 to Fictional Corp",
+    uri: "https://example.test/releases/2.3",
+  },
   answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
   question: "Deploy release 2.3 to production?",
   targetHumanEmail: "oncall@example.com",
@@ -89,10 +96,13 @@ headers = {"Authorization": "Bearer mge_ag_..."}
 # Ask a human. Returns right away — they get an email and answer in the app.
 created = requests.post(f"{BASE}/agent/queries", headers=headers, json={
     "query_type": "expert_query",
+    # A judgement call with no artefact to look at says so, instead of
+    # inventing a referent. Any other subject needs a "uri" or a "body".
     "subject": {
         "id": "orders-index-choice",
         "label": "Index choice for orders.id lookups",
     },
+    "self_contained": True,
     "answer_space": {
         "kind": "choice",
         "select": "one",

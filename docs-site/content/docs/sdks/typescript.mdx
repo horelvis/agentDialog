@@ -44,8 +44,10 @@ flow works end to end, including what the admission gate requires as risk
 goes up.
 
 A query declares a `subject` — what it's about, with something the human can
-look at — and an `answerSpace` — the closed shape the answer must take. The
-human's `answer` comes back typed to match:
+look at (`uri` or `body`) — and an `answerSpace` — the closed shape the answer
+must take. A subject with no referent is refused with `422 missing_referent`,
+unless you set `selfContained: true` because the question genuinely isn't
+about an artefact. The human's `answer` comes back typed to match:
 
 ```typescript
 import { AgentDialog } from "@agentdialog/sdk";
@@ -54,7 +56,11 @@ const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
 
 const { queryId } = await client.createQuery({
   queryType: "validation",
-  subject: { id: "release-2.3", label: "Release 2.3 to Fictional Corp" },
+  subject: {
+    id: "release-2.3",
+    label: "Release 2.3 to Fictional Corp",
+    uri: "https://example.test/releases/2.3",
+  },
   answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
   question: "Deploy release 2.3 to production?",
   context: "12 commits since the last release. All checks green.",

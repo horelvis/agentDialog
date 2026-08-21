@@ -39,14 +39,16 @@ A query is not free text in either direction. `answer_space` is one of six
 closed shapes — `boolean`, `choice`, `scalar`, `date`, `text`, or `fields` —
 so an agent can't hand a human an open-ended question and call it structured.
 `subject` is what the question is about: a stable id, a label, and a
-referent the human can actually look at (a `uri`, an inline `body`, or
-`attachments`).
+referent the human can actually look at — a `uri` (`http(s)` only) or an
+inline `body`.
 
 Before a request becomes a query, AgentDialog checks it can actually be
 decided:
 
-- **A subject needs a referent.** A question about "the contract" without
-  the contract attached is refused, unless `self_contained` is true.
+- **A subject needs a referent.** A question about "the contract" without a
+  link to it or the text of it is refused with `missing_referent`, at any
+  risk level, unless `self_contained` is true — which is for questions that
+  genuinely aren't about an artefact, not a way around sending one.
 - **Risk raises the bar.** Above `low`, every branch of the `answer_space`
   must state its consequence — what happens if the human picks it — and free
   text is refused outright (a `text` answer space is `low`-risk only).
@@ -57,8 +59,10 @@ decided:
   this `subject` from this agent, a new query above `low` risk must send
   `changes` — what's different since then — or it's refused.
 - **Above `medium` risk, the referent must be self-hosted.** AgentDialog
-  needs to hold the artefact itself (an `attachment` or inline `body`) with
-  its `sha256`, not just a `uri` that might change under it.
+  needs to hold the artefact itself — an inline `body` — with its `sha256`,
+  not just a `uri` that might change under it. You can't hash what you don't
+  hold, so a hash over somebody else's link is the agent's word, not a
+  record.
 
 A refusal comes back as `422` with `reason`, `detail`, and `remedy` — the
 remedy says exactly what to add. This is not a validation nicety: it is what
