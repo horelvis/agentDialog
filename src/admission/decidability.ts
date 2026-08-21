@@ -24,14 +24,14 @@ function above(risk: Risk, floor: Risk): boolean {
   return RISK_ORDER.indexOf(risk) > RISK_ORDER.indexOf(floor);
 }
 
-export interface Subject {
+export type Subject = {
   id: string;
   label: string;
   uri?: string;
   attachments?: string[];
   body?: string;
   sha256?: string;
-}
+};
 
 export interface AdmissionInput {
   risk: Risk;

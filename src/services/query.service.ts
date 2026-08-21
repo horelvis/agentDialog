@@ -436,7 +436,7 @@ export async function updateQuery(queryId: string, agentId: string, input: Patch
     .update(humanQueries)
     .set({
       status: "assigned",
-      subject: subject as unknown as Record<string, unknown>,
+      subject,
       answerSpace,
       changes: input.changes ?? query.changes,
       question: input.question ?? query.question,

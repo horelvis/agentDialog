@@ -29,8 +29,12 @@ describe("PATCH /agent/queries/:id", () => {
     const [after] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
     expect(after.status).toBe("assigned");
     expect(after.pausedAt).toBeNull();
-    // The clock was pushed forward by roughly the time it spent paused.
-    expect(after.expiresAt.getTime()).toBeGreaterThanOrEqual(before.expiresAt.getTime());
+    // The clock was pushed forward by roughly the time it spent paused —
+    // not merely left where it was, and not shifted by something unrelated.
+    const shifted = after.expiresAt.getTime() - before.expiresAt.getTime();
+    const paused = Date.now() - before.pausedAt!.getTime();
+    expect(shifted).toBeGreaterThan(paused - 5_000);
+    expect(shifted).toBeLessThan(paused + 5_000);
   });
 
   it("refuses a PATCH from any state other than needs_context", async () => {
