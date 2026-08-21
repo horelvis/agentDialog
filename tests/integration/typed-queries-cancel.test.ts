@@ -20,6 +20,24 @@ describe("POST /agent/queries/:id/cancel", () => {
     expect(row.status).toBe("cancelled");
   });
 
+  // Same reasoning as the PATCH route: the raw Drizzle row is camelCase,
+  // keys the id as `id`, and carries internal columns no agent-facing
+  // response should leak.
+  it("returns the shaped response, not the raw database row", async () => {
+    const { queryId, agentAuth } = await readyInNeedsContext(`c4-${Date.now()}@example.com`);
+    const res = await app.request(`/api/v1/agent/queries/${queryId}/cancel`, {
+      method: "POST", headers: { Authorization: agentAuth },
+    });
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+
+    expect(data.query_id).toBe(queryId);
+    expect(data.status).toBe("cancelled");
+    for (const leaked of ["id", "agentId", "humanId", "conversationId", "queryMessageId", "responseMessageId"]) {
+      expect(data[leaked]).toBeUndefined();
+    }
+  });
+
   // Losing a person's decision to a race is exactly what cannot happen in a
   // system whose value is the record.
   it("loses to an answer that was already given", async () => {

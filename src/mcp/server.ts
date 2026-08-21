@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createQuery, getQuery, listAgentQueries, updateQuery, cancelQuery } from "../services/query.service";
-import { subjectSchema, changeSchema, patchQueryFields } from "../validators/query.validators";
+import { subjectSchema, changeSchema, patchQueryFields, patchQuerySchema } from "../validators/query.validators";
 import { answerSpaceSchema } from "../lib/answer-space";
 
 export function createMcpServer() {
@@ -112,8 +112,10 @@ new query instead.
 Send only the fields that address what the human flagged as missing:
 subject (if the referent itself needs fixing), changes (if this is a delta on
 a prior decision), answer_space, question or context. Anything you omit keeps
-its previous value. On success the query returns to "assigned" and the human
-can answer again.`,
+its previous value, but you must send at least one of them — a bare query_id
+with nothing else is refused, the same as it would be over the REST PATCH
+route. On success the query returns to "assigned" and the human can answer
+again.`,
     {
       query_id: z.string().uuid().describe("The query ID, currently in needs_context"),
       subject: patchQueryFields.subject
@@ -139,9 +141,26 @@ can answer again.`,
 
       console.log(`[MCP:TOOL] clarify_query called by ${agentId} (queryId: ${args.query_id})`);
 
+      // server.tool()'s argument shape is a plain object of field schemas, so
+      // patchQuerySchema's own "nothing to update" refine never runs merely by
+      // declaring these fields inline above. Run it explicitly, or a bare
+      // {query_id} silently resumes the clock and spends a clarification round
+      // without supplying anything the human said was missing — a rule the
+      // REST PATCH route enforces and this tool otherwise would not.
+      const { query_id, ...patch } = args;
+      const parsed = patchQuerySchema.safeParse(patch);
+      if (!parsed.success) {
+        const message = parsed.error.issues
+          .map((i) => (i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message))
+          .join("; ");
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: `Validation failed: ${message}` }) }],
+          isError: true,
+        };
+      }
+
       try {
-        const { query_id, ...patch } = args;
-        const result = await updateQuery(query_id, agentId, patch);
+        const result = await updateQuery(query_id, agentId, parsed.data);
         return {
           content: [{ type: "text", text: JSON.stringify(result) }],
         };
@@ -191,13 +210,12 @@ the query is closed for good — create a new one if you still need an answer.`,
           content: [{ type: "text", text: JSON.stringify(result) }],
         };
       } catch (err: any) {
-        const payload = err?.code === "UNDECIDABLE_QUERY"
-          ? { error: err.message, code: err.code, reason: err.reason,
-              remedy: err.remedy, prior_query_id: err.priorQueryId }
-          : { error: err.message };
+        // cancelQuery only ever throws NotFoundError or ConflictError — never
+        // UndecidableQueryError, so unlike human_query/clarify_query there is
+        // no reason/remedy/prior_query_id shape to forward here.
         console.error(`[MCP:TOOL] cancel_query error for ${agentId}:`, err);
         return {
-          content: [{ type: "text", text: JSON.stringify(payload) }],
+          content: [{ type: "text", text: JSON.stringify({ error: err.message }) }],
           isError: true,
         };
       }

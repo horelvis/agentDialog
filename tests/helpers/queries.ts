@@ -15,7 +15,7 @@ const SPACE = {
 /** A query sitting in needs_context, with its clock paused. */
 export async function readyInNeedsContext(email: string) {
   const app = createTestApp();
-  const { authHeader } = await createTestAgent();
+  const { agent, authHeader } = await createTestAgent();
   const res = await app.request("/api/v1/agent/queries", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: authHeader },
@@ -40,5 +40,5 @@ export async function readyInNeedsContext(email: string) {
     insufficientReason: "missing_delta",
   }).where(eq(humanQueries.id, row.id));
 
-  return { queryId: row.id, human, agentAuth: authHeader, conversationId: row.conversationId };
+  return { queryId: row.id, human, agentId: agent.id, agentAuth: authHeader, conversationId: row.conversationId };
 }

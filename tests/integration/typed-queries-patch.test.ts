@@ -37,6 +37,28 @@ describe("PATCH /agent/queries/:id", () => {
     expect(shifted).toBeLessThan(paused + 5_000);
   });
 
+  // The route returns whatever updateQuery returns. It must be the same
+  // hand-shaped, snake_case object every other query surface returns — not
+  // Drizzle's raw row, which is camelCase, keys the id as `id` rather than
+  // `query_id`, and carries columns (agentId, humanId, conversationId,
+  // queryMessageId, responseMessageId) no agent-facing response should leak.
+  it("returns the shaped response, not the raw database row", async () => {
+    const { queryId, agentAuth } = await readyInNeedsContext(`p5-${Date.now()}@example.com`);
+    const res = await app.request(`/api/v1/agent/queries/${queryId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: agentAuth },
+      body: JSON.stringify({ context: "más contexto" }),
+    });
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+
+    expect(data.query_id).toBe(queryId);
+    expect(data.status).toBe("assigned");
+    for (const leaked of ["id", "agentId", "humanId", "conversationId", "queryMessageId", "responseMessageId"]) {
+      expect(data[leaked]).toBeUndefined();
+    }
+  });
+
   it("refuses a PATCH from any state other than needs_context", async () => {
     const { queryId, agentAuth } = await readyInNeedsContext(`p2-${Date.now()}@example.com`);
     const db = getDb();

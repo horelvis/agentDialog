@@ -385,6 +385,48 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
 
 const MAX_CLARIFICATION_ROUNDS = 2;
 
+const STATUS_HINTS: Record<string, string> = {
+  pending: "The human has been invited but hasn't accepted the invitation yet. They need to open the link in their email and answer in the app — answering automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again.",
+  assigned: "The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again.",
+  answered: "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
+  needs_context: "The human could not decide with what you gave them. Read `insufficient_reason`, then clarify the query with what is missing. The clock is paused while you do.",
+  cancelled: "You withdrew this query. Create a new one if you still need an answer.",
+  expired: "The query has expired without a response. The human did not answer in time. You may create a new query if needed.",
+};
+
+/**
+ * The one canonical shape every surface hands back for a query — REST routes
+ * and MCP tools alike. Both call into this service and return whatever it
+ * returns, so shaping happens here once rather than at each caller: a Drizzle
+ * row is camelCase, carries `id` instead of `query_id`, and exposes columns
+ * (`agentId`, `humanId`, `conversationId`, `queryMessageId`,
+ * `responseMessageId`) no agent-facing response should leak.
+ *
+ * `status` is a separate parameter rather than always `query.status` because
+ * `getQuery` computes it lazily (a row can be stale by the time it's read).
+ */
+function shapeQuery(query: typeof humanQueries.$inferSelect, status: string = query.status) {
+  return {
+    query_id: query.id,
+    status,
+    status_description: STATUS_HINTS[status] || `Unknown status: ${status}`,
+    query_type: query.queryType,
+    question: query.question,
+    context: query.context,
+    confidence: query.confidence,
+    answer: status === "answered" ? query.answer : null,
+    comment: status === "answered" ? query.answerComment : null,
+    human_confidence: status === "answered" ? query.answerConfidence : null,
+    response_time_ms: status === "answered" ? query.responseTimeMs : null,
+    // The needs_context hint tells the agent to read this field, so it has to
+    // actually be here — a status row on its own doesn't say what the human
+    // was missing.
+    insufficient_reason: status === "needs_context" ? query.insufficientReason : null,
+    created_at: query.createdAt.toISOString(),
+    expires_at: query.expiresAt.toISOString(),
+  };
+}
+
 /**
  * The agent supplying what the human said was missing. Only valid from
  * needs_context, and it goes through admission exactly like a creation does.
@@ -452,7 +494,7 @@ export async function updateQuery(queryId: string, agentId: string, input: Patch
   if (!updated) throw new ConflictError("Query changed while it was being clarified");
 
   console.log(`[QUERY] Clarified ${queryId} (round ${query.clarificationRounds})`);
-  return updated;
+  return shapeQuery(updated);
 }
 
 /**
@@ -477,7 +519,7 @@ export async function cancelQuery(queryId: string, agentId: string) {
 
   if (updated) {
     console.log(`[QUERY] Cancelled ${queryId} by agent ${agentId}`);
-    return updated;
+    return shapeQuery(updated);
   }
 
   // Nothing changed: either it is not ours, or it already reached a terminal state.
@@ -516,34 +558,7 @@ export async function getQuery(queryId: string, agentId: string) {
     console.log(`[QUERY] Expired: ${queryId} (was ${query.status})`);
   }
 
-  const statusHints: Record<string, string> = {
-    pending: "The human has been invited but hasn't accepted the invitation yet. They need to open the link in their email and answer in the app — answering automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again.",
-    assigned: "The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again.",
-    answered: "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
-    needs_context: "The human could not decide with what you gave them. Read `insufficient_reason`, then clarify the query with what is missing. The clock is paused while you do.",
-    cancelled: "You withdrew this query. Create a new one if you still need an answer.",
-    expired: "The query has expired without a response. The human did not answer in time. You may create a new query if needed.",
-  };
-
-  return {
-    query_id: query.id,
-    status: effectiveStatus,
-    status_description: statusHints[effectiveStatus] || `Unknown status: ${effectiveStatus}`,
-    query_type: query.queryType,
-    question: query.question,
-    context: query.context,
-    confidence: query.confidence,
-    answer: effectiveStatus === "answered" ? query.answer : null,
-    comment: effectiveStatus === "answered" ? query.answerComment : null,
-    human_confidence: effectiveStatus === "answered" ? query.answerConfidence : null,
-    response_time_ms: effectiveStatus === "answered" ? query.responseTimeMs : null,
-    // The needs_context hint tells the agent to read this field, so it has to
-    // actually be here — a status row on its own doesn't say what the human
-    // was missing.
-    insufficient_reason: effectiveStatus === "needs_context" ? query.insufficientReason : null,
-    created_at: query.createdAt.toISOString(),
-    expires_at: query.expiresAt.toISOString(),
-  };
+  return shapeQuery(query, effectiveStatus);
 }
 
 export async function listAgentQueries(
