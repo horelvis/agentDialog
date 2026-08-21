@@ -21,6 +21,7 @@ type ProcessEmailReplyResult =
   | { already_answered: true }
   | { expired: true }
   | { empty_reply: true }
+  | { sender_mismatch: true }
   | { not_found: true };
 
 export async function processEmailReply(
@@ -50,13 +51,22 @@ export async function processEmailReply(
     return { expired: true };
   }
 
-  // 2. Verify sender matches (permissive — log mismatch but proceed)
+  // 2. Verify the sender is the person the question was addressed to.
+  //
+  // This used to warn and carry on, which meant anyone the query email had been
+  // forwarded to could answer in the target's name — creating them as a human,
+  // accepting the invitation on their behalf and recording the answer — with
+  // nothing on the agent's side to tell the two apart.
+  //
+  // The mismatch is not reported to the caller in any more detail than this:
+  // the target's address must not leak to whoever sent the message.
   const normalizedSender = input.senderEmail.toLowerCase().trim();
   const normalizedTarget = query.humanEmail.toLowerCase().trim();
   if (normalizedSender !== normalizedTarget) {
     console.warn(
-      `[EMAIL-REPLY] Sender mismatch: ${normalizedSender} vs expected ${normalizedTarget} (query ${input.queryId})`,
+      `[EMAIL-REPLY] Rejected reply to query ${input.queryId}: sender is not the target`,
     );
+    return { sender_mismatch: true };
   }
 
   // 3. Find or create human
