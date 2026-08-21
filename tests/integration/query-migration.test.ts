@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { sql } from "drizzle-orm";
 import { getDb } from "../../src/db";
 import { registerAgent } from "../../src/services/agent.service";
+import { readFileSync } from "node:fs";
 
 /**
  * Rows created before the migration are kept, not discarded: the history stays
@@ -12,13 +13,39 @@ import { registerAgent } from "../../src/services/agent.service";
  * The two backfill tests below don't rely on `agentdialog_test`'s accumulated
  * history — a count(*) = 0 check against the live table would pass vacuously
  * on an empty or freshly seeded database, without ever exercising the
- * backfill. Each seeds a row shaped exactly like a pre-migration row, runs
- * the migration's own UPDATE against it (copied verbatim from
- * migrations/0007_typed_queries.sql and migrations/0008_answer_space_text_default.sql),
- * and asserts the fix actually happened. The whole-table checks that follow
- * are kept as a secondary regression signal against the real, already-applied
- * migration — they are not the proof of correctness anymore.
+ * backfill. Each seeds a row shaped exactly like a pre-migration row, runs the
+ * migration's own UPDATE against it, and asserts the fix actually happened.
+ * The whole-table checks that follow are kept as a secondary regression signal
+ * against the real, already-applied migration — they are not the proof of
+ * correctness anymore.
+ *
+ * The UPDATEs are READ OUT OF THE MIGRATION FILE rather than transcribed. They
+ * were previously copied by hand out of two files, which is a standing
+ * invitation for the test to keep proving something the migration no longer
+ * does — and those two files have since been squashed into one, which is
+ * exactly the kind of change a hand copy survives without noticing.
  */
+
+const MIGRATION = "migrations/0007_typed_queries.sql";
+
+/**
+ * The migration's UPDATE statements, in file order, each scoped to a single
+ * row so a test cannot rewrite the whole table.
+ */
+function backfillStatements(): string[] {
+  const sqlText = readFileSync(MIGRATION, "utf8");
+  const statements = sqlText
+    .split(";")
+    .map((chunk) => chunk.replace(/^\s*--.*$/gm, "").trim())
+    .filter((chunk) => /^UPDATE "human_queries"/i.test(chunk));
+
+  // If the migration stops carrying its backfill, this test must fail loudly
+  // rather than quietly verify nothing.
+  if (statements.length !== 2) {
+    throw new Error(`Expected 2 UPDATE statements in ${MIGRATION}, found ${statements.length}`);
+  }
+  return statements;
+}
 
 async function seedFixture(status: "answered" | "pending", answerJson: string) {
   const db = getDb();
@@ -77,14 +104,9 @@ describe("migración de filas antiguas", () => {
       expect(before[0].subject).toEqual({});
       expect(before[0].self_contained).toBe(false);
 
-      // The migration's own backfill, scoped to this row.
-      await db.execute(sql`
-        UPDATE human_queries SET
-          answer_space = '{"kind":"text","max_length":32000}'::jsonb,
-          self_contained = true,
-          subject = jsonb_build_object('id', 'legacy:' || id::text, 'label', left(question, 80))
-        WHERE subject = '{}'::jsonb AND id = ${fixture.queryId}
-      `);
+      // The migration's own backfill, read from the file and scoped to this row.
+      const [subjectBackfill] = backfillStatements();
+      await db.execute(sql.raw(`${subjectBackfill} AND "id" = '${fixture.queryId}'`));
 
       const after = (await db.execute(sql`
         SELECT subject, self_contained, answer_space FROM human_queries WHERE id = ${fixture.queryId}
@@ -97,7 +119,7 @@ describe("migración de filas antiguas", () => {
     }
   });
 
-  it("wraps a still-bare-string answer the way 0008's fix-up does", async () => {
+  it("wraps a still-bare-string answer the way the migration's second UPDATE does", async () => {
     const db = getDb();
     const fixture = await seedFixture("answered", JSON.stringify("Fine by me."));
     try {
@@ -107,11 +129,8 @@ describe("migración de filas antiguas", () => {
       expect(typeof before[0].answer).toBe("string");
       expect(before[0].answer).toBe("Fine by me.");
 
-      await db.execute(sql`
-        UPDATE human_queries SET
-          answer = jsonb_build_object('kind', 'text', 'value', answer #>> '{}')
-        WHERE status = 'answered' AND answer IS NOT NULL AND answer->>'kind' IS NULL AND id = ${fixture.queryId}
-      `);
+      const answerBackfill = backfillStatements()[1];
+      await db.execute(sql.raw(`${answerBackfill} AND "id" = '${fixture.queryId}'`));
 
       const after = (await db.execute(sql`SELECT answer FROM human_queries WHERE id = ${fixture.queryId}`)) as any;
       expect(after[0].answer).toEqual({ kind: "text", value: "Fine by me." });
@@ -136,6 +155,19 @@ describe("migración de filas antiguas", () => {
       WHERE status = 'answered' AND (answer IS NULL OR answer->>'kind' IS NULL)
     `);
     expect((rows as any)[0].n).toBe(0);
+  });
+
+  // T3-1: the index prior-decision detection uses is on (agent_id,
+  // human_email). It was called human_queries_subject_idx, which is the one
+  // thing it does not index, and the squashed migration renames it.
+  it("carries the prior-decision index under a name that describes it", async () => {
+    const db = getDb();
+    const rows = (await db.execute(sql`
+      SELECT indexname::text AS name FROM pg_indexes WHERE tablename = 'human_queries'
+    `)) as any;
+    const names = rows.map((r: any) => r.name);
+    expect(names).toContain("human_queries_agent_human_idx");
+    expect(names).not.toContain("human_queries_subject_idx");
   });
 
   it("accepts the two new statuses", async () => {

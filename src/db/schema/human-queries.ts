@@ -45,5 +45,8 @@ export const humanQueries = pgTable("human_queries", {
   index("human_queries_status_idx").on(table.status),
   index("human_queries_conversation_idx").on(table.conversationId),
   index("human_queries_expires_at_idx").on(table.expiresAt),
-  index("human_queries_subject_idx").on(table.agentId, table.humanEmail),
+  // Prior-decision detection: (agent_id, human_email), narrowed further by a
+  // jsonb predicate on subject->>'id'. Named for what it indexes; it used to
+  // be called human_queries_subject_idx, which is the one column it does not.
+  index("human_queries_agent_human_idx").on(table.agentId, table.humanEmail),
 ]);
