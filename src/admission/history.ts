@@ -13,8 +13,12 @@ import type { AnswerSpace } from "../lib/answer-space";
  * before; it cannot omit our record of it.
  */
 
-/** ISO 4217-ish: three letters. Enough to tell "EUR" from "kg". */
-const CURRENCY = /^[A-Z]{3}$/;
+/**
+ * ISO 4217-ish: three letters. Enough to tell "EUR" from "kg". Case-insensitive
+ * on purpose: "crude" here means no currency conversion, not that pressing
+ * shift on `unit` should silently skip elevation altogether.
+ */
+const CURRENCY = /^[A-Z]{3}$/i;
 
 /**
  * A prior decision is an ANSWERED query about the same subject, from the same

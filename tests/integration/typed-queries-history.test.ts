@@ -137,14 +137,36 @@ describe("elevación del riesgo", () => {
     expect((await res.json()).error.reason).toBe("external_referent_at_high_risk");
   });
 
-  it("never lowers a declared risk", async () => {
+  it("matches the currency unit case-insensitively", async () => {
     const { authHeader } = await createTestAgent();
     const res = await create(authHeader, payload({
-      risk: "critical",
-      target_human_email: `crit-${Date.now()}@example.com`,
-      subject: { id: "c-1", label: "C", body: "x" },   // no sha256
+      risk: "low",
+      target_human_email: `money-lower-${Date.now()}@example.com`,
+      answer_space: { kind: "scalar", unit: "eur", max: 50_000, effect: "Ordeno el pago." },
+      subject: { id: "pago-2", label: "Pago", uri: "https://drive.example/x" },
     }));
+    // "eur" must elevate exactly like "EUR" does.
     expect(res.status).toBe(422);
-    expect((await res.json()).error.reason).toBe("missing_referent_hash");
+    expect((await res.json()).error.reason).toBe("external_referent_at_high_risk");
+  });
+
+  it("never lowers a declared risk, even when elevation would only raise it to a lower floor", async () => {
+    const { authHeader } = await createTestAgent();
+    // A money scalar above the threshold elevates to `high` on its own — but
+    // the agent already declared `critical`, which is above that floor.
+    // atLeast must keep `critical`; an unconditional overwrite would pull it
+    // down to `high` instead.
+    const res = await create(authHeader, payload({
+      risk: "critical",
+      target_human_email: `crit-money-${Date.now()}@example.com`,
+      answer_space: { kind: "scalar", unit: "EUR", max: 50_000, effect: "Ordeno el pago." },
+      subject: { id: "c-1", label: "C", body: "x", sha256: "a".repeat(64) },
+    }));
+    expect(res.status).toBe(201);
+    const { data } = await res.json();
+
+    const db = getDb();
+    const [row] = await db.select().from(humanQueries).where(eq(humanQueries.id, data.query_id));
+    expect(row.risk).toBe("critical");
   });
 });
