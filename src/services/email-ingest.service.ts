@@ -1,4 +1,5 @@
 import type { MailboxClient } from "../lib/mailbox";
+import { withLock } from "../lib/redis-lock";
 import {
   classifyRecipients,
   replyAddressConfig,
@@ -151,4 +152,26 @@ async function markRead(client: MailboxClient, uid: number): Promise<void> {
   } catch (err) {
     console.error(`[EMAIL-INGEST] Could not mark message ${uid} read:`, err);
   }
+}
+
+const INGEST_LOCK_KEY = "lock:email-ingest";
+
+/**
+ * Two minutes: four times the five-minute poll interval would be pointless, and
+ * anything shorter than a slow pass would let a second one start on top of it.
+ * A pass that dies without releasing the lock costs one skipped interval.
+ */
+const INGEST_LOCK_TTL_MS = 120_000;
+
+/**
+ * One pass, under the lock. Returns null when another pass is already running,
+ * which is a normal outcome and not an error.
+ */
+export async function runEmailIngestPass(
+  client: MailboxClient,
+  deps: IngestDeps = {},
+): Promise<IngestSummary | null> {
+  return withLock(INGEST_LOCK_KEY, INGEST_LOCK_TTL_MS, () =>
+    ingestPendingReplies(client, deps),
+  );
 }
