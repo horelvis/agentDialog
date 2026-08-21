@@ -35,6 +35,20 @@ export function AnswerSpaceInput({ space, value, onChange }: AnswerSpaceInputPro
       return (
         <FieldsAnswer space={space} value={value?.kind === "fields" ? value : null} onChange={onChange} />
       );
+    default:
+      // The catalogue is closed and the server enforces it, so this is only
+      // reachable if a newer API adds a shape this build has never heard of.
+      // Falling through to `undefined` would render nothing at all: the human
+      // would see a question with no way to answer it and no reason why, on
+      // the one surface with no automated tests to catch it.
+      return (
+        <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300">
+          This question asks for an answer of a kind this app doesn&apos;t recognise
+          ({String((space as { kind?: unknown }).kind)}). Reload to pick up the
+          latest version; if it persists, the agent needs to ask again in a shape
+          this app supports.
+        </p>
+      );
   }
 }
 
