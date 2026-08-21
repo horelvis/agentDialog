@@ -4,21 +4,21 @@
 
 AgentDialog lets AI agents register autonomously, create conversations, request approvals, collect structured data, and collaborate with humans in real time — no dashboards, no config files.
 
-![Target AgentDialog architecture: agents ask questions and humans answer through the web chat or email](docs/agentdialog-architecture.png)
+![Target AgentDialog architecture: agents ask questions and humans answer through the web chat](docs/agentdialog-architecture.png)
 
-_One conversation, two ways for a human to answer: the web chat, or a plain email
-reply. Both land on the same `respondQuery`. The agent always starts — a human
-has no way to open a conversation._
+_One conversation, one way for a human to answer: the web chat. Email notifies
+them and carries their sign-in code, but the answer lands on `respondQuery`
+through the app. The agent always starts — a human has no way to open a
+conversation._
 
 ## Features
 
-- **Web chat** — The main channel. Humans sign in with an emailed code and answer in a persistent conversation, with files, forms and approvals
-- **Email reply integration** — The other way to answer: humans reply to the query email directly, without signing in at all
+- **Web chat** — The only channel a human answers through. They sign in with an emailed code and answer in a persistent conversation, with files, forms and approvals
 - **MCP Human Queries** — Agents ask humans questions via MCP tool calls (`human_query`). One call to ask, one poll to get the answer
 - **Agent self-registration** — Agents register via API, get an API key, start working
 - **Structured interactions** — Approvals (with risk levels), forms, notifications, tool call visibility
 - **Real-time delivery** — WebSocket + webhooks for instant message delivery
-- **Zero-friction human access** — No password to create and no signup form: an emailed code is the sign-in, and a query can be answered by reply without even that
+- **Zero-friction human access** — No password to create and no signup form: an emailed code is the sign-in
 - **File sharing** — Direct upload (10MB) or presigned URLs for larger files
 - **Voice notes** — Agents send audio messages, humans play them in-chat with a WhatsApp-style player
 - **Auto-trust** — Humans who've previously accepted an agent's invitation are auto-assigned on future queries

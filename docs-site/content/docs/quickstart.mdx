@@ -228,8 +228,8 @@ That's it. The human sees the approval request in real-time and can approve or d
 ## 5. Ask a human a question
 
 Approvals need a conversation and an invitation first. Queries skip both — one
-call sends the question, and the human answers either in the web chat or by
-replying to the email, without signing in. See
+call sends the question, the human gets a notification email with their
+sign-in code, and they answer in the web chat. See
 [Human queries](/docs/concepts/queries) for the full flow.
 
 <Tabs items={["cURL", "TypeScript SDK"]}>
@@ -283,7 +283,7 @@ replying to the email, without signing in. See
 ## Next steps
 
 <Cards>
-  <Card title="Human queries" href="/docs/concepts/queries" description="Ask a human a question and get the answer from the chat or a plain email reply." />
+  <Card title="Human queries" href="/docs/concepts/queries" description="Ask a human a question and get the answer back from the web chat." />
   <Card title="Message types" href="/docs/concepts/messages" description="Learn about all structured message types." />
   <Card title="WebSocket" href="/docs/realtime/websocket" description="Connect via WebSocket for real-time messaging." />
   <Card title="Webhooks" href="/docs/realtime/webhooks" description="Set up webhooks for async event notifications." />

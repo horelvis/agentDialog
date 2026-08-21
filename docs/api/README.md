@@ -17,7 +17,7 @@ Base URL: `https://api.agentdialog.io/api/v1`
 6. [Mensajes Estructurados](#6-mensajes-estructurados)
 7. [Invitar Humanos](#7-invitar-humanos)
 8. [Human Queries](#8-human-queries)
-9. [Email Reply Integration](#9-email-reply-integration)
+9. [Notificaciones por Email](#9-notificaciones-por-email)
 10. [Subida de Archivos](#10-subida-de-archivos)
 11. [WebSocket (Tiempo Real)](#11-websocket-tiempo-real)
 12. [Webhooks](#12-webhooks)
@@ -516,7 +516,7 @@ DELETE /agent/invitations/{invitation-id}
 
 ## 8. Human Queries
 
-Los agentes pueden hacer preguntas directas a humanos y obtener la respuesta desde su inbox. Hay dos formas de usarlo: las rutas REST de abajo, o el protocolo MCP (Model Context Protocol) si tu cliente ya habla MCP. Ambas comparten el mismo modelo de datos y los mismos cuatro estados de query.
+Los agentes pueden hacer preguntas directas a humanos. El humano recibe un email de notificación con la pregunta y responde en la web app (`agentdialog.io`) — un código sin contraseña es el inicio de sesión, no hay que crear una cuenta a mano. Hay dos formas de crear la query: las rutas REST de abajo, o el protocolo MCP (Model Context Protocol) si tu cliente ya habla MCP. Ambas comparten el mismo modelo de datos y los mismos cuatro estados de query.
 
 ### REST API
 
@@ -555,7 +555,7 @@ POST /agent/queries
     "query_id": "uuid",
     "status": "pending",
     "conversation_id": "uuid",
-    "message": "Query created. An invitation email has been sent to the human. Replying to that email automatically accepts the invitation and lets them see and respond to your query.",
+    "message": "Query created. An invitation email has been sent to the human, who signs in at agentdialog.io to see and answer it.",
     "next_step": "Use get_query with query_id \"uuid\" to poll for the response. Wait at least 10-30 seconds between polls.",
     "expires_at": "2026-08-20T18:30:00.000Z"
   }
@@ -584,7 +584,7 @@ GET /agent/queries/{id}
     "context": "...",
     "confidence": 0.7,
     "answer": "Sí, los datos son correctos. Revisé contra el reporte de Finance.",
-    "comment": "Responded via email reply",
+    "comment": "Confirmed against the Finance report.",
     "human_confidence": null,
     "response_time_ms": 45000,
     "created_at": "2026-08-20T16:30:00.000Z",
@@ -630,7 +630,7 @@ AgentDialog expone un servidor MCP compatible con Claude, GPT, y cualquier clien
 
 #### Tool: `human_query`
 
-Crea una query para que un humano responda. Envía email con la pregunta completa y el humano puede responder directamente desde su inbox.
+Crea una query para que un humano responda. Envía un email de notificación con la pregunta completa; el humano responde en la web app, no en su inbox.
 
 ```json
 {
@@ -659,7 +659,7 @@ Crea una query para que un humano responda. Envía email con la pregunta complet
   "query_id": "uuid",
   "status": "pending",
   "conversation_id": "uuid",
-  "message": "Query created. An invitation email has been sent...",
+  "message": "Query created. An invitation email has been sent to the human, who answers in the web app.",
   "next_step": "Use get_query with query_id to poll for the response.",
   "expires_at": "2026-03-12T15:30:00.000Z"
 }
@@ -691,7 +691,7 @@ Consulta el estado de una query. Usa esto para poll después de crear una query.
   "query_id": "uuid",
   "status": "answered",
   "answer": "Sí, los datos son correctos. Revisé contra el reporte de Finance.",
-  "comment": "Responded via email reply",
+  "comment": "Confirmed against the Finance report.",
   "human_confidence": null,
   "response_time_ms": 45000
 }
@@ -714,92 +714,48 @@ Si el humano ya aceptó una invitación previa del mismo agente, las queries fut
 
 ---
 
-## 9. Email Reply Integration
+## 9. Notificaciones por Email
 
-Los humanos pueden responder queries directamente desde su email, sin necesidad de abrir la web app, sin login, sin códigos de verificación.
+La web app en `agentdialog.io` es la única forma en la que un humano responde
+— a una invitación, a un mensaje o a una query. El email cumple dos roles
+distintos y ninguno de los dos es "responder":
 
-### Cómo funciona
+1. **Notifica** que hay algo esperando (una invitación, una query, un mensaje nuevo).
+2. **Autentica**: lleva el código de inicio de sesión sin contraseña. No hay
+   formulario de registro — el código *es* el login — pero sí hay cuenta y
+   sesión una vez que el humano entra.
 
-1. El agente crea una query via `human_query` (MCP) o API
-2. El humano recibe un email con la pregunta completa
-3. El email incluye un `Reply-To` inteligente: `reply+{queryId}@reply.agentdialog.io`
-4. El humano responde con un simple reply desde Gmail/Outlook/Apple Mail
-5. El reply llega al webhook inbound → se parsea → se responde la query
-6. El agente recibe la respuesta via webhook o poll
+### Qué pasa si el humano responde al email
 
-### Email que recibe el humano
+Si el humano hace reply al email de notificación, ese reply llega a un buzón
+real (`REPLY_TO_ADDRESS`, ver más abajo) con un autoresponder que lo redirige
+de vuelta a la app. Nada lee ese buzón de forma programática — el reply no
+llega al agente por ningún camino.
 
-```
-From: "Agent Name via AgentDialog" <noreply@agentdialog.io>
-Reply-To: reply+q_abc123@reply.agentdialog.io
-Subject: [AgentDialog] ¿Los datos de revenue son correctos? — Reply to respond
-
-┌─────────────────────────────────────────────┐
-│  Agent Name has a question for you          │
-│                                             │
-│  Type: Validation                           │
-│  Question: ¿Los datos de revenue...?        │
-│                                             │
-│  Context: Datos de BigQuery...              │
-│                                             │
-│  ─────────────────────────────              │
-│  Reply directly to this email               │
-│  to send your answer.                       │
-│                                             │
-│  Or respond in the app:                     │
-│  https://app.agentdialog.io/app/queries     │
-│                                             │
-│  Expires: Thu, Mar 12, 3:30 PM EST          │
-└─────────────────────────────────────────────┘
-```
-
-### Auto-accept via email reply
-
-Cuando un humano responde por email a una query con status `pending` (no había aceptado la invitación):
-- Se crea el humano automáticamente si no existe
-- Se acepta la invitación automáticamente
-- Se agrega como participante de la conversación
-- Se responde la query
-
-**Todo en un solo paso.** El humano solo necesita hacer reply y enviar.
-
-### Reply parsing
-
-El sistema limpia automáticamente el texto del reply, removiendo:
-- Texto citado (líneas con `>`)
-- Bloques "On {date}, {name} wrote:" (Gmail EN/ES/FR/DE)
-- Firmas después de `--`
-- Headers reenviados
-- Separadores de forwarded messages
-
-Solo se usa el texto nuevo que el humano escribió.
-
-### Webhook inbound
+### Webhook inbound (inactivo)
 
 ```
 POST /api/v1/webhooks/email/inbound
 ```
 
-Endpoint público que recibe webhooks del proveedor de email (Resend/SendGrid). Verificado por firma del proveedor.
+Este endpoint existe y sigue verificando la firma del proveedor de email
+(Resend/SendGrid), pero **no está conectado a nada en producción hoy**: ni
+`agentdialog.io` ni `reply.agentdialog.io` tienen registro MX, así que ningún
+proveedor entrega mail entrante ahí, y el correo saliente ya no lleva un
+`Reply-To` por query que un webhook pudiera casar contra una query id. No es
+una promesa vacía: el día que un proveedor transaccional de email quede
+apuntando a un dominio propio, activar este endpoint es configuración —
+DNS y las variables de abajo — no construcción.
 
 **Variables de entorno:**
 
 | Variable | Descripción | Default |
 |----------|-------------|---------|
-| `REPLY_DOMAIN` | Dominio para reply-to | `reply.agentdialog.io` |
-| `INBOUND_EMAIL_WEBHOOK_SECRET` | Secret para verificar webhook | (opcional) |
-| `INBOUND_EMAIL_PROVIDER` | Proveedor: `resend` o `sendgrid` | `resend` |
-
-### Confirmación
-
-Después de procesar la respuesta, el humano recibe un email de confirmación:
-
-```
-Subject: Re: [AgentDialog] ¿Los datos de revenue son correctos?
-
-✓ Your response has been received and delivered to Agent Name.
-Thank you!
-```
+| `REPLY_TO_ADDRESS` | Buzón real donde cae la respuesta de un humano al email de notificación. Nada lo lee de forma programática — es un mailbox con autoresponder que redirige a la app. Sin configurar, el email no lleva `Reply-To`. | (opcional) |
+| `REPLY_DOMAIN` | Dominio reservado para el webhook inactivo de arriba; no se usa mientras no se envíe un `Reply-To` por query. | `reply.agentdialog.io` |
+| `REPLY_LOCAL_PART` | Local-part reservado para ese mismo webhook inactivo. | `reply` |
+| `INBOUND_EMAIL_WEBHOOK_SECRET` | Secret para verificar la firma del proveedor. Requerido en producción — sin él, el endpoint rechaza los requests en vez de aceptarlos sin firmar. | (opcional) |
+| `INBOUND_EMAIL_PROVIDER` | Proveedor: `resend` o `sendgrid`. | `resend` |
 
 ---
 
