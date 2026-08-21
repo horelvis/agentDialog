@@ -133,7 +133,8 @@ export async function main(): Promise<void> {
   try {
     const answered: Query = await client.waitForAnswer(created.queryId, { timeoutMs: 1000 });
     const status: QueryStatus = answered.status;
-    void status;
+    const statusDescription: string = answered.statusDescription;
+    void status; void statusDescription;
     if (status === "needs_context") {
       const clarified: Query = await client.clarifyQuery(created.queryId, {
         answerSpace: { kind: "text", maxLength: 200 },

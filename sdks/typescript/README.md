@@ -91,7 +91,11 @@ creating a query.
 
 `waitForAnswer` polls `getQuery` until the query is `answered` or `expired`.
 It only throws `QueryTimeoutError` if you pass your own `timeoutMs` and that
-budget runs out first.
+budget runs out first. Every `Query` also carries `statusDescription` — a
+human-readable sentence for whatever `status` currently is, handy for
+logging or handing straight to an LLM without a switch statement over
+`status`. `QuerySummary` (from `listQueries`) does not carry it — the list
+endpoint doesn't send one.
 
 ### When the human can't decide
 

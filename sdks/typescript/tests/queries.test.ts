@@ -91,7 +91,8 @@ describe("query methods", () => {
   it("maps a snake_case response into camelCase, including a typed answer", async () => {
     mockFetch({
       data: {
-        query_id: "q1", status: "answered", query_type: "validation",
+        query_id: "q1", status: "answered", status_description: "The human has responded.",
+        query_type: "validation",
         question: "Ship it?", context: null, confidence: null,
         answer: { kind: "boolean", value: true }, comment: "go ahead", human_confidence: 0.9,
         response_time_ms: 1234, insufficient_reason: null,
@@ -104,12 +105,14 @@ describe("query methods", () => {
     expect(query.humanConfidence).toBe(0.9);
     expect(query.responseTimeMs).toBe(1234);
     expect(query.answer).toEqual({ kind: "boolean", value: true });
+    expect(query.statusDescription).toBe("The human has responded.");
   });
 
   it("maps a choice answer's option_ids into optionIds", async () => {
     mockFetch({
       data: {
-        query_id: "q1", status: "answered", query_type: "labeling",
+        query_id: "q1", status: "answered", status_description: "The human has responded.",
+        query_type: "labeling",
         question: "Which one?", context: null, confidence: null,
         answer: { kind: "choice", option_ids: ["a", "b"] }, comment: null, human_confidence: null,
         response_time_ms: 500, insufficient_reason: null,
@@ -151,7 +154,8 @@ describe("query methods", () => {
   it("clarifyQuery PATCHes only the supplied fields, translating answerSpace", async () => {
     const calls = mockFetch({
       data: {
-        query_id: "q1", status: "assigned", query_type: "validation",
+        query_id: "q1", status: "assigned", status_description: "The human has accepted the invitation.",
+        query_type: "validation",
         question: "Ship it?", context: null, confidence: null,
         answer: null, comment: null, human_confidence: null,
         response_time_ms: null, insufficient_reason: null,
@@ -171,12 +175,14 @@ describe("query methods", () => {
       context: "Here's the missing referent.",
     });
     expect(query.status).toBe("assigned");
+    expect(query.statusDescription).toBe("The human has accepted the invitation.");
   });
 
   it("cancelQuery POSTs to the cancel endpoint with no body", async () => {
     const calls = mockFetch({
       data: {
-        query_id: "q1", status: "cancelled", query_type: "validation",
+        query_id: "q1", status: "cancelled", status_description: "You withdrew this query.",
+        query_type: "validation",
         question: "Ship it?", context: null, confidence: null,
         answer: null, comment: null, human_confidence: null,
         response_time_ms: null, insufficient_reason: null,
@@ -189,12 +195,15 @@ describe("query methods", () => {
     expect(calls[0].init.method).toBe("POST");
     expect(calls[0].init.body).toBeUndefined();
     expect(query.status).toBe("cancelled");
+    expect(query.statusDescription).toBe("You withdrew this query.");
   });
 
   it("surfaces insufficientReason once a query needs context", async () => {
     mockFetch({
       data: {
-        query_id: "q1", status: "needs_context", query_type: "validation",
+        query_id: "q1", status: "needs_context",
+        status_description: "The human could not decide with what you gave them.",
+        query_type: "validation",
         question: "Ship it?", context: null, confidence: null,
         answer: null, comment: null, human_confidence: null,
         response_time_ms: null, insufficient_reason: "unknown_subject",

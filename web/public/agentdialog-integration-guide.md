@@ -639,6 +639,7 @@ GET /agent/queries/{id}
   "data": {
     "query_id": "uuid",
     "status": "answered",
+    "status_description": "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
     "query_type": "validation",
     "question": "...",
     "context": "...",
@@ -654,7 +655,7 @@ GET /agent/queries/{id}
 }
 ```
 
-`answer`, `comment` y `human_confidence` son `null` hasta que `status` es `answered`. `insufficient_reason` es `null` salvo que `status` sea `needs_context`.
+`status_description` acompaña siempre a la query (una frase legible sobre qué significa `status` y qué hacer después). `answer`, `comment` y `human_confidence` son `null` hasta que `status` es `answered`. `insufficient_reason` es `null` salvo que `status` sea `needs_context`.
 
 #### Aclarar una query
 
@@ -839,6 +840,7 @@ Consulta el estado de una query. Usa esto para poll después de crear una query.
 {
   "query_id": "uuid",
   "status": "answered",
+  "status_description": "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
   "answer": { "kind": "boolean", "value": true },
   "comment": "Confirmed against the Finance report.",
   "human_confidence": null,

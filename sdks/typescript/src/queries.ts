@@ -86,6 +86,8 @@ export interface CreatedQuery {
 export interface Query {
   queryId: string;
   status: QueryStatus;
+  /** A human-readable sentence explaining what `status` means and what to do next. */
+  statusDescription: string;
   queryType: QueryType;
   question: string;
   context: string | null;
@@ -100,6 +102,10 @@ export interface Query {
   expiresAt: string;
 }
 
+// QuerySummary intentionally has no statusDescription: listAgentQueries()
+// builds its rows by hand rather than through shapeQuery() and never sends
+// one, so adding the field here would be `undefined` at runtime for every
+// list result.
 export interface QuerySummary {
   queryId: string;
   status: QueryStatus;
@@ -155,6 +161,7 @@ export type AnswerWire =
 export interface QueryWire {
   query_id: string;
   status: QueryStatus;
+  status_description: string;
   query_type: QueryType;
   question: string;
   context: string | null;
@@ -280,6 +287,7 @@ export function fromQueryWire(wire: QueryWire): Query {
   return {
     queryId: wire.query_id,
     status: wire.status,
+    statusDescription: wire.status_description,
     queryType: wire.query_type,
     question: wire.question,
     context: wire.context,

@@ -89,6 +89,11 @@ if (query.status === "answered") console.log(query.answer);
 const pending = await client.listQueries({ status: "pending", limit: 20 });
 ```
 
+Every `Query` also carries `statusDescription` — a human-readable sentence
+for whatever `status` currently is, handy for logging or handing straight to
+an LLM without a switch statement over `status`. `QuerySummary` (from
+`listQueries`) does not carry it — the list endpoint doesn't send one.
+
 ### When the human can't decide
 
 A query can also come back `needs_context`: the human opened it and told

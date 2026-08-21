@@ -150,6 +150,7 @@ curl https://api.agentdialog.io/api/v1/agent/queries/{id} \
   "data": {
     "query_id": "uuid",
     "status": "answered",
+    "status_description": "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
     "query_type": "validation",
     "question": "Deploy release 2.3 to production?",
     "context": "12 commits since the last release. All checks green.",
@@ -165,9 +166,10 @@ curl https://api.agentdialog.io/api/v1/agent/queries/{id} \
 }
 ```
 
-`answer`, `comment`, and `human_confidence` are `null` until `status` is
-`answered`. `insufficient_reason` is `null` unless `status` is
-`needs_context`.
+`status_description` is always present — a human-readable sentence for
+whatever `status` currently is. `answer`, `comment`, and `human_confidence`
+are `null` until `status` is `answered`. `insufficient_reason` is `null`
+unless `status` is `needs_context`.
 
 ## Clarify a query
 

@@ -8,7 +8,8 @@ afterEach(() => { globalThis.fetch = realFetch; });
 function queryPayload(status: string, answer: { kind: string; value: boolean } | null = null) {
   return {
     data: {
-      query_id: "q1", status, query_type: "validation", question: "Ship it?",
+      query_id: "q1", status, status_description: `mock status: ${status}`,
+      query_type: "validation", question: "Ship it?",
       context: null, confidence: null, answer, comment: null,
       human_confidence: null, response_time_ms: null, insufficient_reason: null,
       created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
@@ -42,6 +43,7 @@ describe("waitForAnswer", () => {
     const query = await client.waitForAnswer("q1", { pollIntervalMs: 1 });
     expect(query.status).toBe("answered");
     expect(query.answer).toEqual({ kind: "boolean", value: true });
+    expect(query.statusDescription).toBe("mock status: answered");
     expect(state.calls).toBe(3);
   });
 

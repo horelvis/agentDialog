@@ -45,7 +45,8 @@ describe("Vercel AI SDK adapter", () => {
   it("checkAnswerTool reads a query", async () => {
     mockFetch({
       data: {
-        query_id: "q1", status: "answered", query_type: "validation",
+        query_id: "q1", status: "answered", status_description: "The human has responded.",
+        query_type: "validation",
         question: "Ship it?", context: null, confidence: null,
         answer: { kind: "boolean", value: true }, comment: null, human_confidence: null,
         response_time_ms: null, insufficient_reason: null,

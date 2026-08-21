@@ -110,7 +110,7 @@ export function askHumanTool(client: AgentDialog, options: AskHumanOptions = {})
 export function checkAnswerTool(client: AgentDialog) {
   return tool({
     description:
-      'Check whether a human has answered a query created with ask_human. Returns the status and, once answered, their typed answer. If status is "needs_context", read insufficientReason and fix the query with clarify_query (see the SDK\'s clarifyQuery).',
+      'Check whether a human has answered a query created with ask_human. Returns the status and, once answered, their typed answer. If status is "needs_context", read insufficientReason — there is no tool for this, so fix the query by calling the AgentDialog client\'s clarifyQuery(queryId, input) directly, then wait and check_answer again.',
     inputSchema: jsonSchema<{ queryId: string }>({
       type: "object",
       properties: {
