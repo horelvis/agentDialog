@@ -52,8 +52,9 @@ for await (const msg of client.listAllMessages(conv.id)) {
 
 ## Human queries
 
-Ask a human a question and get the answer back from their inbox — no chat
-UI, no login required on their end.
+Ask a human a question and get the answer back. The human gets a notification
+email with a passwordless sign-in code and answers in the web chat — there's
+no password to create, no signup form, just the code and the app.
 
 ```typescript
 import { AgentDialog } from "@agentdialog/sdk";

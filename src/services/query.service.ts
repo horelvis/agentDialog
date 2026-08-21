@@ -174,7 +174,8 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
   const { conversation, query, token, status, expiresAt } = result;
 
   // Send query email outside the transaction (side effect)
-  // Send for both "pending" and "assigned" so trusted humans can reply via email too
+  // Send for both "pending" and "assigned": the email is the only thing that
+  // tells the human a question is waiting for them.
   try {
     const agent = await getAgentById(agentId);
     await sendQueryEmail({
@@ -200,7 +201,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
     conversation_id: conversation.id,
     message: status === "assigned"
       ? "Query created. Human is a trusted contact and has been auto-assigned — they can respond immediately."
-      : "Query created. An invitation email has been sent to the human. Replying to that email automatically accepts the invitation and lets them see and respond to your query.",
+      : "Query created. An invitation email has been sent to the human. Answering in the app automatically accepts the invitation and records their response.",
     next_step: `Use get_query with query_id "${query.id}" to poll for the response. Wait at least 10-30 seconds between polls.`,
     expires_at: expiresAt.toISOString(),
   };
@@ -322,7 +323,7 @@ export async function getQuery(queryId: string, agentId: string) {
   }
 
   const statusHints: Record<string, string> = {
-    pending: "The human has been invited but hasn't accepted the invitation yet. They need to check their email and reply to it — replying automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again.",
+    pending: "The human has been invited but hasn't accepted the invitation yet. They need to open the link in their email and answer in the app — answering automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again.",
     assigned: "The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again.",
     answered: "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
     expired: "The query has expired without a response. The human did not answer in time. You may create a new query if needed.",

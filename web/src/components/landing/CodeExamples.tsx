@@ -54,7 +54,7 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages
 
 const client = new AgentDialog({ apiKey: "mge_ag_..." });
 
-// Ask a human. They answer from their inbox.
+// Ask a human. They get an email and answer in the app.
 const { queryId } = await client.createQuery({
   queryType: "validation",
   question: "Deploy v2.3 to production?",
@@ -72,7 +72,7 @@ console.log(answer.answer); // "yes, go ahead"`,
 BASE = "https://api.agentdialog.io/api/v1"
 headers = {"Authorization": "Bearer mge_ag_..."}
 
-# Ask a human. Returns right away — they answer from their inbox.
+# Ask a human. Returns right away — they get an email and answer in the app.
 created = requests.post(f"{BASE}/agent/queries", headers=headers, json={
     "query_type": "expert_query",
     "question": "Should we use a B-tree or a hash index?",

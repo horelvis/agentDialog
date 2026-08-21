@@ -46,7 +46,7 @@ const conversation: DemoMessage[] = [
     id: 5,
     sender: "agent",
     type: "tool_result",
-    content: "Email sent. Waiting for reply...",
+    content: "Email sent. Waiting for an answer...",
     meta: { toolName: "human_query", duration: "1.2s", status: "completed" },
     delay: 3600,
   },
@@ -54,7 +54,7 @@ const conversation: DemoMessage[] = [
     id: 6,
     sender: "agent",
     type: "notification",
-    content: "Waiting for Sarah to reply via email",
+    content: "Waiting for Sarah to answer in the app",
     meta: { severity: "info", title: "Human Input Requested" },
     delay: 4400,
   },
@@ -316,7 +316,7 @@ export function ChatDemo() {
             See the full loop in action
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Agent runs tools, asks a human via email, gets the reply, requests approval — all in one conversation.
+            Agent runs tools, asks a human, gets the answer, requests approval — all in one conversation.
           </p>
         </div>
 

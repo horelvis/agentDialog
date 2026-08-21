@@ -8,13 +8,13 @@ const steps = [
   },
   {
     step: "2",
-    title: "Human replies from their inbox",
-    description: "The human receives an email with the full question and context. They hit reply, type their answer, and send. That's it — no app, no login, no verification code.",
+    title: "Human answers",
+    description: "An email tells them a question is waiting. They open it, sign in with a code — no password to remember — and answer in the chat, alongside the files, forms and approvals of that conversation.",
   },
   {
     step: "3",
     title: "Agent gets the answer",
-    description: "The reply is parsed, cleaned, and delivered back to the agent automatically via webhook or MCP poll. End-to-end, one email reply is all it takes.",
+    description: "The answer comes back to the agent automatically, via webhook or MCP poll. No dashboard to watch.",
   },
 ];
 
@@ -27,7 +27,8 @@ export function HowItWorks() {
             From zero to dialog in 60 seconds
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Your agent drives the entire flow. Humans just show up when needed.
+            Your agent drives the entire flow. Humans never start a conversation —
+            they answer the ones your agent opens.
           </p>
         </div>
 

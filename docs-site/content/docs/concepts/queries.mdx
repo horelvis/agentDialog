@@ -1,14 +1,16 @@
 ---
 title: Human queries
-description: How an agent asks a human a question and gets the answer back from their inbox
+description: How an agent asks a human a question and gets the answer back from the web chat
 ---
 
 import { Steps, Step } from "fumadocs-ui/components/steps";
 import { Callout } from "fumadocs-ui/components/callout";
 
-A query is the fastest way for an agent to get a human's input: no chat UI,
-no login, no app to open. The agent asks a question through the API; the
-human answers by replying to an email.
+A query is the fastest way for an agent to get a human's input. The agent asks
+through the API, and the human answers in the web chat at `agentdialog.io`,
+which is where the conversation and its files, forms and approvals live. The
+notification email tells them a question is waiting and carries their
+passwordless sign-in code — it is not itself a way to answer.
 
 ## Flow
 
@@ -19,15 +21,11 @@ human answers by replying to an email.
   </Step>
   <Step>
     ### Human receives an email
-    AgentDialog creates a conversation behind the scenes and emails the human the question and context. The email's `Reply-To` header is set to `reply+{queryId}@reply.agentdialog.io` — a per-query address.
+    AgentDialog creates a conversation behind the scenes and emails the human the question and context, with a link into the app. If they aren't already signed in, the email carries their passwordless sign-in code.
   </Step>
   <Step>
-    ### Human replies from their inbox
-    The human answers like any other email — no verification code, no web app. If this is their first query from this agent, the email doubles as an invitation and replying accepts it.
-  </Step>
-  <Step>
-    ### The inbound webhook processes the reply
-    AgentDialog's mail handler receives the reply, matches it to the query by the `reply+{queryId}` address, strips the quoted thread, accepts the invitation if it wasn't already accepted, and records the answer.
+    ### Human answers in the app
+    They sign in (or resume their session), open the query, and respond — `POST /human/queries/{id}/respond`. If this is their first query from this agent, opening it doubles as accepting the invitation.
   </Step>
   <Step>
     ### Agent reads the answer
@@ -46,14 +44,14 @@ has previously **accepted an invitation from that same agent** and not since
 revoked it:
 
 - **No prior accepted invitation** → the query starts as `pending`. The human
-  still has to open the invitation (their first reply doubles as accepting
-  it) before they can answer.
+  still has to open the query in the app (which doubles as accepting the
+  invitation) before they can answer.
 - **Prior accepted invitation, not revoked** → the human already trusts this
   agent, so the query is created directly as `assigned`. There's nothing for
   the human to accept — they can answer immediately.
 
-In both cases the human gets the same email and can reply the same way; the
-status only changes how the agent should read "no answer yet". A `pending`
+In both cases the human gets the same email and answers the same way, in the
+app; the status only changes how the agent should read "no answer yet". A `pending`
 query might be waiting on the human to notice the invitation at all, while
 an `assigned` query means they've seen it and simply haven't answered.
 
@@ -67,13 +65,14 @@ as "no answer" and, if it still needs input, create a new query.
   `pending` with Agent B until they accept an invitation from B too.
 </Callout>
 
-## Why email instead of the app
+## Why a query instead of a regular message
 
 Most AgentDialog concepts — [conversations](/docs/concepts/conversations),
-[messages](/docs/concepts/messages) — assume the human has the web app open.
-Queries are built for the opposite case: an agent needs one quick answer from
-someone who is not watching a dashboard. Routing the whole exchange through
-email means the only thing the human needs is the inbox they already check.
+[messages](/docs/concepts/messages) — assume the human has the web app open
+already. Queries are built for the opposite case: an agent needs one quick
+answer from someone who is not watching a dashboard. The notification email
+is what gets them there — they don't need to have the app open, or even be
+signed in, to learn a question is waiting.
 
 ## See also
 

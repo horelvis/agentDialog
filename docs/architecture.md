@@ -1,5 +1,10 @@
 # Architecture
 
+![Target AgentDialog architecture: agents ask questions and humans answer through the web chat or email](./agentdialog-architecture.png)
+
+_Target experience: the web chat and email are two interfaces over the same
+persistent conversation and human-query lifecycle._
+
 ## The four pieces
 
 ```
@@ -22,11 +27,20 @@ Most chat platforms are built for humans who occasionally talk to a bot.
 AgentDialog inverts that: the agent is the one who initiates. It registers
 itself over the API, creates a conversation, and pulls a human in only when it
 needs something — an approval, a judgement call, a piece of knowledge it does not
-have. The human does not need an account, an app, or a login. They get an email
-and they reply to it.
+have. The human continues the conversation in the authenticated chat at
+`agentdialog.io`. Email tells them a question is waiting and carries the code
+they sign in with; it is a notification channel, not an answering one.
+
+**A human can never start a conversation**, and that is enforced by the route
+surface rather than by convention: `src/routes/agent/conversations.ts` has
+`POST /`, while `src/routes/human/conversations.ts` has only `GET`. A human joins
+a conversation an agent already created, by invitation. From then on they can send
+messages into it and answer its queries — but they have no way to open one.
 
 That inversion is why the agent-side API is the rich one and the human-side API
-is thin: the human's primary interface is their inbox, not the web app.
+is focused: the web app provides persistent conversations, files, forms and
+approvals, while email provides the lowest-friction path for a direct answer.
+Both interfaces feed the same conversation and query records.
 
 ## Backend layout
 
@@ -77,6 +91,17 @@ verification used to bcrypt-compare against every row.
 
 This is the flow the whole product exists for.
 
+The diagram at the top shows the target experience: a human query appears as an
+actionable card inside the chat. The current web app already has the chat and
+query-response capabilities but exposes them as separate views; bringing the
+response action into the conversation is the remaining UI integration.
+
+The diagram also shows email as a second way to answer. **That half is not
+built.** Nothing reads inbound mail: email notifies the human and carries their
+sign-in code, and the answer comes back through the web app. An IMAP workaround
+was built and rejected — `docs/operations.md` records why, and it is worth
+reading before anyone tries it again.
+
 ```
 agent                     AgentDialog                      human
   │                            │                             │
@@ -84,13 +109,12 @@ agent                     AgentDialog                      human
   │                            ├─ create conversation        │
   │                            ├─ create query message       │
   │                            ├─ invite the human           │
-  │                            ├─ send email ───────────────►│  Reply-To:
-  │                            │                             │  reply+{queryId}@
-  │◄──── query_id, status ─────┤                             │  reply.agentdialog.io
+  │                            ├─ notify by email ──────────►│  "a question is
+  │◄──── query_id, status ─────┤                             │   waiting for you"
   │                            │                             │
-  │                            │◄──── plain email reply ─────┤
-  │                            ├─ verify webhook signature   │
-  │                            ├─ strip quotes and signature │
+  │                            │◄──── sign-in code request ──┤
+  │                            ├─ email the code ───────────►│
+  │                            │◄──── code, then the answer ─┤  in the web app
   │                            ├─ auto-accept the invitation │
   │                            ├─ record the answer          │
   │                            ├─ dispatch webhooks          │
@@ -98,20 +122,33 @@ agent                     AgentDialog                      human
   │◄──── status, answer ───────┤                             │
 ```
 
+The answer arrives at `POST /api/v1/human/queries/:id/respond` in
+`src/routes/human/queries.ts`, which calls `respondQuery`. The dormant provider
+webhook would call the same function, which is what would make the two
+interfaces one conversation rather than two if inbound email is ever turned on.
+
 `createQuery` in `src/services/query.service.ts` does the first half in a single
 transaction, then sends the email as a side effect outside it — a failed send
 must not roll back a created query.
 
 `pending` versus `assigned` is the part newcomers misread. A human who has
 already accepted a query from this agent is **auto-assigned** and can answer
-immediately. Everyone else starts `pending`, and their first reply doubles as
-accepting the invitation. There is no link to click. Trust is revocable, in
-`src/db/schema/trust-revocations.ts`.
+immediately. Everyone else starts `pending`, and answering doubles as accepting
+the invitation — there is no separate accept step to complete first. Trust is
+revocable, in `src/db/schema/trust-revocations.ts`.
 
-Inbound replies land at `POST /api/v1/webhooks/email/inbound`, verified by
-provider signature in `src/lib/email-webhook-verify.ts`, then parsed by
+`POST /api/v1/webhooks/email/inbound` is the dormant inbound path. It verifies a
+provider signature in `src/lib/email-webhook-verify.ts` and parses the body with
 `src/lib/email-parser.ts`, which strips quoted history and signatures across
-Gmail (EN/ES/FR/DE), Outlook and Apple Mail.
+Gmail (EN/ES/FR/DE), Outlook and Apple Mail. Nothing calls it: no provider is
+configured, and outbound mail carries no per-query `Reply-To` for it to match.
+It is kept because it is the shape inbound email would take if it returns, not
+because it does anything today.
+
+`stripReplyQuotes` is worth one warning if that day comes. It cuts at the first
+quoted line, so a reply typed *below* the quote — Outlook's default — reduces to
+an empty string. That is one of the faults that sank the IMAP attempt, and it
+lives in code that is still here.
 
 ## Three ways in
 

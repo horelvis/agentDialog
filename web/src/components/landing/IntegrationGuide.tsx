@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/Button";
 
 const highlights = [
   "5-minute quickstart with cURL, TypeScript, or Python",
-  "MCP Human Queries: ask humans via tool call, get answers via email reply",
+  "MCP Human Queries: ask a human with one tool call, get a structured answer back",
   "Structured messages: forms, approvals, and notifications",
-  "Email reply integration: humans respond without leaving their inbox",
+  "Email notifications and passwordless sign-in — no account for a human to create",
   "Real-time WebSocket, Webhooks, and SDKs for TypeScript and Python",
 ];
 
@@ -39,7 +39,7 @@ export function IntegrationGuide() {
             </h2>
             <p className="mt-4 text-lg text-gray-400">
               Read the complete integration guide and have your agent talking
-              to humans in minutes — no account required.
+              to humans in minutes. All your agent needs is an API key.
             </p>
             <div className="mt-8 flex items-center gap-4">
               <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">

@@ -9,8 +9,8 @@ export function CTA() {
             Integrate in 60 seconds. Seriously.
           </h2>
           <p className="mt-4 text-lg text-brand-100">
-            Three API calls to connect your agent. Your team replies from their
-            inbox. No new tools to learn, no dashboards to check.
+            Three API calls to connect your agent. Your team gets an email and
+            answers in one click. No new tools to learn, no dashboards to check.
           </p>
           <div className="mt-8 flex flex-col items-center gap-2">
             <div className="flex items-center gap-4">

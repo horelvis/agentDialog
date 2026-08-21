@@ -268,6 +268,68 @@ a configuration this project no longer has. Do not run it without rewriting it.
 missing or malformed, so a misconfigured deploy fails immediately and loudly
 rather than at the first request that needs the value.
 
+### Inbound email: tried, measured, rejected
+
+**Nothing reads inbound email.** A human answers a query in the web app. Email
+notifies them that a question is waiting and carries their sign-in code, and
+that is all it does.
+
+This is worth recording because the obvious cheap fix was built, reviewed and
+thrown away, and the next person to reach for it should know why.
+
+The shortcut was to read the `agentdialog.app@gmail.com` mailbox directly over
+IMAP with an App Password, using `+` addressing so no DNS work was needed, polled
+every five minutes from Cloud Scheduler. It reached code-complete with tests. A
+whole-branch review then found three faults, and the first two are not fixable by
+being more careful:
+
+- **`\Seen` cannot be both a person's "I read this" and the system's "I processed
+  this".** The design marked a message read once ingested, and deliberately never
+  touched anyone else's mail so the mailbox stayed usable by a human. Those two
+  goals contradict: Gmail marks a message read the moment it is opened, and *Mark
+  all as read* is one click. Any reply a person opened before a poll ran was lost
+  permanently and silently, with no trace in any log.
+- **The unread backlog is re-downloaded forever.** Foreign mail is never marked
+  read, so it comes back every pass, and classification happened only after
+  fetching the full message body. A few hundred unread messages meant a few
+  hundred full downloads every five minutes, 288 times a day, against Gmail
+  IMAP's ~2.5 GB/day ceiling. Crossing it throttles the account and takes the
+  feature down, presenting as an authentication failure.
+- A reply typed *below* the quoted text — Outlook's default — stripped to an
+  empty string and was dropped as an empty answer, again silently.
+
+The common thread is that the design modelled the mailbox as an input queue when
+it is really a shared inbox with a human co-owner. A consumer mailbox is not a
+message broker and does not become one by being polled carefully.
+
+The spec and plan are kept at `docs/superpowers/specs/2026-08-20-inbound-email-ingestion-design.md`
+and `docs/superpowers/plans/2026-08-21-inbound-email-ingestion.md` as a record of
+the attempt.
+
+#### What replaces it
+
+`POST /api/v1/webhooks/email/inbound` is still deployed and still verifies
+provider signatures. It is **dormant**: no provider posts to it, and outbound
+mail no longer carries a per-query `Reply-To` for it to match against. That is
+the route back, and it is configuration rather than construction — a
+transactional provider on a domain we own, its webhook pointed here, and
+`INBOUND_EMAIL_WEBHOOK_SECRET` set. Doing it that way also fixes the SPF and
+DKIM alignment problem described under **Email** below, which is a reason to do
+it eventually regardless of inbound.
+
+#### The one setting that stops replies vanishing
+
+People reply to notification emails whatever the email says. Set an
+**auto-responder on the mailbox in `REPLY_TO_ADDRESS`** — Gmail: Settings →
+General → Vacation responder, on indefinitely — telling the sender their reply
+was not read and pointing them at `https://agentdialog.io`. This is the whole
+mitigation, it is a Gmail setting rather than code, and without it a reply
+disappears in exactly the silent way that got the IMAP approach rejected.
+
+If `REPLY_TO_ADDRESS` is unset the email carries no `Reply-To` at all, and a
+reply goes to `SMTP_FROM` instead. Point one or the other at a mailbox that has
+the auto-responder; do not leave both pointing somewhere nobody watches.
+
 ### Three ways to deploy, and only one that is current
 
 | Path | Used | min-instances |
@@ -318,20 +380,24 @@ Two consequences worth knowing:
 - A consumer Gmail account caps at roughly 500 messages a day, and messages sent
   from a `@gmail.com` address on behalf of `agentdialog.io` have no aligned SPF
   or DKIM, which costs deliverability.
-- **Inbound email does not work at all.** Query emails carry a `Reply-To` of
-  `reply+{queryId}@reply.agentdialog.io`, but neither `agentdialog.io` nor
-  `reply.agentdialog.io` has an MX record — confirmed against two resolvers — so
-  a human's reply bounces and reaches nothing. `POST /api/v1/webhooks/email/inbound`
-  is deployed and reachable, but no provider ever calls it. The feature the
-  landing page sells is not operational: the code is complete, the mail
-  infrastructure was never built.
+- **Inbound email is not read at all, by design.** Query emails no longer carry a
+  per-query `Reply-To`, and the product no longer tells anyone to answer by
+  replying. Neither `agentdialog.io` nor `reply.agentdialog.io` has an MX record
+  — confirmed against two resolvers — so a reply to either would reach nothing
+  anyway. See "Inbound email: tried, measured, rejected" above for why the
+  IMAP workaround was abandoned and what the route back looks like.
 
 ## Things that have bitten, and how to recognise them
 
-**`bun run typecheck` fails at the root.** Six pre-existing errors in
-`src/mcp/server.ts`. It is not your change. It also means
-`Dockerfile.cloudrun` — which runs it — is sensitive to any zod resolution
-change; see the `overrides` entry in the root `package.json`.
+**`bun run typecheck` at the root was long documented as failing regardless of
+your change** — six pre-existing errors in `src/mcp/server.ts`. It no longer
+does: `bunx tsc --noEmit` exits 0, verified on `main` as well as here, and
+nothing in this repository's recent history changed `src/mcp/server.ts` to make
+that happen — the errors were most likely environmental. Treat a failure now as
+real. If it fails, the change under test
+broke something real — do not wave it off as the old, known failure. This
+still means `Dockerfile.cloudrun` — which runs it — is sensitive to any zod
+resolution change; see the `overrides` entry in the root `package.json`.
 
 **A Docker build resolving unexpected dependency versions.** The `COPY` globs
 must be `bun.lock*`. Bun 1.4 writes a text lockfile, and the old `bun.lockb*`
