@@ -26,15 +26,15 @@ AgentDialog is an API-first platform that gives AI agents a structured way to co
   </Step>
   <Step>
     ### Agent creates a conversation
-    The agent creates a conversation with an intent type: `permission`, `clarification`, `solicitation`, or `notification`.
+    The agent creates a conversation with an intent type: `permission`, `clarification`, `solicitation`, or `notification`. Only agents can do this — a human has no endpoint that opens a conversation.
   </Step>
   <Step>
     ### Agent invites a human
-    The agent sends an invitation to a human's email. The human receives a verification code — no passwords, no accounts.
+    The agent sends an invitation to a human's email. The human receives a verification code — no password to create, no signup form.
   </Step>
   <Step>
     ### They communicate
-    Messages flow in real-time via WebSocket. The agent can send structured messages like approval requests, interactive forms, and tool call visibility. The human responds directly in the chat.
+    Messages flow in real-time via WebSocket. The agent can send structured messages like approval requests, interactive forms, and tool call visibility. The human responds directly in the chat — the main channel. A human query can also be answered by replying to its email, without signing in.
   </Step>
 </Steps>
 
@@ -46,7 +46,7 @@ AgentDialog is an API-first platform that gives AI agents a structured way to co
 | **Interactive forms** | Agents send structured forms with selects, numbers, and text fields. Humans fill them inline. |
 | **Tool visibility** | Watch agents work in real-time: which tools they call, inputs, and results. |
 | **File sharing** | Direct upload up to 10MB or presigned URLs for larger files. |
-| **Zero-friction auth** | Humans join via email verification code. No accounts or passwords. |
+| **Zero-friction auth** | Humans sign in with an emailed code. No password to create, no signup form. |
 | **Real-time** | WebSocket for instant delivery. Webhooks for async flows. |
 
 ## Base URL

@@ -155,7 +155,7 @@ import { Cards, Card } from "fumadocs-ui/components/card";
   </Tab>
 </Tabs>
 
-The human receives an email with a verification code. They enter it and join the conversation — no account needed.
+The human receives an email with a verification code. They enter it and join the conversation — no password to create, no signup form.
 
 ## 4. Send a message
 
@@ -227,9 +227,10 @@ That's it. The human sees the approval request in real-time and can approve or d
 
 ## 5. Ask a human a question
 
-Approvals need a conversation and an invitation first. Queries skip both —
-one call sends the question by email, and the human answers straight from
-their inbox. See [Human queries](/docs/concepts/queries) for the full flow.
+Approvals need a conversation and an invitation first. Queries skip both — one
+call sends the question, and the human answers either in the web chat or by
+replying to the email, without signing in. See
+[Human queries](/docs/concepts/queries) for the full flow.
 
 <Tabs items={["cURL", "TypeScript SDK"]}>
   <Tab value="cURL">
@@ -282,7 +283,7 @@ their inbox. See [Human queries](/docs/concepts/queries) for the full flow.
 ## Next steps
 
 <Cards>
-  <Card title="Human queries" href="/docs/concepts/queries" description="Ask a human a question and get the answer from their inbox." />
+  <Card title="Human queries" href="/docs/concepts/queries" description="Ask a human a question and get the answer from the chat or a plain email reply." />
   <Card title="Message types" href="/docs/concepts/messages" description="Learn about all structured message types." />
   <Card title="WebSocket" href="/docs/realtime/websocket" description="Connect via WebSocket for real-time messaging." />
   <Card title="Webhooks" href="/docs/realtime/webhooks" description="Set up webhooks for async event notifications." />

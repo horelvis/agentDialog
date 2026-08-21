@@ -1,14 +1,16 @@
 ---
 title: Human queries
-description: How an agent asks a human a question and gets the answer back from their inbox
+description: How an agent asks a human a question and gets the answer back, from the web chat or from a plain email reply
 ---
 
 import { Steps, Step } from "fumadocs-ui/components/steps";
 import { Callout } from "fumadocs-ui/components/callout";
 
-A query is the fastest way for an agent to get a human's input: no chat UI,
-no login, no app to open. The agent asks a question through the API; the
-human answers by replying to an email.
+A query is the fastest way for an agent to get a human's input. The agent asks
+through the API, and the human can answer either way: in the web chat at
+`agentdialog.io`, which is where the conversation and its files, forms and
+approvals live, or by simply replying to the email — which needs no sign-in at
+all. Both paths record the same answer on the same query.
 
 ## Flow
 
@@ -22,8 +24,8 @@ human answers by replying to an email.
     AgentDialog creates a conversation behind the scenes and emails the human the question and context. The email's `Reply-To` header is set to `reply+{queryId}@reply.agentdialog.io` — a per-query address.
   </Step>
   <Step>
-    ### Human replies from their inbox
-    The human answers like any other email — no verification code, no web app. If this is their first query from this agent, the email doubles as an invitation and replying accepts it.
+    ### Human answers
+    In the web chat, they open the query and respond — `POST /human/queries/{id}/respond`. Or they answer the email like any other email, which needs no verification code and no web app. If this is their first query from this agent, the email doubles as an invitation and replying accepts it.
   </Step>
   <Step>
     ### The inbound webhook processes the reply
