@@ -516,7 +516,9 @@ DELETE /agent/invitations/{invitation-id}
 
 ## 8. Human Queries
 
-Los agentes pueden hacer preguntas directas a humanos. El humano recibe un email de notificación con la pregunta y responde en la web app (`agentdialog.io`) — un código sin contraseña es el inicio de sesión, no hay que crear una cuenta a mano. Hay dos formas de crear la query: las rutas REST de abajo, o el protocolo MCP (Model Context Protocol) si tu cliente ya habla MCP. Ambas comparten el mismo modelo de datos y los mismos cuatro estados de query.
+Los agentes pueden hacer preguntas directas a humanos. El humano recibe un email de notificación con la pregunta y responde en la web app (`agentdialog.io`) — un código sin contraseña es el inicio de sesión, no hay que crear una cuenta a mano. Hay dos formas de crear la query: las rutas REST de abajo, o el protocolo MCP (Model Context Protocol) si tu cliente ya habla MCP. Ambas comparten el mismo modelo de datos y los mismos seis estados de query.
+
+Una query no es texto libre en ninguna dirección. El agente declara un `subject` (de qué trata, con algo que el humano pueda mirar) y un `answer_space` (la forma cerrada que debe tener la respuesta), y antes de convertirse en query, la petición pasa por una **puerta de admisión**: se rechaza con `422` cualquier pregunta que un humano no pudiera decidir realmente — un `subject` sin referente, un riesgo por encima de `low` sin consecuencias declaradas, una decisión repetida sin `changes`, etc. El campo `remedy` de ese `422` dice exactamente qué añadir.
 
 ### REST API
 
@@ -529,23 +531,91 @@ POST /agent/queries
 ```json
 {
   "query_type": "validation",
-  "question": "¿Los datos de revenue de Q4 son correctos? $2.3M (+15% YoY)",
+  "risk": "low",
+  "subject": {
+    "id": "q4-revenue-figure",
+    "label": "Cifra de revenue de Q4",
+    "body": "Q4 revenue: 2.300.000 EUR (+15% YoY). Fuente: finance.quarterly_revenue, corte del 2026-01-05."
+  },
+  "answer_space": {
+    "kind": "boolean",
+    "labels": { "t": "Correcto", "f": "Incorrecto" }
+  },
+  "question": "¿Los datos de revenue de Q4 son correctos? 2,3M EUR (+15% YoY)",
   "context": "Datos extraídos de BigQuery, tabla finance.quarterly_revenue...",
-  "target_human_email": "sarah@company.com",
+  "target_human_email": "sarah@example.com",
   "confidence": 0.7,
   "timeout_minutes": 30
 }
 ```
 
+El `subject` de arriba lleva el referente en `body`. **Sin referente y sin `self_contained: true` la petición se rechaza con `422 missing_referent`** — a cualquier riesgo. Si la pregunta de verdad no trata sobre ningún artefacto (un juicio, una preferencia), esa es la válvula de escape:
+
+```json
+{
+  "query_type": "expert_query",
+  "subject": {
+    "id": "politica-reembolsos-2026",
+    "label": "Criterio de reembolso fuera de plazo"
+  },
+  "self_contained": true,
+  "answer_space": {
+    "kind": "choice",
+    "select": "one",
+    "options": [
+      { "id": "reembolsar", "label": "Reembolsar igualmente" },
+      { "id": "denegar", "label": "Denegar" }
+    ]
+  },
+  "question": "Como criterio general, ¿reembolsamos fuera de plazo cuando el cliente avisó por teléfono?",
+  "target_human_email": "sarah@example.com",
+  "timeout_minutes": 120
+}
+```
+
+`self_contained` no es un atajo: si hay algo que mirar, hay que mandarlo.
+
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
 | `query_type` | enum | Sí | `validation`, `interpretation`, `expert_query`, `labeling` |
+| `subject` | object | Sí | De qué trata la pregunta — ver [Subject](#subject) abajo |
+| `answer_space` | object | Sí | La forma cerrada que debe tener la respuesta — ver [Answer spaces](#answer-spaces) abajo |
 | `question` | string | Sí | La pregunta para el humano (max 10,000 chars) |
 | `target_human_email` | string | Sí | Email del humano a quien preguntar |
+| `risk` | enum | No | `low` (default), `medium`, `high`, `critical` — un piso; la puerta de admisión puede subirlo, nunca bajarlo |
+| `self_contained` | boolean | No | `true` solo si la pregunta de verdad no necesita referente (default `false`) |
+| `changes` | array | No | Deltas antes/después que cubre esta decisión — obligatorio por encima de `low` si este humano ya decidió sobre este `subject` |
 | `context` | string | No | Contexto adicional: código, datos, etc. (max 100,000 chars) |
 | `confidence` | number | No | Confianza del agente en su propia evaluación (0-1) |
 | `timeout_minutes` | number | No | Minutos antes de expirar (default: 60, max: 10080) |
 | `metadata` | object | No | Metadata arbitraria asociada a la query |
+
+##### Subject
+
+`subject` es de qué trata la pregunta: un id estable que se reutiliza para la misma cosa, una etiqueta que el humano reconoce, y (salvo que `self_contained` sea `true`) un referente que pueda mirar.
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `id` | string | Sí | Id estable, reutilizado entre queries sobre lo mismo |
+| `label` | string | Sí | Etiqueta legible |
+| `uri` | string | No | Enlace `http(s)` al referente. Otros esquemas se rechazan |
+| `body` | string | No | El referente inline, si no hay una URI estable |
+| `sha256` | string | No | Hash del referente — obligatorio por encima de `medium` risk, donde además el referente tiene que ser `body`: no se puede hashear lo que no se tiene |
+
+##### Answer spaces
+
+`answer_space` es una de seis formas cerradas. `kind` es el discriminador.
+
+| Kind | Campos | Forma de la respuesta |
+|------|--------|------------------------|
+| `boolean` | `labels: { t, f }`, `consequences?: { t, f }` | `{ "kind": "boolean", "value": true \| false }` |
+| `choice` | `select: "one" \| "many"`, `options: [{ id, label, consequence? }]` | `{ "kind": "choice", "option_ids": [...] }` |
+| `scalar` | `unit`, `min?`, `max?`, `step?`, `effect?` | `{ "kind": "scalar", "value": number }` |
+| `date` | `earliest?`, `latest?`, `effect?` | `{ "kind": "date", "value": "YYYY-MM-DD" }` |
+| `text` | `max_length` | `{ "kind": "text", "value": string }` — rechazado por encima de `low` risk |
+| `fields` | `fields: [Slot]`, `effect?` | `{ "kind": "fields", "values": { [slotId]: ... } }` |
+
+Un slot de `fields` es un único dato — `{ id, label, kind, ... }`, con la misma forma por `kind` que arriba, sin `consequences`/`consequence` (un slot no nunca anida). Por encima de `low` risk, cada rama de un `answer_space` discreto (`boolean`, `choice`) debe declarar su `consequences`/`consequence`.
 
 **Response (201):**
 
@@ -566,6 +636,22 @@ Todas las respuestas REST van envueltas en un objeto `data` de nivel superior.
 
 `status` viene `pending` o `assigned` directamente — ver [auto-trust](#auto-trust) más abajo. `message` describe en texto qué pasa después según el `status`; `next_step` indica qué llamar a continuación.
 
+##### Rechazada: 422
+
+```json
+{
+  "error": {
+    "code": "UNDECIDABLE_QUERY",
+    "message": "The subject 'q4-revenue-figure' carries no uri or body, so the human has nothing to look at.",
+    "reason": "missing_referent",
+    "detail": "The subject 'q4-revenue-figure' carries no uri or body, so the human has nothing to look at.",
+    "remedy": "Link the artefact with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing."
+  }
+}
+```
+
+`remedy` dice exactamente qué añadir. No es un error transitorio — corrige la petición y reintenta.
+
 #### Consultar una query
 
 ```
@@ -579,21 +665,57 @@ GET /agent/queries/{id}
   "data": {
     "query_id": "uuid",
     "status": "answered",
+    "status_description": "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
     "query_type": "validation",
     "question": "...",
     "context": "...",
     "confidence": 0.7,
-    "answer": "Sí, los datos son correctos. Revisé contra el reporte de Finance.",
+    "answer": { "kind": "boolean", "value": true },
     "comment": "Confirmed against the Finance report.",
     "human_confidence": null,
     "response_time_ms": 45000,
+    "insufficient_reason": null,
     "created_at": "2026-08-20T16:30:00.000Z",
     "expires_at": "2026-08-20T18:30:00.000Z"
   }
 }
 ```
 
-`answer`, `comment` y `human_confidence` son `null` hasta que `status` es `answered`.
+`status_description` acompaña siempre a la query (una frase legible sobre qué significa `status` y qué hacer después). `answer`, `comment` y `human_confidence` son `null` hasta que `status` es `answered`. `insufficient_reason` es `null` salvo que `status` sea `needs_context`.
+
+#### Aclarar una query
+
+```
+PATCH /agent/queries/{id}
+```
+
+Solo válido cuando `status` es `needs_context`. Envía lo que resuelva lo que el humano marcó como faltante:
+
+```json
+{
+  "context": "Changelog: https://example.test/changelog/2.3"
+}
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `subject` | object | No | Referente de reemplazo |
+| `answer_space` | object | No | Forma de respuesta de reemplazo |
+| `changes` | array | No | Delta antes/después |
+| `question` | string | No | Pregunta reformulada |
+| `context` | string | No | Contexto adicional |
+
+Al menos un campo es obligatorio — un `PATCH` vacío se rechaza. Los campos que no se envían conservan su valor anterior. La petición pasa por la misma puerta de admisión que la creación y puede volver `422` igual. Si tiene éxito, la query vuelve a `status: "assigned"` con la misma forma que [consultar una query](#consultar-una-query), y su reloj de expiración retoma desde donde se pausó.
+
+#### Cancelar una query
+
+```
+POST /agent/queries/{id}/cancel
+```
+
+Retira una query antes de que el humano responda. Válido desde `pending`, `assigned`, o `needs_context`.
+
+Devuelve la query con la misma forma que [consultar una query](#consultar-una-query), con `status: "cancelled"`. Si la respuesta del humano ya llegó primero, esto devuelve `409` en su lugar — una respuesta que ya existe nunca se descarta.
 
 #### Listar queries
 
@@ -603,7 +725,7 @@ GET /agent/queries
 
 | Param | Tipo | Default | Descripción |
 |-------|------|---------|-------------|
-| `status` | string | — | Filtra por `pending`, `assigned`, `answered`, `expired` |
+| `status` | string | — | Filtra por `pending`, `assigned`, `needs_context`, `answered`, `cancelled`, `expired` |
 | `limit` | number | 20 | Máximo de items (1-100) |
 
 ### MCP
@@ -630,24 +752,65 @@ AgentDialog expone un servidor MCP compatible con Claude, GPT, y cualquier clien
 
 #### Tool: `human_query`
 
-Crea una query para que un humano responda. Envía un email de notificación con la pregunta completa; el humano responde en la web app, no en su inbox.
+Crea una query para que un humano responda una pregunta que de verdad pueda decidir. Envía un email de notificación con la pregunta completa; el humano responde en la web app, no en su inbox.
 
 ```json
 {
   "query_type": "validation",
-  "question": "¿Los datos de revenue de Q4 son correctos? $2.3M (+15% YoY)",
+  "risk": "low",
+  "subject": {
+    "id": "q4-revenue-figure",
+    "label": "Cifra de revenue de Q4",
+    "body": "Q4 revenue: 2.300.000 EUR (+15% YoY). Fuente: finance.quarterly_revenue, corte del 2026-01-05."
+  },
+  "answer_space": {
+    "kind": "boolean",
+    "labels": { "t": "Correcto", "f": "Incorrecto" }
+  },
+  "question": "¿Los datos de revenue de Q4 son correctos? 2,3M EUR (+15% YoY)",
   "context": "Datos extraídos de BigQuery, tabla finance.quarterly_revenue...",
-  "target_human_email": "sarah@company.com",
+  "target_human_email": "sarah@example.com",
   "confidence": 0.7,
   "timeout_minutes": 30
 }
 ```
 
+El `subject` de arriba lleva el referente en `body`. **Sin referente y sin `self_contained: true` la petición se rechaza con `422 missing_referent`** — a cualquier riesgo. Si la pregunta de verdad no trata sobre ningún artefacto (un juicio, una preferencia), esa es la válvula de escape:
+
+```json
+{
+  "query_type": "expert_query",
+  "subject": {
+    "id": "politica-reembolsos-2026",
+    "label": "Criterio de reembolso fuera de plazo"
+  },
+  "self_contained": true,
+  "answer_space": {
+    "kind": "choice",
+    "select": "one",
+    "options": [
+      { "id": "reembolsar", "label": "Reembolsar igualmente" },
+      { "id": "denegar", "label": "Denegar" }
+    ]
+  },
+  "question": "Como criterio general, ¿reembolsamos fuera de plazo cuando el cliente avisó por teléfono?",
+  "target_human_email": "sarah@example.com",
+  "timeout_minutes": 120
+}
+```
+
+`self_contained` no es un atajo: si hay algo que mirar, hay que mandarlo.
+
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
 | `query_type` | enum | Sí | `validation`, `interpretation`, `expert_query`, `labeling` |
+| `risk` | enum | No | `low` (default), `medium`, `high`, `critical` — un piso; el servidor puede subirlo, nunca bajarlo |
+| `subject` | object | Sí | De qué trata: un id, una label, y un referente (`uri` o `body`) |
+| `self_contained` | boolean | No | `true` solo si la pregunta de verdad no necesita referente |
+| `answer_space` | object | Sí | La forma cerrada de la respuesta: `boolean`, `choice`, `scalar`, `date`, `text` o `fields` — ver la sección REST arriba para el catálogo completo |
 | `question` | string | Sí | La pregunta para el humano (max 10,000 chars) |
 | `context` | string | No | Contexto adicional: código, datos, etc. (max 100,000 chars) |
+| `changes` | array | No | Deltas antes/después que cubre esta decisión |
 | `target_human_email` | string | Sí | Email del humano a quien preguntar |
 | `confidence` | number | No | Confianza del agente en su propia evaluación (0-1) |
 | `timeout_minutes` | number | No | Minutos antes de expirar (default: 60, max: 10080) |
@@ -665,6 +828,44 @@ Crea una query para que un humano responda. Envía un email de notificación con
 }
 ```
 
+Una pregunta que la puerta de admisión juzga indecidible viene rechazada como error con `reason`, `remedy` y (si aplica) `prior_query_id`:
+
+```json
+{
+  "error": "The subject 'q4-revenue-figure' carries no uri or body, so the human has nothing to look at.",
+  "code": "UNDECIDABLE_QUERY",
+  "reason": "missing_referent",
+  "remedy": "Link the artefact with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing."
+}
+```
+
+`remedy` dice exactamente qué añadir — corrige y reintenta.
+
+#### Tool: `clarify_query`
+
+Envía lo que el humano dijo que faltaba, después de que `get_query` reporte `status: "needs_context"`. Solo válido desde ese estado — llamarla en cualquier otro estado se rechaza. Hay un límite de cuántas veces se puede aclarar una misma query; superado ese límite, el `remedy` indica abrir una query nueva en su lugar.
+
+```json
+{
+  "query_id": "uuid-de-la-query",
+  "context": "Changelog: https://example.test/changelog/2.3"
+}
+```
+
+Envía solo los campos que resuelvan lo que el humano marcó como faltante: `subject` (si el referente necesita arreglo), `changes` (si es un delta sobre una decisión previa), `answer_space`, `question` o `context`. Lo que no envíes conserva su valor anterior, pero hay que enviar al menos un campo — un `query_id` solo se rechaza, igual que en la ruta REST `PATCH`. Si tiene éxito, la query vuelve a `assigned` y el humano puede responder de nuevo.
+
+#### Tool: `cancel_query`
+
+Retira una query cuyo contexto quedó obsoleto, antes de que el humano responda.
+
+```json
+{
+  "query_id": "uuid-de-la-query"
+}
+```
+
+Una respuesta que ya llegó gana: si el humano respondió primero, esta llamada devuelve un conflicto en vez de descartar silenciosamente su decisión — revisa el resultado en vez de asumir que la retirada surtió efecto. Una vez cancelada, la query queda cerrada para siempre; crea una nueva si aún necesitas una respuesta.
+
 #### Tool: `get_query`
 
 Consulta el estado de una query. Usa esto para poll después de crear una query.
@@ -681,7 +882,9 @@ Consulta el estado de una query. Usa esto para poll después de crear una query.
 |--------|-------------|
 | `pending` | El humano fue invitado pero no ha aceptado aún |
 | `assigned` | El humano aceptó (o es trusted) y puede ver la query |
-| `answered` | El humano respondió — la respuesta está en el campo `answer` |
+| `needs_context` | El humano no pudo decidir con lo que le diste. Lee `insufficient_reason` y usa `clarify_query` para completar lo que falta. El reloj está pausado mientras tanto |
+| `answered` | El humano respondió — la respuesta tipada está en el campo `answer` |
+| `cancelled` | Retiraste esta query con `cancel_query` |
 | `expired` | Expiró sin respuesta |
 
 **Response cuando answered:**
@@ -690,10 +893,12 @@ Consulta el estado de una query. Usa esto para poll después de crear una query.
 {
   "query_id": "uuid",
   "status": "answered",
-  "answer": "Sí, los datos son correctos. Revisé contra el reporte de Finance.",
+  "status_description": "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
+  "answer": { "kind": "boolean", "value": true },
   "comment": "Confirmed against the Finance report.",
   "human_confidence": null,
-  "response_time_ms": 45000
+  "response_time_ms": 45000,
+  "insufficient_reason": null
 }
 ```
 
@@ -703,10 +908,12 @@ Lista todas las queries del agente con filtros opcionales.
 
 ```json
 {
-  "status": "pending",
+  "status": "needs_context",
   "limit": 20
 }
 ```
+
+`status` acepta `pending`, `assigned`, `needs_context`, `answered`, `cancelled` o `expired`. `needs_context` es el filtro útil después de cualquier turno que te devuelva una query pendiente de aclarar: encuentra de una sola vez todas las que están esperando por ti, en vez de consultarlas una por una con `get_query`.
 
 #### Auto-trust
 
@@ -1302,8 +1509,9 @@ Todos los errores siguen el mismo formato:
 | 401 | `UNAUTHORIZED` | API key inválida o sesión expirada |
 | 403 | `FORBIDDEN` | No tienes permisos para esta acción |
 | 404 | `NOT_FOUND` | Recurso no encontrado |
-| 409 | `CONFLICT` | Conflicto (ej: slug duplicado, invitación existente) |
+| 409 | `CONFLICT` | Conflicto (ej: slug duplicado, invitación existente, cancelar una query ya respondida) |
 | 422 | `VALIDATION_ERROR` | Datos de entrada inválidos |
+| 422 | `UNDECIDABLE_QUERY` | La puerta de admisión rechazó una query o un `PATCH` de aclaración — trae `reason` y `remedy`, ver [sección 8](#8-human-queries) |
 | 429 | `RATE_LIMIT` | Demasiadas peticiones |
 | 500 | `INTERNAL_ERROR` | Error interno del servidor |
 

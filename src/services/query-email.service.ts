@@ -1,5 +1,7 @@
 import { sendEmail } from "../lib/email";
 import { env } from "../env";
+import type { Subject } from "../admission/decidability";
+import type { Change } from "../validators/query.validators";
 
 interface SendQueryEmailInput {
   queryId: string;
@@ -7,6 +9,8 @@ interface SendQueryEmailInput {
   question: string;
   context?: string | null;
   queryType: string;
+  subject: Subject;
+  changes?: Change[];
   targetEmail: string;
   expiresAt: Date;
   invitationToken: string;
@@ -40,6 +44,47 @@ function formatExpiry(date: Date): string {
   });
 }
 
+const MATERIAL_CHANGES_MAX = 5;
+
+/**
+ * Names the subject and, if any changed materially since a prior decision,
+ * lists them. It deliberately stops there: the answer space itself — the
+ * options, the consequences, the fields to fill — only renders in the app,
+ * where the human can actually act on it. An email that tried to reproduce
+ * it would drift from what respondQuery accepts the moment either one changes.
+ */
+function subjectSummary(subject: Subject, changes?: Change[]): { html: string; text: string } {
+  const material = (changes ?? []).filter((c) => c.materiality === "material");
+
+  let changesHtml = "";
+  let changesText = "";
+  if (material.length > 0) {
+    const shown = material.slice(0, MATERIAL_CHANGES_MAX);
+    const remaining = material.length - shown.length;
+    const itemsHtml = shown
+      .map((c) => `<li>${escapeHtml(c.path)}: ${escapeHtml(c.before)} &rarr; ${escapeHtml(c.after)}</li>`)
+      .join("");
+    changesHtml = `
+        <div style="margin-top: 8px; font-size: 12px; color: #868e96; font-weight: 600;">WHAT CHANGED</div>
+        <ul style="margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: #495057;">${itemsHtml}</ul>
+        ${remaining > 0 ? `<div style="margin-top: 4px; font-size: 12px; color: #868e96;">+${remaining} more — see the app for the full list.</div>` : ""}
+    `;
+    changesText = "What changed:\n" + shown.map((c) => `  - ${c.path}: ${c.before} -> ${c.after}\n`).join("")
+      + (remaining > 0 ? `  ...and ${remaining} more — see the app for the full list.\n` : "");
+  }
+
+  const html = `
+      <div style="margin: 16px 0; padding: 12px 16px; background: #f8f9fa; border-left: 3px solid #6366f1; border-radius: 4px;">
+        <div style="font-size: 12px; color: #868e96; font-weight: 600;">ABOUT</div>
+        <div style="margin-top: 4px; font-size: 15px; font-weight: 500;">${escapeHtml(subject.label)}</div>
+        ${changesHtml}
+      </div>
+  `;
+  const text = `About: ${subject.label}\n${changesText}`;
+
+  return { html, text };
+}
+
 export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolean> {
   const e = env();
   // Not a per-query address: inbound email is not ingested, so a reply reaches
@@ -69,6 +114,8 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
     ? input.question.slice(0, 57) + "..."
     : input.question;
 
+  const about = subjectSummary(input.subject, input.changes);
+
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
       <div style="padding: 24px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;">
@@ -85,6 +132,8 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
         <div style="margin-bottom: 8px;">
           <span style="display: inline-block; padding: 2px 8px; background: #ede9fe; color: #6d28d9; border-radius: 4px; font-size: 12px; font-weight: 500;">${escapeHtml(typeLabel)}</span>
         </div>
+
+        ${about.html}
 
         <div style="margin: 16px 0; padding: 16px; background: #fafafa; border-radius: 6px; border: 1px solid #f0f0f0;">
           <div style="font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(input.question)}</div>
@@ -114,6 +163,7 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
 
 Type: ${typeLabel}
 
+${about.text}
 Question:
 ${input.question}
 ${contextText}

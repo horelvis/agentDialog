@@ -47,3 +47,20 @@ export class RateLimitError extends AppError {
     }
   }
 }
+
+/**
+ * The receiver of this error is an agent, not a person reading documentation.
+ * It can only correct itself and retry if the error says what is missing, so
+ * `remedy` is part of the contract rather than a courtesy.
+ */
+export class UndecidableQueryError extends AppError {
+  constructor(
+    public reason: string,
+    public detail: string,
+    public remedy: string,
+    public priorQueryId?: string,
+  ) {
+    super(422, detail, "UNDECIDABLE_QUERY");
+    this.name = "UndecidableQueryError";
+  }
+}

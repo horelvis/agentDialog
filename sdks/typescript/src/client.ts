@@ -4,6 +4,7 @@ import {
   ForbiddenError,
   NotFoundError,
   ValidationError,
+  UndecidableQueryError,
   RateLimitError,
   ServerError,
   QueryTimeoutError,
@@ -32,11 +33,13 @@ import type {
 } from "./types.js";
 import {
   toCreateQueryBody,
+  toClarifyQueryBody,
   fromCreatedQueryWire,
   fromQueryWire,
   fromQuerySummaryWire,
 } from "./queries.js";
 import type {
+  ClarifyQueryInput,
   CreateQueryInput,
   CreatedQuery,
   CreatedQueryWire,
@@ -233,6 +236,31 @@ export class AgentDialog {
   }
 
   /**
+   * Supply what the human said was missing, after `getQuery` reports
+   * `status: "needs_context"`. Only valid from that status. On success the
+   * query returns to `assigned` and the human can answer again.
+   */
+  async clarifyQuery(queryId: string, input: ClarifyQueryInput): Promise<Query> {
+    const wire = await this.request<QueryWire>(
+      "PATCH",
+      `/agent/queries/${queryId}`,
+      toClarifyQueryBody(input),
+    );
+    return fromQueryWire(wire);
+  }
+
+  /**
+   * Withdraw a question whose context has moved on, before the human
+   * answers. An answer that already landed wins: if the human answered
+   * first, this rejects with a conflict rather than discarding their
+   * decision.
+   */
+  async cancelQuery(queryId: string): Promise<Query> {
+    const wire = await this.request<QueryWire>("POST", `/agent/queries/${queryId}/cancel`);
+    return fromQueryWire(wire);
+  }
+
+  /**
    * Poll a query until a human answers it or it expires.
    *
    * Backs off from pollIntervalMs up to maxPollIntervalMs, because humans
@@ -380,6 +408,12 @@ function errorFromResponse(status: number, body: any): AgentDialogError {
     case 404:
       return new NotFoundError(message);
     case 422:
+      // The admission gate's refusal (UNDECIDABLE_QUERY) is a distinct class
+      // of 422 from an ordinary malformed payload: it carries reason/remedy
+      // that an agent needs to retry correctly, not just a message to log.
+      if (err.code === "UNDECIDABLE_QUERY") {
+        return new UndecidableQueryError(message, err.reason, err.remedy, err.prior_query_id);
+      }
       return new ValidationError(message, details);
     case 429:
       return new RateLimitError(message, err.retryAfter ?? 1);

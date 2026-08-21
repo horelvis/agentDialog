@@ -43,6 +43,13 @@ export const envSchema = z.object({
   WEBHOOK_TIMEOUT_MS: z.coerce.number().default(10000),
   WEBHOOK_MAX_RETRIES: z.coerce.number().default(3),
 
+  // The amount above which a money question is treated as high risk regardless
+  // of what the agent declared. Deliberately crude: no currency conversion, the
+  // number is compared as-is. Comparing euros with yen without a rate table
+  // would be worse than not comparing, and its job is to raise the floor rather
+  // than to measure.
+  RISK_ELEVATION_AMOUNT: z.coerce.number().default(1000),
+
   // Reply addressing, used only by the dormant provider webhook. Nothing sends
   // a per-query Reply-To today: inbound email is not ingested at all, so a
   // reply reaches a person, not the system. See REPLY_TO_ADDRESS below.

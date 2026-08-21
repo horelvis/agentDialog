@@ -5,7 +5,7 @@ export type IntentType = "permission" | "clarification" | "solicitation" | "noti
 export type InvitationStatus = "pending" | "accepted" | "declined" | "expired" | "revoked";
 export type MessageType = "text" | "tool_call" | "tool_result" | "form" | "form_response" | "approval" | "approval_response" | "notification" | "file" | "system" | "voice_note" | "human_query" | "human_query_response";
 export type QueryType = "validation" | "interpretation" | "expert_query" | "labeling";
-export type QueryStatus = "pending" | "assigned" | "answered" | "expired";
+export type QueryStatus = "pending" | "assigned" | "answered" | "needs_context" | "cancelled" | "expired";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type Severity = "info" | "warning" | "error" | "success";
 export type ToolCallStatus = "running" | "completed" | "failed";
@@ -175,26 +175,90 @@ export interface ApiError {
   };
 }
 
+/** What the question is about — the referent the human can actually look at. */
+export interface QuerySubject {
+  id: string;
+  label: string;
+  uri?: string;
+  body?: string;
+  sha256?: string;
+}
+
+/** A before/after delta this query covers, for a question about a prior decision. */
+export interface QueryChange {
+  path: string;
+  before: string;
+  after: string;
+  materiality: "minor" | "material";
+}
+
+/** One datum inside a `fields` answer space. Never nests. */
+export type AnswerSlot = { id: string; label: string; proposed?: unknown } & (
+  | { kind: "boolean"; labels: { t: string; f: string } }
+  | { kind: "choice"; options: Array<{ id: string; label: string }> }
+  | { kind: "scalar"; unit: string; min?: number; max?: number; step?: number }
+  | { kind: "date"; earliest?: string; latest?: string }
+  | { kind: "text"; maxLength: number }
+);
+
+/**
+ * The closed catalogue of answer shapes a query can ask for. Mirrors the
+ * server's catalogue (`src/lib/answer-space.ts`) structurally — declared
+ * locally rather than imported because `web/` carries no dependency on
+ * `@agentdialog/sdk` or on the API package, and this is the only place that
+ * needs the shape.
+ */
+export type AnswerSpace =
+  | { kind: "boolean"; labels: { t: string; f: string }; consequences?: { t: string; f: string } }
+  | { kind: "choice"; select: "one" | "many";
+      options: Array<{ id: string; label: string; consequence?: string }> }
+  | { kind: "scalar"; unit: string; min?: number; max?: number; step?: number; effect?: string }
+  | { kind: "date"; earliest?: string; latest?: string; effect?: string }
+  | { kind: "text"; maxLength: number }
+  | { kind: "fields"; fields: AnswerSlot[]; effect?: string };
+
+/** The human's typed answer. Its `kind` must match the query's `answerSpace`. */
+export type Answer =
+  | { kind: "boolean"; value: boolean }
+  | { kind: "choice"; optionIds: string[] }
+  | { kind: "scalar"; value: number }
+  | { kind: "date"; value: string }
+  | { kind: "text"; value: string }
+  | { kind: "fields"; values: Record<string, unknown> };
+
+export const INSUFFICIENT_REASONS = [
+  "unknown_subject",
+  "missing_delta",
+  "unclear_consequences",
+  "referent_unreachable",
+  "not_my_decision",
+] as const;
+
+export type InsufficientReason = (typeof INSUFFICIENT_REASONS)[number];
+
 export interface HumanQuery {
   id: string;
-  agentId: string;
-  humanEmail: string;
-  humanId: string | null;
   conversationId: string;
   queryType: QueryType;
   status: QueryStatus;
+  statusDescription: string;
   question: string;
   context: string | null;
   confidence: number | null;
-  timeoutMinutes: number;
-  expiresAt: string;
-  answer: string | null;
+  subject: QuerySubject;
+  selfContained: boolean;
+  changes: QueryChange[] | null;
+  risk: RiskLevel;
+  answerSpace: AnswerSpace;
+  insufficientReason: InsufficientReason | null;
+  answer: Answer | null;
   answerComment: string | null;
   answerConfidence: number | null;
   responseTimeMs: number | null;
-  metadata: Record<string, unknown>;
+  /** ISO timestamp of a prior answered query about the same subject, if the API found one. */
+  priorDecisionAt: string | null;
   createdAt: string;
-  updatedAt: string;
+  expiresAt: string;
 }
 
 export interface SendMessageInput {

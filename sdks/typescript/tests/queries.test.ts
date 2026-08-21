@@ -16,12 +16,17 @@ function mockFetch(payload: unknown, status = 200) {
   return calls;
 }
 
+const subject = { id: "deploy-v2.3", label: "Deploy v2.3 to production" };
+const answerSpace = { kind: "boolean" as const, labels: { t: "Yes", f: "No" } };
+
 describe("query methods", () => {
   it("defaults to the production API host", async () => {
     const calls = mockFetch({ data: { query_id: "q1", status: "pending", conversation_id: "c1", expires_at: "2026-08-20T12:00:00.000Z" } });
     const client = new AgentDialog({ apiKey: "mge_ag_test" });
     await client.createQuery({
       queryType: "validation",
+      subject,
+      answerSpace,
       question: "Ship it?",
       targetHumanEmail: "someone@example.com",
     });
@@ -33,6 +38,8 @@ describe("query methods", () => {
     const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
     await client.createQuery({
       queryType: "expert_query",
+      subject,
+      answerSpace,
       question: "Ship it?",
       targetHumanEmail: "someone@example.com",
       timeoutMinutes: 30,
@@ -40,19 +47,55 @@ describe("query methods", () => {
     const body = JSON.parse(String(calls[0].init.body));
     expect(body).toEqual({
       query_type: "expert_query",
+      subject,
+      answer_space: { kind: "boolean", labels: { t: "Yes", f: "No" } },
       question: "Ship it?",
       target_human_email: "someone@example.com",
       timeout_minutes: 30,
     });
   });
 
-  it("maps a snake_case response into camelCase", async () => {
+  it("translates the two nested shapes that also change case", async () => {
+    const calls = mockFetch({ data: { query_id: "q1", status: "pending", conversation_id: "c1", expires_at: "2026-08-20T12:00:00.000Z" } });
+    const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
+    await client.createQuery({
+      queryType: "labeling",
+      subject,
+      answerSpace: {
+        kind: "choice",
+        select: "one",
+        options: [{ id: "a", label: "Option A" }, { id: "b", label: "Option B" }],
+      },
+      question: "Which one?",
+      targetHumanEmail: "someone@example.com",
+    });
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body.answer_space).toEqual({
+      kind: "choice",
+      select: "one",
+      options: [{ id: "a", label: "Option A" }, { id: "b", label: "Option B" }],
+    });
+
+    const textCalls = mockFetch({ data: { query_id: "q2", status: "pending", conversation_id: "c1", expires_at: "2026-08-20T12:00:00.000Z" } });
+    await client.createQuery({
+      queryType: "labeling",
+      subject,
+      answerSpace: { kind: "text", maxLength: 500 },
+      question: "Describe it",
+      targetHumanEmail: "someone@example.com",
+    });
+    const textBody = JSON.parse(String(textCalls[0].init.body));
+    expect(textBody.answer_space).toEqual({ kind: "text", max_length: 500 });
+  });
+
+  it("maps a snake_case response into camelCase, including a typed answer", async () => {
     mockFetch({
       data: {
-        query_id: "q1", status: "answered", query_type: "validation",
+        query_id: "q1", status: "answered", status_description: "The human has responded.",
+        query_type: "validation",
         question: "Ship it?", context: null, confidence: null,
-        answer: "yes", comment: "go ahead", human_confidence: 0.9,
-        response_time_ms: 1234,
+        answer: { kind: "boolean", value: true }, comment: "go ahead", human_confidence: 0.9,
+        response_time_ms: 1234, insufficient_reason: null,
         created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
       },
     });
@@ -61,7 +104,24 @@ describe("query methods", () => {
     expect(query.queryId).toBe("q1");
     expect(query.humanConfidence).toBe(0.9);
     expect(query.responseTimeMs).toBe(1234);
-    expect(query.answer).toBe("yes");
+    expect(query.answer).toEqual({ kind: "boolean", value: true });
+    expect(query.statusDescription).toBe("The human has responded.");
+  });
+
+  it("maps a choice answer's option_ids into optionIds", async () => {
+    mockFetch({
+      data: {
+        query_id: "q1", status: "answered", status_description: "The human has responded.",
+        query_type: "labeling",
+        question: "Which one?", context: null, confidence: null,
+        answer: { kind: "choice", option_ids: ["a", "b"] }, comment: null, human_confidence: null,
+        response_time_ms: 500, insufficient_reason: null,
+        created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
+      },
+    });
+    const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
+    const query = await client.getQuery("q1");
+    expect(query.answer).toEqual({ kind: "choice", optionIds: ["a", "b"] });
   });
 
   it("passes list filters as query parameters and maps the response", async () => {
@@ -70,7 +130,7 @@ describe("query methods", () => {
         {
           query_id: "q1", status: "answered", query_type: "validation",
           question: "Ship it?", human_email: "someone@example.com",
-          answer: "yes", created_at: "2026-08-20T10:00:00.000Z",
+          answer: { kind: "boolean", value: true }, created_at: "2026-08-20T10:00:00.000Z",
           expires_at: "2026-08-20T12:00:00.000Z",
         },
       ],
@@ -85,9 +145,74 @@ describe("query methods", () => {
       queryType: "validation",
       question: "Ship it?",
       humanEmail: "someone@example.com",
-      answer: "yes",
+      answer: { kind: "boolean", value: true },
       createdAt: "2026-08-20T10:00:00.000Z",
       expiresAt: "2026-08-20T12:00:00.000Z",
     });
+  });
+
+  it("clarifyQuery PATCHes only the supplied fields, translating answerSpace", async () => {
+    const calls = mockFetch({
+      data: {
+        query_id: "q1", status: "assigned", status_description: "The human has accepted the invitation.",
+        query_type: "validation",
+        question: "Ship it?", context: null, confidence: null,
+        answer: null, comment: null, human_confidence: null,
+        response_time_ms: null, insufficient_reason: null,
+        created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
+      },
+    });
+    const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
+    const query = await client.clarifyQuery("q1", {
+      answerSpace: { kind: "text", maxLength: 200 },
+      context: "Here's the missing referent.",
+    });
+    expect(calls[0].url).toBe("https://example.test/api/v1/agent/queries/q1");
+    expect(calls[0].init.method).toBe("PATCH");
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body).toEqual({
+      answer_space: { kind: "text", max_length: 200 },
+      context: "Here's the missing referent.",
+    });
+    expect(query.status).toBe("assigned");
+    expect(query.statusDescription).toBe("The human has accepted the invitation.");
+  });
+
+  it("cancelQuery POSTs to the cancel endpoint with no body", async () => {
+    const calls = mockFetch({
+      data: {
+        query_id: "q1", status: "cancelled", status_description: "You withdrew this query.",
+        query_type: "validation",
+        question: "Ship it?", context: null, confidence: null,
+        answer: null, comment: null, human_confidence: null,
+        response_time_ms: null, insufficient_reason: null,
+        created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
+      },
+    });
+    const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
+    const query = await client.cancelQuery("q1");
+    expect(calls[0].url).toBe("https://example.test/api/v1/agent/queries/q1/cancel");
+    expect(calls[0].init.method).toBe("POST");
+    expect(calls[0].init.body).toBeUndefined();
+    expect(query.status).toBe("cancelled");
+    expect(query.statusDescription).toBe("You withdrew this query.");
+  });
+
+  it("surfaces insufficientReason once a query needs context", async () => {
+    mockFetch({
+      data: {
+        query_id: "q1", status: "needs_context",
+        status_description: "The human could not decide with what you gave them.",
+        query_type: "validation",
+        question: "Ship it?", context: null, confidence: null,
+        answer: null, comment: null, human_confidence: null,
+        response_time_ms: null, insufficient_reason: "unknown_subject",
+        created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
+      },
+    });
+    const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
+    const query = await client.getQuery("q1");
+    expect(query.status).toBe("needs_context");
+    expect(query.insufficientReason).toBe("unknown_subject");
   });
 });

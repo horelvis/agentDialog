@@ -87,11 +87,25 @@ headers = {
 }
 
 # Ask a human. Returns immediately; they get an email and answer in the app.
+# subject is what the question is about, and it needs a referent the human
+# can look at: "uri" or "body". Without one — and without
+# "self_contained": True — the request comes back 422 missing_referent.
+# answer_space is the closed shape the answer must take; see the queries API
+# reference for the full catalogue.
 created = requests.post(f"{BASE}/agent/queries",
     headers=headers,
     json={
         "query_type": "validation",
-        "question": "Deploy v2.3 to production?",
+        "subject": {
+            "id": "release-2.3",
+            "label": "Release 2.3 to Fictional Corp",
+            "uri": "https://example.test/releases/2.3",
+        },
+        "answer_space": {
+            "kind": "boolean",
+            "labels": {"t": "Ship it", "f": "Hold"},
+        },
+        "question": "Deploy release 2.3 to production?",
         "context": "12 commits since the last release. All checks green.",
         "target_human_email": "oncall@example.com",
         "timeout_minutes": 120,
@@ -107,6 +121,7 @@ while True:
         break
     time.sleep(15)
 
+# answer is a typed object, e.g. {"kind": "boolean", "value": true}
 print(query["status"], query["answer"])
 ```
 

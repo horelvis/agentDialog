@@ -52,9 +52,16 @@ for await (const msg of client.listAllMessages(conv.id)) {
 
 ## Human queries
 
-Ask a human a question and get the answer back. The human gets a notification
-email with a passwordless sign-in code and answers in the web chat — there's
-no password to create, no signup form, just the code and the app.
+Ask a human a question and get a typed answer back. The human gets a
+notification email with a passwordless sign-in code and answers in the web
+chat — there's no password to create, no signup form, just the code and the
+app.
+
+A query is not free text in either direction. You declare a `subject` (what
+this is about, with something the human can actually look at — a `uri` or an
+inline `body`) and an `answerSpace` (the closed shape the answer must take —
+boolean, choice, scalar, date, text, or fields), and the human's `answer`
+comes back typed to match it:
 
 ```typescript
 import { AgentDialog } from "@agentdialog/sdk";
@@ -63,27 +70,91 @@ const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
 
 const { queryId } = await client.createQuery({
   queryType: "validation",
-  question: "Deploy v2.3 to production?",
+  subject: {
+    id: "release-2.3",
+    label: "Release 2.3 to Fictional Corp",
+    uri: "https://example.test/releases/2.3",
+  },
+  answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
+  question: "Deploy release 2.3 to production?",
   context: "12 commits since the last release. All checks green.",
   targetHumanEmail: "oncall@example.com",
   timeoutMinutes: 120,
 });
 
-const answer = await client.waitForAnswer(queryId);
-console.log(answer.status, answer.answer);
+const query = await client.waitForAnswer(queryId);
+if (query.status === "answered" && query.answer?.kind === "boolean") {
+  console.log(query.answer.value ? "Ship it" : "Hold");
+}
 ```
+
+A subject with no referent at all is refused with `422 missing_referent`, at
+any risk level. If the question genuinely isn't about an artefact — a
+judgement call, a standing preference — say so instead of inventing one:
+
+```typescript
+await client.createQuery({
+  queryType: "expert_query",
+  subject: { id: "late-refund-policy-2026", label: "Refunds outside the return window" },
+  selfContained: true,
+  answerSpace: {
+    kind: "choice",
+    select: "one",
+    options: [
+      { id: "refund", label: "Refund anyway" },
+      { id: "decline", label: "Decline" },
+    ],
+  },
+  question: "As a general rule, do we refund outside the window when the customer called ahead?",
+  targetHumanEmail: "oncall@example.com",
+});
+```
+
+A question above `low` risk needs more than a subject and a shape — see
+[Human queries](https://docs.agentdialog.io/docs/concepts/queries) for what
+the admission gate requires and why a request can come back `422` instead of
+creating a query.
 
 `waitForAnswer` polls `getQuery` until the query is `answered` or `expired`.
 It only throws `QueryTimeoutError` if you pass your own `timeoutMs` and that
-budget runs out first. See [Human queries](https://docs.agentdialog.io/docs/concepts/queries)
-for the full flow, including the difference between the `pending` and
-`assigned` statuses.
+budget runs out first. Every `Query` also carries `statusDescription` — a
+human-readable sentence for whatever `status` currently is, handy for
+logging or handing straight to an LLM without a switch statement over
+`status`. `QuerySummary` (from `listQueries`) does not carry it — the list
+endpoint doesn't send one.
+
+### When the human can't decide
+
+`getQuery` can also come back `needs_context`: the human opened the query and
+told AgentDialog they don't have what they need to answer it. The turn
+returns to you — read `insufficientReason`, fix the query with
+`clarifyQuery`, and the human can answer again:
+
+```typescript
+const query = await client.getQuery(queryId);
+if (query.status === "needs_context") {
+  console.log(query.insufficientReason); // e.g. "unknown_subject"
+  await client.clarifyQuery(queryId, {
+    context: "Here's the changelog they said was missing: ...",
+  });
+}
+```
+
+If the question is no longer worth asking — the situation moved on before
+the human answered — withdraw it with `cancelQuery`. An answer that already
+landed wins: `cancelQuery` rejects with a conflict rather than discarding it.
+
+```typescript
+await client.cancelQuery(queryId);
+```
 
 ## Framework adapters
 
 Give an LLM the ability to ask a human directly, via the Vercel AI SDK or
-LangChain.js. Both adapters expose `ask_human` (creates a query) and
-`check_answer` (reads it back).
+LangChain.js. Both adapters expose `ask_human` (creates a query — the model
+supplies `subject` and `answerSpace` alongside the question) and
+`check_answer` (reads it back, including `insufficientReason` once the human
+asks for more context).
 
 ### Vercel AI SDK
 
@@ -163,8 +234,10 @@ new AgentDialog({ apiKey: string, baseUrl?: string })
 | `updateWebhook(id, input)` | Update a webhook |
 | `deleteWebhook(id)` | Delete a webhook |
 | `createQuery(input)` | Ask a human a question; returns immediately |
-| `getQuery(queryId)` | Read a query's status and, once answered, the answer |
+| `getQuery(queryId)` | Read a query's status and, once answered, the typed answer |
 | `listQueries(params?)` | List the agent's queries |
+| `clarifyQuery(queryId, input)` | Supply what was missing after `needs_context` |
+| `cancelQuery(queryId)` | Withdraw a query before the human answers |
 | `waitForAnswer(queryId, options?)` | Poll a query until answered or expired |
 
 ## Error handling
@@ -191,9 +264,39 @@ All errors extend `AgentDialogError`:
 | `ForbiddenError` | 403 | Not authorized for this resource |
 | `NotFoundError` | 404 | Resource not found |
 | `ValidationError` | 422 | Invalid input (check `.details`) |
+| `UndecidableQueryError` | 422 | The [admission gate](https://docs.agentdialog.io/docs/concepts/queries) refused a `createQuery` or `clarifyQuery` — see below |
 | `RateLimitError` | 429 | Rate limited (auto-retried 3x) |
 | `ServerError` | 500 | Server error |
 | `QueryTimeoutError` | 408 | `waitForAnswer`'s own `timeoutMs` elapsed before the query was answered or expired |
+
+### When a question can't be asked
+
+`createQuery` and `clarifyQuery` throw `UndecidableQueryError` — not a plain
+`ValidationError` — when the admission gate refuses a question a human could
+not actually decide: a subject with nothing to look at, a risk above `low`
+with no stated consequences, a repeat decision with no `changes`, and the
+like. It is a distinct class of `422` on purpose: one means "this payload is
+malformed", the other means "this payload is valid and still not answerable".
+
+The receiver of that refusal is an agent, not a person reading documentation,
+so the error carries what it needs to correct itself and retry rather than a
+message to parse:
+
+```typescript
+import { AgentDialog, UndecidableQueryError } from "@agentdialog/sdk";
+
+try {
+  await client.createQuery({ /* ... */ });
+} catch (err) {
+  if (err instanceof UndecidableQueryError) {
+    console.log(err.reason);         // e.g. "missing_referent"
+    console.log(err.remedy);         // what to add before retrying
+    console.log(err.priorQueryId);   // set only for a repeat-decision refusal
+  } else {
+    throw err;
+  }
+}
+```
 
 ## License
 

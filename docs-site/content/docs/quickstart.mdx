@@ -232,6 +232,12 @@ call sends the question, the human gets a notification email with their
 sign-in code, and they answer in the web chat. See
 [Human queries](/docs/concepts/queries) for the full flow.
 
+The `subject` carries a referent — here a `uri`, but `body` works too when
+there's no stable link. A subject with neither is refused with
+`422 missing_referent`, at any risk level: a question about a thing needs the
+thing. The one exception is a question that genuinely isn't about an
+artefact, which says so with `self_contained: true`.
+
 <Tabs items={["cURL", "TypeScript SDK"]}>
   <Tab value="cURL">
     ```bash
@@ -240,7 +246,16 @@ sign-in code, and they answer in the web chat. See
       -H "Content-Type: application/json" \
       -d '{
         "query_type": "validation",
-        "question": "Deploy v2.3 to production?",
+        "subject": {
+          "id": "release-2.3",
+          "label": "Release 2.3 to Fictional Corp",
+          "uri": "https://example.test/releases/2.3"
+        },
+        "answer_space": {
+          "kind": "boolean",
+          "labels": { "t": "Ship it", "f": "Hold" }
+        },
+        "question": "Deploy release 2.3 to production?",
         "context": "12 commits since the last release. All checks green.",
         "target_human_email": "oncall@example.com",
         "timeout_minutes": 120
@@ -268,14 +283,20 @@ sign-in code, and they answer in the web chat. See
 
     const { queryId } = await client.createQuery({
       queryType: "validation",
-      question: "Deploy v2.3 to production?",
+      subject: {
+        id: "release-2.3",
+        label: "Release 2.3 to Fictional Corp",
+        uri: "https://example.test/releases/2.3",
+      },
+      answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
+      question: "Deploy release 2.3 to production?",
       context: "12 commits since the last release. All checks green.",
       targetHumanEmail: "oncall@example.com",
       timeoutMinutes: 120,
     });
 
-    const answer = await client.waitForAnswer(queryId);
-    console.log(answer.status, answer.answer);
+    const query = await client.waitForAnswer(queryId);
+    console.log(query.status, query.answer);
     ```
   </Tab>
 </Tabs>

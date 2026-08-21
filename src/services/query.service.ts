@@ -1,4 +1,4 @@
-import { eq, and, lt, desc, inArray } from "drizzle-orm";
+import { eq, and, or, lt, desc, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { humanQueries } from "../db/schema/human-queries";
 import { conversations } from "../db/schema/conversations";
@@ -7,15 +7,66 @@ import { messages } from "../db/schema/messages";
 import { humans } from "../db/schema/humans";
 import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
-import { NotFoundError, ForbiddenError, ConflictError } from "../lib/errors";
+import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError, ValidationError } from "../lib/errors";
 import { generateInvitationToken } from "../lib/crypto";
+import { canonicaliseEmail, sameEmail } from "../lib/email-identity";
 import { dispatchWebhooks } from "./webhook.service";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
-import type { CreateQueryInput, RespondQueryInput } from "../validators/query.validators";
+import { checkPayload, type Subject, type Risk } from "../admission/decidability";
+import { findPriorDecision, elevateRisk } from "../admission/history";
+import { validateAnswerAgainstSpace, type AnswerSpace, type Answer } from "../lib/answer-space";
+import type { CreateQueryInput, RespondQueryInput, PatchQueryInput, Change } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
   const db = getDb();
+
+  // Canonicalised once and reused for every row that persists this address.
+  // `findPriorDecision` searches by a lowercased, trimmed email — if the
+  // stored address kept its original casing, a second question about the
+  // same subject from an agent that capitalised it differently would find no
+  // prior decision, silently bypassing the very rule this exists to enforce.
+  // `invitedHumanEmail` must be canonicalised the same way: `processEmailReply`
+  // joins it against `humanQueries.humanEmail`, and normalising only one side
+  // would break that join for any mixed-case address instead of just moving
+  // the bug.
+  const targetEmail = canonicaliseEmail(input.target_human_email);
+
+  // Admission runs before the transaction opens: a query that a human could not
+  // decide never becomes a row, a conversation, an invitation or an email.
+  //
+  // History first: it decides both the effective risk and whether a delta is
+  // owed, and the payload rules are judged at the ELEVATED risk, not the
+  // declared one.
+  const prior = await findPriorDecision(agentId, targetEmail, input.subject.id);
+  const risk = elevateRisk(input.risk, {
+    hasPriorDecision: prior !== null,
+    answerSpace: input.answer_space,
+  });
+
+  // No `risk !== "low"` here: a prior decision elevates to at least `medium`
+  // on its own, so that conjunction was always true whenever `prior` was set.
+  // The spec used to describe a `low`-risk branch where the delta was merely
+  // shown rather than demanded; the code could never reach it, and the spec
+  // has been corrected to say what this does.
+  if (prior && (!input.changes || input.changes.length === 0)) {
+    throw new UndecidableQueryError(
+      "prior_decision_without_delta",
+      `This person decided about '${input.subject.id}' on ${prior.decidedAt.toISOString().slice(0, 10)}.`,
+      "Send `changes` with what has changed since then.",
+      prior.id,
+    );
+  }
+
+  const verdict = checkPayload({
+    risk,
+    subject: input.subject,
+    self_contained: input.self_contained,
+    answer_space: input.answer_space,
+  });
+  if (!verdict.admit) {
+    throw new UndecidableQueryError(verdict.reason, verdict.detail, verdict.remedy);
+  }
 
   const result = await db.transaction(async (tx) => {
     // 1. Create conversation for this query
@@ -46,7 +97,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       .values({
         conversationId: conversation.id,
         invitedByAgentId: agentId,
-        invitedHumanEmail: input.target_human_email,
+        invitedHumanEmail: targetEmail,
         token,
         message: input.question,
         expiresAt: invitationExpiresAt,
@@ -60,7 +111,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
     const [human] = await tx
       .select()
       .from(humans)
-      .where(eq(humans.email, input.target_human_email))
+      .where(eq(humans.email, targetEmail))
       .limit(1);
 
     if (human) {
@@ -71,7 +122,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         .where(
           and(
             eq(invitations.invitedByAgentId, agentId),
-            eq(invitations.invitedHumanEmail, input.target_human_email),
+            eq(invitations.invitedHumanEmail, targetEmail),
             eq(invitations.status, "accepted"),
           ),
         )
@@ -106,12 +157,12 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
 
           humanId = human.id;
           status = "assigned";
-          console.log(`[QUERY] Auto-accepted: ${input.target_human_email} trusts agent ${agentId}`);
+          console.log(`[QUERY] Auto-accepted: ${targetEmail} trusts agent ${agentId}`);
         } else {
-          console.log(`[QUERY] Trust revoked: ${input.target_human_email} revoked agent ${agentId}`);
+          console.log(`[QUERY] Trust revoked: ${targetEmail} revoked agent ${agentId}`);
         }
       } else {
-        console.log(`[QUERY] No prior trust: ${input.target_human_email} has no accepted invitations from agent ${agentId}`);
+        console.log(`[QUERY] No prior trust: ${targetEmail} has no accepted invitations from agent ${agentId}`);
       }
     }
 
@@ -142,7 +193,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       .insert(humanQueries)
       .values({
         agentId,
-        humanEmail: input.target_human_email,
+        humanEmail: targetEmail,
         humanId,
         conversationId: conversation.id,
         queryMessageId: queryMessage.id,
@@ -150,6 +201,11 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         status,
         question: input.question,
         context: input.context,
+        risk,
+        subject: input.subject,
+        selfContained: input.self_contained,
+        changes: input.changes,
+        answerSpace: input.answer_space,
         confidence: input.confidence,
         timeoutMinutes: input.timeout_minutes,
         expiresAt,
@@ -184,16 +240,18 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       question: input.question,
       context: input.context,
       queryType: input.query_type,
-      targetEmail: input.target_human_email,
+      subject: input.subject,
+      changes: input.changes,
+      targetEmail,
       expiresAt,
       invitationToken: token,
     });
-    console.log(`[QUERY] Query email sent to ${input.target_human_email}`);
+    console.log(`[QUERY] Query email sent to ${targetEmail}`);
   } catch (emailErr) {
-    console.error(`[QUERY] Email FAILED for ${input.target_human_email}:`, emailErr);
+    console.error(`[QUERY] Email FAILED for ${targetEmail}:`, emailErr);
   }
 
-  console.log(`[QUERY] Created ${query.id} for ${input.target_human_email} (status: ${status}, type: ${input.query_type}, agent: ${agentId})`);
+  console.log(`[QUERY] Created ${query.id} for ${targetEmail} (status: ${status}, type: ${input.query_type}, agent: ${agentId})`);
 
   return {
     query_id: query.id,
@@ -218,64 +276,188 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
 
   if (!query) throw new NotFoundError("Query", queryId);
 
-  if (query.status === "answered") {
-    throw new ForbiddenError("Query has already been answered");
-  }
-  if (query.status === "expired") {
-    throw new ForbiddenError("Query has expired");
+  if (query.status === "answered") throw new ForbiddenError("Query has already been answered");
+  if (query.status === "expired") throw new ForbiddenError("Query has expired");
+  if (query.status === "cancelled") throw new ForbiddenError("Query was cancelled by the agent");
+
+  // Entitlement. For every status but `pending` there is already a
+  // participant row — added when the invitation was accepted — and that row
+  // is what stops a stranger from answering. A `pending` query has no
+  // participant yet: nobody has accepted anything. The only thing that can
+  // stand in for that row is the same check the email path already makes in
+  // `processEmailReply` — the authenticated human's own address must be the
+  // address the query was addressed to. Falling through to "no participant,
+  // so refuse" here would leave the very first query from any agent
+  // unanswerable, which is the bug this block exists to close; weakening it
+  // to "any authenticated human may answer a pending query" would instead
+  // open a hole where anyone could resolve someone else's invitation. So a
+  // `pending` query is answerable by exactly the human it was sent to, and
+  // by nobody else.
+  const isPending = query.status === "pending";
+  if (isPending) {
+    const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+    if (!sameEmail(human?.email, query.humanEmail)) {
+      throw new ForbiddenError("You are not the person this query was addressed to");
+    }
+  } else {
+    const [participant] = await db
+      .select()
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, query.conversationId),
+          eq(conversationParticipants.humanId, humanId),
+        ),
+      )
+      .limit(1);
+
+    if (!participant) {
+      throw new ForbiddenError("You are not a participant in this query's conversation");
+    }
   }
 
-  // Verify human is a participant in the conversation
-  const [participant] = await db
-    .select()
-    .from(conversationParticipants)
-    .where(
-      and(
-        eq(conversationParticipants.conversationId, query.conversationId),
-        eq(conversationParticipants.humanId, humanId),
-      ),
-    )
-    .limit(1);
+  // Answering a `pending` query is also how it gets accepted — there is no
+  // separate accept step (docs/architecture.md), and `processEmailReply`
+  // already does exactly this for the email path. Mirrored here: accept the
+  // invitation and add the participant in the same transaction as the
+  // response, so a crash between the two never leaves an answered query
+  // with no participant row, or an accepted invitation with no answer.
+  async function acceptPendingInvitation(tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+    const [invitation] = await tx
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.conversationId, query.conversationId),
+          eq(invitations.invitedHumanEmail, query.humanEmail),
+          eq(invitations.status, "pending"),
+        ),
+      )
+      .limit(1);
 
-  if (!participant) {
-    throw new ForbiddenError("You are not a participant in this query's conversation");
+    if (invitation) {
+      await tx
+        .update(invitations)
+        .set({ status: "accepted", updatedAt: new Date() })
+        .where(eq(invitations.id, invitation.id));
+    }
+
+    // No unique constraint exists on (conversation_id, human_id) — recorded
+    // as a data-model gap for the final review, not fixed here (a schema
+    // change on the last day of this plan, against a database that may
+    // already hold duplicates, is a bad trade). Until it exists,
+    // .onConflictDoNothing() has nothing to conflict against and is a
+    // silent no-op, so a duplicate participant row is prevented here
+    // explicitly instead — check-then-insert inside this same transaction.
+    const [existingParticipant] = await tx
+      .select({ id: conversationParticipants.id })
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, query.conversationId),
+          eq(conversationParticipants.humanId, humanId),
+        ),
+      )
+      .limit(1);
+
+    if (!existingParticipant) {
+      await tx.insert(conversationParticipants).values({
+        conversationId: query.conversationId,
+        actorType: "human",
+        humanId,
+        role: "participant",
+      });
+    }
   }
 
-  // Send response message
-  const [responseMessage] = await db
-    .insert(messages)
-    .values({
-      conversationId: query.conversationId,
-      senderType: "human",
-      senderHumanId: humanId,
-      type: "human_query_response",
-      content: input.answer,
-      structuredData: {
-        queryId: query.id,
-        answer: input.answer,
-        comment: input.comment,
-        confidence: input.confidence,
-      },
-    })
-    .returning();
+  if (input.outcome === "insufficient_context") {
+    // The turn goes back to the agent. The clock freezes because it is now the
+    // agent's move: without this a query dies while the agent is fixing it, and
+    // the human watches something expire that they themselves asked to clarify.
+    //
+    // The guard above and this WHERE must agree on which statuses are live:
+    // `isPending` decided which one applied there, so it decides which one
+    // applies here too, rather than the two drifting apart.
+    const fromStatuses: (typeof humanQueries.$inferSelect)["status"][] = isPending ? ["pending"] : ["assigned"];
+    const [updated] = await db.transaction(async (tx) => {
+      if (isPending) await acceptPendingInvitation(tx);
+
+      return tx
+        .update(humanQueries)
+        .set({
+          status: "needs_context",
+          insufficientReason: input.reason,
+          clarificationRounds: query.clarificationRounds + 1,
+          pausedAt: new Date(),
+          humanId,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(humanQueries.id, queryId), inArray(humanQueries.status, fromStatuses)))
+        .returning();
+    });
+
+    if (!updated) throw new ConflictError("Query is no longer awaiting an answer");
+
+    dispatchWebhooks(query.agentId, "query.needs_context", {
+      query_id: query.id,
+      status: "needs_context",
+      reason: input.reason,
+      note: input.note,
+    }).catch((err) => console.error(`[QUERY] Webhook dispatch failed for ${queryId}:`, err));
+
+    return shapeHumanQuery(updated);
+  }
+
+  // From here, outcome === "answer".
+  const space = query.answerSpace as unknown as AnswerSpace;
+  const fit = validateAnswerAgainstSpace(space, input.answer);
+  if (!fit.ok) {
+    throw new ValidationError(`Answer does not fit this query: ${fit.problem}`);
+  }
 
   const responseTimeMs = Date.now() - query.createdAt.getTime();
 
-  // Update query with optimistic lock — only update if still in "assigned" status
-  const [updated] = await db
-    .update(humanQueries)
-    .set({
-      status: "answered",
-      humanId,
-      responseMessageId: responseMessage.id,
-      answer: input.answer,
-      answerComment: input.comment,
-      answerConfidence: input.confidence,
-      responseTimeMs,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "assigned")))
-    .returning();
+  // Same agreement as above: the statuses this update accepts from must
+  // match exactly what the guard above already verified.
+  const fromStatuses: (typeof humanQueries.$inferSelect)["status"][] = isPending ? ["pending"] : ["assigned", "needs_context"];
+
+  const [updated] = await db.transaction(async (tx) => {
+    if (isPending) await acceptPendingInvitation(tx);
+
+    // Send response message
+    const [responseMessage] = await tx
+      .insert(messages)
+      .values({
+        conversationId: query.conversationId,
+        senderType: "human",
+        senderHumanId: humanId,
+        type: "human_query_response",
+        content: summariseAnswer(space, input.answer),
+        structuredData: {
+          queryId: query.id,
+          answer: input.answer,
+          comment: input.comment,
+          confidence: input.confidence,
+        },
+      })
+      .returning();
+
+    // Update query with optimistic lock — only update if still awaiting an answer
+    return tx
+      .update(humanQueries)
+      .set({
+        status: "answered",
+        humanId,
+        responseMessageId: responseMessage.id,
+        answer: input.answer,
+        answerComment: input.comment,
+        answerConfidence: input.confidence,
+        responseTimeMs,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(humanQueries.id, queryId), inArray(humanQueries.status, fromStatuses)))
+      .returning();
+  });
 
   if (!updated) {
     throw new ConflictError("Query was already answered or its status changed");
@@ -294,7 +476,239 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
     console.error(`[QUERY] Webhook dispatch failed for ${queryId}:`, err);
   });
 
-  return updated;
+  return shapeHumanQuery(updated);
+}
+
+const MAX_CLARIFICATION_ROUNDS = 2;
+
+const STATUS_HINTS: Record<string, string> = {
+  pending: "The human has been invited but hasn't accepted the invitation yet. They need to open the link in their email and answer in the app — answering automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again.",
+  assigned: "The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again.",
+  answered: "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
+  needs_context: "The human could not decide with what you gave them. Read `insufficient_reason`, then clarify the query with what is missing. The clock is paused while you do.",
+  cancelled: "You withdrew this query. Create a new one if you still need an answer.",
+  expired: "The query has expired without a response. The human did not answer in time. You may create a new query if needed.",
+};
+
+/**
+ * The one canonical shape every surface hands back for a query — REST routes
+ * and MCP tools alike. Both call into this service and return whatever it
+ * returns, so shaping happens here once rather than at each caller: a Drizzle
+ * row is camelCase, carries `id` instead of `query_id`, and exposes columns
+ * (`agentId`, `humanId`, `conversationId`, `queryMessageId`,
+ * `responseMessageId`) no agent-facing response should leak.
+ *
+ * `status` is a separate parameter rather than always `query.status` because
+ * `getQuery` computes it lazily (a row can be stale by the time it's read).
+ */
+function shapeQuery(query: typeof humanQueries.$inferSelect, status: string = query.status) {
+  return {
+    query_id: query.id,
+    status,
+    status_description: STATUS_HINTS[status] || `Unknown status: ${status}`,
+    query_type: query.queryType,
+    question: query.question,
+    context: query.context,
+    confidence: query.confidence,
+    answer: status === "answered" ? query.answer : null,
+    comment: status === "answered" ? query.answerComment : null,
+    human_confidence: status === "answered" ? query.answerConfidence : null,
+    response_time_ms: status === "answered" ? query.responseTimeMs : null,
+    // The needs_context hint tells the agent to read this field, so it has to
+    // actually be here — a status row on its own doesn't say what the human
+    // was missing.
+    insufficient_reason: status === "needs_context" ? query.insufficientReason : null,
+    created_at: query.createdAt.toISOString(),
+    expires_at: query.expiresAt.toISOString(),
+  };
+}
+
+/**
+ * What the human sees, as opposed to what the agent sees in `shapeQuery`
+ * above: it carries `subject`, `changes`, `risk` and `answer_space` because
+ * the human is the one who has to decide, and it never repeats fields (like
+ * agent/conversation ids) the human's side has no use for.
+ *
+ * All the jsonb columns — `subject`, `changes`, `answerSpace` — are stored as
+ * exactly the snake_case shape the agent sent, so they pass through unchanged
+ * rather than needing a case conversion here.
+ */
+async function shapeHumanQuery(
+  query: typeof humanQueries.$inferSelect,
+  opts: { includePriorDecision?: boolean } = {},
+) {
+  const status = query.status;
+
+  // "You decided about this on …" only makes sense before the human answers
+  // again — once this row is itself the answered one, it would find itself.
+  let priorDecisionAt: string | null = null;
+  if (opts.includePriorDecision) {
+    const subject = query.subject as unknown as Subject;
+    const prior = await findPriorDecision(query.agentId, query.humanEmail, subject.id);
+    if (prior && prior.id !== query.id) priorDecisionAt = prior.decidedAt.toISOString();
+  }
+
+  return {
+    query_id: query.id,
+    // The human is a participant in this conversation, so unlike shapeQuery
+    // above this is not an internal id — it is the handle their own client
+    // uses to reach the conversation's messages and files. It was originally
+    // here so the renderer could fetch a subject attachment; attachments are
+    // out of scope now (see the design spec) and the renderer no longer takes
+    // it, but the conversation is still the human's, so it stays.
+    conversation_id: query.conversationId,
+    status,
+    status_description: STATUS_HINTS[status] || `Unknown status: ${status}`,
+    query_type: query.queryType,
+    question: query.question,
+    context: query.context,
+    confidence: query.confidence,
+    subject: query.subject as unknown as Subject,
+    self_contained: query.selfContained,
+    changes: query.changes as unknown as Change[] | null,
+    risk: query.risk as Risk,
+    answer_space: query.answerSpace as unknown as AnswerSpace,
+    insufficient_reason: status === "needs_context" ? query.insufficientReason : null,
+    answer: status === "answered" ? (query.answer as unknown as Answer | null) : null,
+    comment: status === "answered" ? query.answerComment : null,
+    human_confidence: status === "answered" ? query.answerConfidence : null,
+    response_time_ms: status === "answered" ? query.responseTimeMs : null,
+    prior_decision_at: priorDecisionAt,
+    created_at: query.createdAt.toISOString(),
+    expires_at: query.expiresAt.toISOString(),
+  };
+}
+
+/**
+ * The agent supplying what the human said was missing. Only valid from
+ * needs_context, and it goes through admission exactly like a creation does.
+ */
+export async function updateQuery(queryId: string, agentId: string, input: PatchQueryInput) {
+  const db = getDb();
+
+  const [query] = await db
+    .select()
+    .from(humanQueries)
+    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.agentId, agentId)))
+    .limit(1);
+
+  if (!query) throw new NotFoundError("Query", queryId);
+  if (query.status !== "needs_context") {
+    throw new ConflictError(`Query is ${query.status}, so there is nothing to clarify`);
+  }
+
+  if (query.clarificationRounds >= MAX_CLARIFICATION_ROUNDS) {
+    // Unfreeze on the way out. The clock only pauses while the agent can still
+    // act; leaving it paused here would freeze the query for ever.
+    //
+    // Guarded on the status, exactly like the successful branch below: the
+    // human may have answered, or the agent cancelled, between the SELECT
+    // above and this write, and neither should be dragged back to unpaused.
+    await db.update(humanQueries)
+      .set({ pausedAt: null, updatedAt: new Date() })
+      .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "needs_context")));
+
+    throw new UndecidableQueryError(
+      "clarification_rounds_exhausted",
+      `This query has already been clarified ${MAX_CLARIFICATION_ROUNDS} times.`,
+      "Create a new query instead of clarifying this one again.",
+    );
+  }
+
+  const subject = (input.subject ?? query.subject) as Subject;
+  const answerSpace = (input.answer_space ?? query.answerSpace) as unknown as AnswerSpace;
+
+  // Re-run elevation on the patched payload, and persist the result.
+  //
+  // A PATCH is exempt from prior-decision DETECTION - demanding a delta from a
+  // query that is being clarified would be circular, since the human asked for
+  // the clarification. That exemption was applied as "the PATCH skips history
+  // altogether", which let the monetary half of elevation be laundered away: a
+  // cheap `low` query, a request for context, then a PATCH swapping
+  // `answer_space` for {kind:"scalar", unit:"EUR", max:50000}. The risk stayed
+  // `low`, so no consequences, no hash and no held referent were required.
+  //
+  // Elevation from an amount needs no history at all, so it is recomputed here
+  // from the payload as patched. `hasPriorDecision` carries the floor the row
+  // already holds rather than a fresh lookup: `atLeast` never lowers, so a
+  // query that was elevated to `medium` on creation stays there.
+  const storedRisk = query.risk as Risk;
+  const risk = elevateRisk(storedRisk, {
+    hasPriorDecision: false,
+    answerSpace,
+  });
+
+  const verdict = checkPayload({
+    risk,
+    subject,
+    self_contained: query.selfContained,
+    answer_space: answerSpace,
+  });
+  if (!verdict.admit) {
+    throw new UndecidableQueryError(verdict.reason, verdict.detail, verdict.remedy);
+  }
+
+  // Give back the time the agent spent holding the turn.
+  const pausedMs = query.pausedAt ? Date.now() - query.pausedAt.getTime() : 0;
+
+  const [updated] = await db
+    .update(humanQueries)
+    .set({
+      status: "assigned",
+      subject,
+      risk,
+      answerSpace,
+      changes: input.changes ?? query.changes,
+      question: input.question ?? query.question,
+      context: input.context ?? query.context,
+      expiresAt: new Date(query.expiresAt.getTime() + pausedMs),
+      pausedAt: null,
+      insufficientReason: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "needs_context")))
+    .returning();
+
+  if (!updated) throw new ConflictError("Query changed while it was being clarified");
+
+  console.log(`[QUERY] Clarified ${queryId} (round ${query.clarificationRounds})`);
+  return shapeQuery(updated);
+}
+
+/**
+ * The agent withdrawing a question whose context has moved on.
+ *
+ * A conditional update, so an answer that landed first always wins: losing a
+ * person's decision to a race is exactly what cannot happen in a system whose
+ * value is the record.
+ */
+export async function cancelQuery(queryId: string, agentId: string) {
+  const db = getDb();
+
+  const [updated] = await db
+    .update(humanQueries)
+    .set({ status: "cancelled", pausedAt: null, updatedAt: new Date() })
+    .where(and(
+      eq(humanQueries.id, queryId),
+      eq(humanQueries.agentId, agentId),
+      inArray(humanQueries.status, ["pending", "assigned", "needs_context"]),
+    ))
+    .returning();
+
+  if (updated) {
+    console.log(`[QUERY] Cancelled ${queryId} by agent ${agentId}`);
+    return shapeQuery(updated);
+  }
+
+  // Nothing changed: either it is not ours, or it already reached a terminal state.
+  const [current] = await db
+    .select()
+    .from(humanQueries)
+    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.agentId, agentId)))
+    .limit(1);
+
+  if (!current) throw new NotFoundError("Query", queryId);
+  throw new ConflictError(`Query is already ${current.status} and cannot be cancelled`);
 }
 
 export async function getQuery(queryId: string, agentId: string) {
@@ -308,42 +722,25 @@ export async function getQuery(queryId: string, agentId: string) {
 
   if (!query) throw new NotFoundError("Query", queryId);
 
-  // Lazy expire check
+  // Lazy expire check. Guarded on the status we read, so an answer that
+  // landed between the SELECT and this UPDATE is not overwritten with
+  // `expired` — losing a person's decision to a race is the one thing this
+  // system may not do.
   let effectiveStatus = query.status;
-  if (
-    (query.status === "pending" || query.status === "assigned") &&
-    new Date() > query.expiresAt
-  ) {
-    await db
+  if (isExpirable(query) && new Date() > query.expiresAt) {
+    const [expired] = await db
       .update(humanQueries)
       .set({ status: "expired", updatedAt: new Date() })
-      .where(eq(humanQueries.id, queryId));
-    effectiveStatus = "expired";
-    console.log(`[QUERY] Expired: ${queryId} (was ${query.status})`);
+      .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, query.status)))
+      .returning({ id: humanQueries.id });
+
+    if (expired) {
+      effectiveStatus = "expired";
+      console.log(`[QUERY] Expired: ${queryId} (was ${query.status})`);
+    }
   }
 
-  const statusHints: Record<string, string> = {
-    pending: "The human has been invited but hasn't accepted the invitation yet. They need to open the link in their email and answer in the app — answering automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again.",
-    assigned: "The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again.",
-    answered: "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
-    expired: "The query has expired without a response. The human did not answer in time. You may create a new query if needed.",
-  };
-
-  return {
-    query_id: query.id,
-    status: effectiveStatus,
-    status_description: statusHints[effectiveStatus] || `Unknown status: ${effectiveStatus}`,
-    query_type: query.queryType,
-    question: query.question,
-    context: query.context,
-    confidence: query.confidence,
-    answer: effectiveStatus === "answered" ? query.answer : null,
-    comment: effectiveStatus === "answered" ? query.answerComment : null,
-    human_confidence: effectiveStatus === "answered" ? query.answerConfidence : null,
-    response_time_ms: effectiveStatus === "answered" ? query.responseTimeMs : null,
-    created_at: query.createdAt.toISOString(),
-    expires_at: query.expiresAt.toISOString(),
-  };
+  return shapeQuery(query, effectiveStatus);
 }
 
 export async function listAgentQueries(
@@ -386,32 +783,65 @@ export async function listHumanQueries(humanId: string) {
     .where(eq(conversationParticipants.humanId, humanId));
 
   const conversationIds = participantRows.map((r) => r.conversationId);
-  if (conversationIds.length === 0) return [];
 
+  // A pending query has no participant row yet — nobody has accepted it.
+  // Without this branch it is invisible here even though respondQuery
+  // (correctly) lets this same human answer it, which is no visibility at
+  // all: the real UI only ever calls this list. Visible by the same
+  // entitlement respondQuery uses — the query's own target address, not a
+  // participant row.
+  const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+
+  const visibility = [];
+  if (conversationIds.length > 0) {
+    visibility.push(inArray(humanQueries.conversationId, conversationIds));
+  }
+  if (human) {
+    visibility.push(
+      and(
+        eq(humanQueries.status, "pending"),
+        eq(humanQueries.humanEmail, canonicaliseEmail(human.email)),
+      ),
+    );
+  }
+  if (visibility.length === 0) return [];
+
+  // `needs_context` is fetched but never shown: the turn is the agent's, so
+  // the human has nothing to do with it. It is here only so this sweep can
+  // expire an abandoned one — see EXPIRABLE_STATUSES. Without that, the only
+  // sweep that runs on the human's side skipped it and it never died.
   const rows = await db
     .select()
     .from(humanQueries)
     .where(
       and(
-        inArray(humanQueries.conversationId, conversationIds),
-        inArray(humanQueries.status, ["pending", "assigned"]),
+        inArray(humanQueries.status, [...EXPIRABLE_STATUSES]),
+        or(...visibility),
       ),
     )
     .orderBy(desc(humanQueries.createdAt));
 
-  // Batch expire in a single UPDATE instead of N individual queries
+  // Batch expire in a single UPDATE instead of N individual queries. Guarded
+  // on the statuses we read, so a row that moved on in the meantime is left
+  // alone rather than stomped.
   const now = new Date();
-  const expiredIds = rows.filter((q) => now > q.expiresAt).map((q) => q.id);
+  const expiredIds = rows.filter((q) => isExpirable(q) && now > q.expiresAt).map((q) => q.id);
 
   if (expiredIds.length > 0) {
     await db
       .update(humanQueries)
       .set({ status: "expired", updatedAt: now })
-      .where(inArray(humanQueries.id, expiredIds));
+      .where(and(
+        inArray(humanQueries.id, expiredIds),
+        inArray(humanQueries.status, [...EXPIRABLE_STATUSES]),
+      ));
     console.log(`[QUERY] Batch expired ${expiredIds.length} queries`);
   }
 
-  return rows.filter((q) => now <= q.expiresAt);
+  const visible = rows.filter(
+    (q) => now <= q.expiresAt && (q.status === "pending" || q.status === "assigned"),
+  );
+  return Promise.all(visible.map((q) => shapeHumanQuery(q, { includePriorDecision: true })));
 }
 
 export async function getQueryForHuman(queryId: string, humanId: string) {
@@ -437,7 +867,62 @@ export async function getQueryForHuman(queryId: string, humanId: string) {
     )
     .limit(1);
 
-  if (!participant) throw new NotFoundError("Query", queryId);
+  if (!participant) {
+    // No participant row yet — only visible if this is a pending query
+    // addressed to exactly this human, the same entitlement respondQuery
+    // uses. Anything else (wrong human, or a status a participant row
+    // would otherwise gate) stays a 404 rather than leaking existence.
+    if (query.status !== "pending") throw new NotFoundError("Query", queryId);
 
-  return query;
+    const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+    if (!sameEmail(human?.email, query.humanEmail)) {
+      throw new NotFoundError("Query", queryId);
+    }
+  }
+
+  return shapeHumanQuery(query, { includePriorDecision: true });
+}
+
+/**
+ * Which statuses a sweep may expire.
+ *
+ * `needs_context` belongs here. The spec is explicit that the pause only
+ * applies while the agent can still act — with the clarification rounds
+ * exhausted, "the pause is not applied and the query expires normally" — and
+ * without this a query whose PATCH ran out, or that the agent simply
+ * abandoned, sat in `needs_context` for ever with an `expires_at` in the past
+ * that nothing would ever act on.
+ *
+ * A *paused* `needs_context` query is deliberately excluded: the clock is
+ * frozen while the turn is genuinely the agent's, which is the whole point of
+ * `paused_at`.
+ */
+const EXPIRABLE_STATUSES = ["pending", "assigned", "needs_context"] as const;
+
+function isExpirable(query: Pick<typeof humanQueries.$inferSelect, "status" | "pausedAt">): boolean {
+  if (query.status === "pending" || query.status === "assigned") return true;
+  return query.status === "needs_context" && query.pausedAt === null;
+}
+
+/** A one-line rendering of a typed answer, for the conversation transcript. */
+function summariseAnswer(space: AnswerSpace, answer: Answer): string {
+  switch (answer.kind) {
+    case "boolean":
+      return space.kind === "boolean"
+        ? (answer.value ? space.labels.t : space.labels.f)
+        : String(answer.value);
+    case "choice": {
+      if (space.kind !== "choice") return answer.option_ids.join(", ");
+      const byId = new Map(space.options.map((o) => [o.id, o.label]));
+      return answer.option_ids.map((id) => byId.get(id) ?? id).join(", ");
+    }
+    case "scalar":
+      return space.kind === "scalar" ? `${answer.value} ${space.unit}` : String(answer.value);
+    case "date":
+      return answer.value;
+    case "text":
+      return answer.value;
+    case "fields":
+      return Object.entries(answer.values).map(([k, v]) => `${k}: ${v}`).join("; ");
+  }
 }

@@ -1,13 +1,14 @@
 ---
 title: Queries
-description: "Ask a human a question and poll for their answer"
+description: "Ask a human a question they can actually decide, and poll for their typed answer"
 ---
 
 Queries are the fastest way to get a human's input: one call to create the
 question, then poll (or use the SDK's `waitForAnswer`) until they answer. The
 human gets an email telling them a question is waiting, signs in with a code
 rather than a password, and answers in the app. See
-[Human queries](/docs/concepts/queries) for the full flow.
+[Human queries](/docs/concepts/queries) for the full flow, including what the
+admission gate requires and how `needs_context` works.
 
 ## Create a query
 
@@ -19,7 +20,17 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
   -H "Content-Type: application/json" \
   -d '{
     "query_type": "validation",
-    "question": "Deploy v2.3 to production?",
+    "risk": "low",
+    "subject": {
+      "id": "release-2.3",
+      "label": "Release 2.3 to Fictional Corp",
+      "uri": "https://example.test/releases/2.3"
+    },
+    "answer_space": {
+      "kind": "boolean",
+      "labels": { "t": "Ship it", "f": "Hold" }
+    },
+    "question": "Deploy release 2.3 to production?",
     "context": "12 commits since the last release. All checks green.",
     "target_human_email": "oncall@example.com",
     "confidence": 0.8,
@@ -30,12 +41,79 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `query_type` | string | Yes | `validation`, `interpretation`, `expert_query`, or `labeling` |
+| `subject` | object | Yes | What the question is about — see [Subject](#subject) below |
+| `answer_space` | object | Yes | The closed shape the answer must take — see [Answer spaces](#answer-spaces) below |
 | `question` | string | Yes | The question for the human (max 10,000 chars) |
 | `target_human_email` | string | Yes | Email of the human to ask |
+| `risk` | string | No | `low` (default), `medium`, `high`, or `critical` — a floor; the admission gate can raise it, never lower it |
+| `self_contained` | boolean | No | Set `true` only if the question truly needs no referent (default `false`) |
+| `changes` | array | No | Before/after deltas this decision covers — required above `low` risk if this human already decided about this `subject` |
 | `context` | string | No | Extra context — code, data, anything that helps them answer (max 100,000 chars) |
 | `confidence` | number | No | The agent's own confidence in its assessment (0–1) |
 | `timeout_minutes` | number | No | Minutes before the query expires (default 60, max 10080) |
 | `metadata` | object | No | Arbitrary metadata stored with the query |
+
+### Subject
+
+`subject` is what the question is about — a stable id you reuse for the same
+thing, a label the human will recognise, and (except when `self_contained`
+is `true`) a referent they can look at. There are two referents: `uri` and
+`body`. A subject with neither, and without `self_contained: true`, is
+refused with `422 missing_referent` at any risk level.
+
+A question that genuinely isn't about an artefact — a judgement call, a
+standing preference — declares that instead of inventing a referent:
+
+```json
+{
+  "query_type": "expert_query",
+  "subject": {
+    "id": "late-refund-policy-2026",
+    "label": "Refunds outside the return window"
+  },
+  "self_contained": true,
+  "answer_space": {
+    "kind": "choice",
+    "select": "one",
+    "options": [
+      { "id": "refund", "label": "Refund anyway" },
+      { "id": "decline", "label": "Decline" }
+    ]
+  },
+  "question": "As a general rule, do we refund outside the window when the customer called ahead?",
+  "target_human_email": "oncall@example.com"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | A stable id for this subject, reused across queries about the same thing |
+| `label` | string | Yes | Human-readable label |
+| `uri` | string | No | An `http(s)` link to the referent. Any other scheme is rejected |
+| `body` | string | No | The referent inline, if there's no stable URI for it |
+| `sha256` | string | No | Hash of the referent — required above `medium` risk, where the referent must also be `body`: you can't hash what you don't hold |
+
+### Answer spaces
+
+`answer_space` is one of six closed shapes. `kind` is a discriminator; the
+rest of the object depends on it.
+
+| Kind | Fields | Answer shape |
+|------|--------|--------------|
+| `boolean` | `labels: { t, f }`, `consequences?: { t, f }` | `{ "kind": "boolean", "value": true \| false }` |
+| `choice` | `select: "one" \| "many"`, `options: [{ id, label, consequence? }]` | `{ "kind": "choice", "option_ids": [...] }` |
+| `scalar` | `unit`, `min?`, `max?`, `step?`, `effect?` | `{ "kind": "scalar", "value": number }` |
+| `date` | `earliest?`, `latest?`, `effect?` | `{ "kind": "date", "value": "YYYY-MM-DD" }` |
+| `text` | `max_length` | `{ "kind": "text", "value": string }` — refused above `low` risk |
+| `fields` | `fields: [Slot]`, `effect?` | `{ "kind": "fields", "values": { [slotId]: ... } }` |
+
+A `fields` slot is one datum — `{ id, label, kind, ... }`, using the same
+per-kind shape as above minus `boolean`'s `consequences` and `choice`'s
+`consequence` (a slot carries a datum, not a decision, so it never nests).
+
+Above `low` risk, every branch of a discrete `answer_space` (`boolean`,
+`choice`) must state its `consequences`/`consequence` — what happens if the
+human picks it.
 
 **Response `201`:**
 
@@ -63,6 +141,25 @@ All responses are wrapped in a top-level `data` object.
 | `next_step` | string | What to call next to get the answer |
 | `expires_at` | string | ISO timestamp; after this the query moves to `expired` |
 
+### Refused: `422`
+
+A request the admission gate judges undecidable never becomes a query:
+
+```json
+{
+  "error": {
+    "code": "UNDECIDABLE_QUERY",
+    "message": "The subject 'release-2.3' carries no uri or body, so the human has nothing to look at.",
+    "reason": "missing_referent",
+    "detail": "The subject 'release-2.3' carries no uri or body, so the human has nothing to look at.",
+    "remedy": "Link the artefact with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing."
+  }
+}
+```
+
+`remedy` says exactly what to add. Fix the request and retry — this is not a
+transient error.
+
 ## Get a query
 
 `GET https://api.agentdialog.io/api/v1/agent/queries/{id}`
@@ -72,29 +169,80 @@ curl https://api.agentdialog.io/api/v1/agent/queries/{id} \
   -H "Authorization: Bearer mge_ag_..."
 ```
 
-**Response:**
+**Response when `answered`:**
 
 ```json
 {
   "data": {
     "query_id": "uuid",
     "status": "answered",
+    "status_description": "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
     "query_type": "validation",
-    "question": "Deploy v2.3 to production?",
+    "question": "Deploy release 2.3 to production?",
     "context": "12 commits since the last release. All checks green.",
     "confidence": 0.8,
-    "answer": "yes, go ahead",
+    "answer": { "kind": "boolean", "value": true },
     "comment": "Checked the changelog, looks good.",
     "human_confidence": null,
     "response_time_ms": 184000,
+    "insufficient_reason": null,
     "created_at": "2026-08-20T16:30:00.000Z",
     "expires_at": "2026-08-20T18:30:00.000Z"
   }
 }
 ```
 
-`answer`, `comment`, and `human_confidence` are `null` until `status` is
-`answered`.
+`status_description` is always present — a human-readable sentence for
+whatever `status` currently is. `answer`, `comment`, and `human_confidence`
+are `null` until `status` is `answered`. `insufficient_reason` is `null`
+unless `status` is `needs_context`.
+
+## Clarify a query
+
+`PATCH https://api.agentdialog.io/api/v1/agent/queries/{id}`
+
+Only valid when `status` is `needs_context` — supply whatever addresses what
+the human flagged as missing.
+
+```bash
+curl -X PATCH https://api.agentdialog.io/api/v1/agent/queries/{id} \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "context": "Changelog: https://example.test/changelog/2.3"
+  }'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `subject` | object | No | Replacement referent |
+| `answer_space` | object | No | Replacement answer shape |
+| `changes` | array | No | Before/after delta |
+| `question` | string | No | Reworded question |
+| `context` | string | No | Additional context |
+
+At least one field is required — a bare `PATCH` with nothing to change is
+refused. Fields you omit keep their previous value. The request is checked
+against the same admission gate as creation and can come back `422` the same
+way. On success the query returns to `status: "assigned"` with the same
+shape as [get a query](#get-a-query) above, and its expiry clock resumes
+from wherever it paused.
+
+## Cancel a query
+
+`POST https://api.agentdialog.io/api/v1/agent/queries/{id}/cancel`
+
+Withdraws a query before the human answers. Valid from `pending`, `assigned`,
+or `needs_context`.
+
+```bash
+curl -X POST https://api.agentdialog.io/api/v1/agent/queries/{id}/cancel \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+Returns the query in the same shape as [get a query](#get-a-query), with
+`status: "cancelled"`. If the human's answer landed first, this returns
+`409` instead — an answer that already exists is never discarded.
 
 ## List queries
 
@@ -107,7 +255,7 @@ curl "https://api.agentdialog.io/api/v1/agent/queries?status=pending&limit=20" \
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `status` | string | — | Filter by `pending`, `assigned`, `answered`, or `expired` |
+| `status` | string | — | Filter by `pending`, `assigned`, `needs_context`, `answered`, `cancelled`, or `expired` |
 | `limit` | number | 20 | Max items (1–100) |
 
 ## Statuses
@@ -116,7 +264,9 @@ curl "https://api.agentdialog.io/api/v1/agent/queries?status=pending&limit=20" \
 |--------|---------|
 | `pending` | The human has been invited but hasn't accepted the invitation yet. They need to open the link in their email and answer in the app — answering automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again. |
 | `assigned` | The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again. |
-| `answered` | The human has responded. Their answer is in the `answer` field below. No further polling needed. |
+| `needs_context` | The human could not decide with what you gave them. Read `insufficient_reason`, then `PATCH` the query with what is missing. The clock is paused while you do. |
+| `answered` | The human has responded. Their typed answer is in the `answer` field. No further polling needed. |
+| `cancelled` | You withdrew this query with `POST /agent/queries/{id}/cancel`. Create a new one if you still need an answer. |
 | `expired` | The query has expired without a response. The human did not answer in time. You may create a new query if needed. |
 
 A query starts `assigned` instead of `pending` when the target human already

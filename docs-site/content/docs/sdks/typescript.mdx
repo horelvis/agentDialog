@@ -40,7 +40,14 @@ console.log("API key:", agent.apiKey); // Store securely — shown once
 This is the core of the SDK: `createQuery` sends the question by email and
 returns immediately, and `waitForAnswer` polls until the human replies (or
 the query expires). See [Human queries](/docs/concepts/queries) for how the
-flow works end to end.
+flow works end to end, including what the admission gate requires as risk
+goes up.
+
+A query declares a `subject` — what it's about, with something the human can
+look at (`uri` or `body`) — and an `answerSpace` — the closed shape the answer
+must take. A subject with no referent is refused with `422 missing_referent`,
+unless you set `selfContained: true` because the question genuinely isn't
+about an artefact. The human's `answer` comes back typed to match:
 
 ```typescript
 import { AgentDialog } from "@agentdialog/sdk";
@@ -49,14 +56,22 @@ const client = new AgentDialog({ apiKey: process.env.AGENTDIALOG_API_KEY! });
 
 const { queryId } = await client.createQuery({
   queryType: "validation",
-  question: "Deploy v2.3 to production?",
+  subject: {
+    id: "release-2.3",
+    label: "Release 2.3 to Fictional Corp",
+    uri: "https://example.test/releases/2.3",
+  },
+  answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
+  question: "Deploy release 2.3 to production?",
   context: "12 commits since the last release. All checks green.",
   targetHumanEmail: "oncall@example.com",
   timeoutMinutes: 120,
 });
 
-const answer = await client.waitForAnswer(queryId);
-console.log(answer.status, answer.answer);
+const query = await client.waitForAnswer(queryId);
+if (query.status === "answered" && query.answer?.kind === "boolean") {
+  console.log(query.answer.value ? "Ship it" : "Hold");
+}
 ```
 
 `waitForAnswer` resolves once the query is `answered` or `expired` — it never
@@ -80,12 +95,44 @@ if (query.status === "answered") console.log(query.answer);
 const pending = await client.listQueries({ status: "pending", limit: 20 });
 ```
 
+Every `Query` also carries `statusDescription` — a human-readable sentence
+for whatever `status` currently is, handy for logging or handing straight to
+an LLM without a switch statement over `status`. `QuerySummary` (from
+`listQueries`) does not carry it — the list endpoint doesn't send one.
+
+### When the human can't decide
+
+A query can also come back `needs_context`: the human opened it and told
+AgentDialog they don't have what they need. The turn returns to you — read
+`insufficientReason`, then fix the query with `clarifyQuery`. Only fields you
+send change; everything else keeps its previous value.
+
+```typescript
+const query = await client.getQuery(queryId);
+if (query.status === "needs_context") {
+  console.log(query.insufficientReason); // e.g. "unknown_subject"
+  await client.clarifyQuery(queryId, {
+    context: "Here's the changelog they said was missing: ...",
+  });
+}
+```
+
+If the question stops being worth asking before the human answers, withdraw
+it with `cancelQuery`. An answer that already landed wins — `cancelQuery`
+rejects with a conflict instead of discarding it:
+
+```typescript
+await client.cancelQuery(queryId);
+```
+
 ## Framework adapters
 
 The SDK ships tool adapters so an LLM can ask a human directly, without you
 wiring up `createQuery`/`getQuery` calls by hand. Both adapters expose the
-same two tools: `ask_human` (calls `createQuery`) and `check_answer` (calls
-`getQuery`) — the model creates a query, then checks back on it in a later
+same two tools: `ask_human` (calls `createQuery` — the model supplies
+`subject` and `answerSpace` along with the question) and `check_answer`
+(calls `getQuery`, surfacing `insufficientReason` if the human asked for more
+context) — the model creates a query, then checks back on it in a later
 turn.
 
 ### Vercel AI SDK
@@ -154,6 +201,8 @@ invitations, webhooks, and profile management.
 | `createWebhook(input)` / `listWebhooks()` | Register and list webhooks |
 | `getProfile()` / `updateProfile(input)` | Read and update the agent's profile |
 | `rotateApiKey()` | Rotate the API key |
+| `clarifyQuery(queryId, input)` | Supply what a human said was missing, from `needs_context` |
+| `cancelQuery(queryId)` | Withdraw a query before the human answers |
 
 See the [API reference](/docs/api-reference/agent/register) for the
 underlying endpoints.
@@ -183,6 +232,32 @@ try {
 | `ForbiddenError` | 403 | Not authorized for this resource |
 | `NotFoundError` | 404 | Resource not found |
 | `ValidationError` | 422 | Invalid input (check `.details`) |
+| `UndecidableQueryError` | 422 | The [admission gate](/docs/concepts/queries) refused a `createQuery` or `clarifyQuery` — see below |
 | `RateLimitError` | 429 | Rate limited (auto-retried up to 3 times) |
 | `ServerError` | 500 | Server error |
 | `QueryTimeoutError` | 408 | `waitForAnswer`'s own `timeoutMs` elapsed before the query was answered or expired |
+
+### When a question can't be asked
+
+`createQuery` and `clarifyQuery` throw `UndecidableQueryError` — not a plain
+`ValidationError` — when the admission gate refuses a question a human
+could not actually decide. It's a distinct class of `422` on purpose: one
+means "this payload is malformed", the other means "this payload is valid
+and still not answerable". The error carries what an agent needs to correct
+itself and retry, rather than a message to parse:
+
+```typescript
+import { AgentDialog, UndecidableQueryError } from "@agentdialog/sdk";
+
+try {
+  await client.createQuery({ /* ... */ });
+} catch (err) {
+  if (err instanceof UndecidableQueryError) {
+    console.log(err.reason);         // e.g. "missing_referent"
+    console.log(err.remedy);         // what to add before retrying
+    console.log(err.priorQueryId);   // set only for a repeat-decision refusal
+  } else {
+    throw err;
+  }
+}
+```
