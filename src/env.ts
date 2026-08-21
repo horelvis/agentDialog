@@ -50,6 +50,14 @@ export const envSchema = z.object({
   REPLY_LOCAL_PART: z.string().default("reply"),
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().optional(),
   INBOUND_EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).default("resend"),
+
+  // Inbound mailbox, read over IMAP. Optional on purpose: with these unset the
+  // poll endpoint answers 503 and nothing else changes behaviour. This is the
+  // bridge until a transactional provider posts to the inbound webhook.
+  IMAP_HOST: z.string().optional(),
+  IMAP_PORT: z.coerce.number().default(993),
+  IMAP_USER: z.string().optional(),
+  IMAP_PASSWORD: z.string().optional(),
 }).superRefine((env, ctx) => {
   // The inbound email webhook records a human's answer to an agent's query and
   // auto-accepts their invitation. Without a signing secret the endpoint has no
