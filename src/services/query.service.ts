@@ -13,6 +13,7 @@ import { dispatchWebhooks } from "./webhook.service";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
 import { checkPayload } from "../admission/decidability";
+import { findPriorDecision, elevateRisk } from "../admission/history";
 import type { CreateQueryInput, RespondQueryInput } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
@@ -20,8 +21,27 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
 
   // Admission runs before the transaction opens: a query that a human could not
   // decide never becomes a row, a conversation, an invitation or an email.
+  //
+  // History first: it decides both the effective risk and whether a delta is
+  // owed, and the payload rules are judged at the ELEVATED risk, not the
+  // declared one.
+  const prior = await findPriorDecision(agentId, input.target_human_email, input.subject.id);
+  const risk = elevateRisk(input.risk, {
+    hasPriorDecision: prior !== null,
+    answerSpace: input.answer_space,
+  });
+
+  if (prior && risk !== "low" && (!input.changes || input.changes.length === 0)) {
+    throw new UndecidableQueryError(
+      "prior_decision_without_delta",
+      `This person decided about '${input.subject.id}' on ${prior.decidedAt.toISOString().slice(0, 10)}.`,
+      "Send `changes` with what has changed since then.",
+      prior.id,
+    );
+  }
+
   const verdict = checkPayload({
-    risk: input.risk,
+    risk,
     subject: input.subject,
     self_contained: input.self_contained,
     answer_space: input.answer_space,
@@ -163,7 +183,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         status,
         question: input.question,
         context: input.context,
-        risk: input.risk,
+        risk,
         subject: input.subject,
         selfContained: input.self_contained,
         changes: input.changes,
