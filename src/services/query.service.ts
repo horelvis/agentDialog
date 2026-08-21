@@ -15,7 +15,7 @@ import { sendQueryEmail } from "./query-email.service";
 import { checkPayload, type Subject, type Risk } from "../admission/decidability";
 import { findPriorDecision, elevateRisk } from "../admission/history";
 import { validateAnswerAgainstSpace, type AnswerSpace, type Answer } from "../lib/answer-space";
-import type { CreateQueryInput, RespondQueryInput, PatchQueryInput } from "../validators/query.validators";
+import type { CreateQueryInput, RespondQueryInput, PatchQueryInput, Change } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
   const db = getDb();
@@ -234,6 +234,8 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       question: input.question,
       context: input.context,
       queryType: input.query_type,
+      subject: input.subject,
+      changes: input.changes,
       targetEmail: input.target_human_email,
       expiresAt,
       invitationToken: token,
@@ -314,7 +316,7 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
       note: input.note,
     }).catch((err) => console.error(`[QUERY] Webhook dispatch failed for ${queryId}:`, err));
 
-    return updated;
+    return shapeHumanQuery(updated);
   }
 
   // From here, outcome === "answer".
@@ -380,7 +382,7 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
     console.error(`[QUERY] Webhook dispatch failed for ${queryId}:`, err);
   });
 
-  return updated;
+  return shapeHumanQuery(updated);
 }
 
 const MAX_CLARIFICATION_ROUNDS = 2;
@@ -422,6 +424,60 @@ function shapeQuery(query: typeof humanQueries.$inferSelect, status: string = qu
     // actually be here — a status row on its own doesn't say what the human
     // was missing.
     insufficient_reason: status === "needs_context" ? query.insufficientReason : null,
+    created_at: query.createdAt.toISOString(),
+    expires_at: query.expiresAt.toISOString(),
+  };
+}
+
+/**
+ * What the human sees, as opposed to what the agent sees in `shapeQuery`
+ * above: it carries `subject`, `changes`, `risk` and `answer_space` because
+ * the human is the one who has to decide, and it never repeats fields (like
+ * agent/conversation ids) the human's side has no use for.
+ *
+ * All the jsonb columns — `subject`, `changes`, `answerSpace` — are stored as
+ * exactly the snake_case shape the agent sent, so they pass through unchanged
+ * rather than needing a case conversion here.
+ */
+async function shapeHumanQuery(
+  query: typeof humanQueries.$inferSelect,
+  opts: { includePriorDecision?: boolean } = {},
+) {
+  const status = query.status;
+
+  // "You decided about this on …" only makes sense before the human answers
+  // again — once this row is itself the answered one, it would find itself.
+  let priorDecisionAt: string | null = null;
+  if (opts.includePriorDecision) {
+    const subject = query.subject as unknown as Subject;
+    const prior = await findPriorDecision(query.agentId, query.humanEmail, subject.id);
+    if (prior && prior.id !== query.id) priorDecisionAt = prior.decidedAt.toISOString();
+  }
+
+  return {
+    query_id: query.id,
+    // The human is a participant in this conversation, so unlike shapeQuery
+    // above it is not an internal id here — it is what lets the human's own
+    // client fetch a subject attachment via
+    // GET /human/conversations/:id/files/:attachmentId/download.
+    conversation_id: query.conversationId,
+    status,
+    status_description: STATUS_HINTS[status] || `Unknown status: ${status}`,
+    query_type: query.queryType,
+    question: query.question,
+    context: query.context,
+    confidence: query.confidence,
+    subject: query.subject as unknown as Subject,
+    self_contained: query.selfContained,
+    changes: query.changes as unknown as Change[] | null,
+    risk: query.risk as Risk,
+    answer_space: query.answerSpace as unknown as AnswerSpace,
+    insufficient_reason: status === "needs_context" ? query.insufficientReason : null,
+    answer: status === "answered" ? (query.answer as unknown as Answer | null) : null,
+    comment: status === "answered" ? query.answerComment : null,
+    human_confidence: status === "answered" ? query.answerConfidence : null,
+    response_time_ms: status === "answered" ? query.responseTimeMs : null,
+    prior_decision_at: priorDecisionAt,
     created_at: query.createdAt.toISOString(),
     expires_at: query.expiresAt.toISOString(),
   };
@@ -626,7 +682,8 @@ export async function listHumanQueries(humanId: string) {
     console.log(`[QUERY] Batch expired ${expiredIds.length} queries`);
   }
 
-  return rows.filter((q) => now <= q.expiresAt);
+  const visible = rows.filter((q) => now <= q.expiresAt);
+  return Promise.all(visible.map((q) => shapeHumanQuery(q, { includePriorDecision: true })));
 }
 
 export async function getQueryForHuman(queryId: string, humanId: string) {
@@ -654,7 +711,7 @@ export async function getQueryForHuman(queryId: string, humanId: string) {
 
   if (!participant) throw new NotFoundError("Query", queryId);
 
-  return query;
+  return shapeHumanQuery(query, { includePriorDecision: true });
 }
 
 /** A one-line rendering of a typed answer, for the conversation transcript. */

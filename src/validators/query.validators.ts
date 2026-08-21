@@ -17,6 +17,8 @@ export const changeSchema = z.object({
   materiality: z.enum(["minor", "material"]),
 });
 
+export type Change = z.infer<typeof changeSchema>;
+
 export const createQuerySchema = z.object({
   query_type: z.enum(["validation", "interpretation", "expert_query", "labeling"]),
   risk: z.enum(["low", "medium", "high", "critical"]).default("low"),

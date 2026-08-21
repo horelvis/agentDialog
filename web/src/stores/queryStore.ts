@@ -1,16 +1,14 @@
 import { create } from "zustand";
 import type { HumanQuery } from "@/api/types";
 import * as queriesApi from "@/api/queries";
+import type { RespondInput } from "@/api/queries";
 
 interface QueryState {
   queries: HumanQuery[];
   loading: boolean;
 
   fetchQueries: () => Promise<void>;
-  respond: (
-    queryId: string,
-    input: { answer: string; comment?: string; confidence?: number },
-  ) => Promise<void>;
+  respond: (queryId: string, input: RespondInput) => Promise<void>;
 }
 
 export const useQueryStore = create<QueryState>((set) => ({
@@ -31,6 +29,10 @@ export const useQueryStore = create<QueryState>((set) => ({
 
   respond: async (queryId, input) => {
     await queriesApi.respondQuery(queryId, input);
+    // Both outcomes remove the card: an answer closes it, and
+    // insufficient_context hands the turn back to the agent — either way
+    // listHumanQueries only ever returns pending/assigned rows, so this
+    // query will not be among them until the agent clarifies it.
     set((s) => ({
       queries: s.queries.filter((q) => q.id !== queryId),
     }));
