@@ -50,6 +50,23 @@ describe("answerSpaceSchema", () => {
     expect(answerSpaceSchema.safeParse(nested).success).toBe(false);
   });
 
+  // A slot transports a datum, not a decision: a choice slot nested inside
+  // fields must not carry a per-option consequence.
+  it("rejects a choice slot nested in fields whose option carries a consequence", () => {
+    const nested = {
+      kind: "fields",
+      fields: [
+        {
+          id: "route",
+          label: "Route",
+          kind: "choice",
+          options: [{ id: "renew", label: "Renovar", consequence: "Firmo hoy." }],
+        },
+      ],
+    };
+    expect(answerSpaceSchema.safeParse(nested).success).toBe(false);
+  });
+
   it("rejects a choice with no options", () => {
     expect(answerSpaceSchema.safeParse({ kind: "choice", select: "one", options: [] }).success).toBe(false);
   });
@@ -155,6 +172,24 @@ describe("validateAnswerAgainstSpace", () => {
     expect(validateAnswerAgainstSpace(space, { kind: "date", value: "2026-06-01" })).toEqual({ ok: true });
     expect(validateAnswerAgainstSpace(space, { kind: "date", value: "2025-12-31" }).ok).toBe(false);
     expect(validateAnswerAgainstSpace(space, { kind: "date", value: "no es fecha" }).ok).toBe(false);
+  });
+
+  // Date.parse rolls a calendar-impossible date forward instead of failing
+  // (2026-02-31 becomes 2026-03-03), so this must be checked explicitly: a
+  // wrong answer recorded as valid is the worst failure this module can have.
+  it("rejects a calendar-impossible date", () => {
+    const space: AnswerSpace = { kind: "date" };
+    expect(validateAnswerAgainstSpace(space, { kind: "date", value: "2026-02-31" }).ok).toBe(false);
+  });
+
+  it("rejects 29 February in a non-leap year", () => {
+    const space: AnswerSpace = { kind: "date" };
+    expect(validateAnswerAgainstSpace(space, { kind: "date", value: "2023-02-29" }).ok).toBe(false);
+  });
+
+  it("accepts a real leap day", () => {
+    const space: AnswerSpace = { kind: "date" };
+    expect(validateAnswerAgainstSpace(space, { kind: "date", value: "2024-02-29" })).toEqual({ ok: true });
   });
 
   it("rejects text longer than max_length", () => {

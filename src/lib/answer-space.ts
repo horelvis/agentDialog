@@ -23,6 +23,11 @@ const choiceOption = z.object({
   consequence: z.string().min(1).max(500).optional(),
 });
 
+// .strict() matters here: without it, zod's default "strip" mode would
+// silently drop a `consequence` on a nested choice slot instead of rejecting
+// it, which is exactly the leak Finding 2 caught.
+const choiceSlotOption = choiceOption.omit({ consequence: true }).strict();
+
 const choiceSpace = z.object({
   kind: z.literal("choice"),
   select: z.enum(["one", "many"]),
@@ -66,7 +71,10 @@ const slot = z.intersection(
   }),
   z.discriminatedUnion("kind", [
     booleanSpace.omit({ consequences: true }),
-    choiceSpace.innerType().omit({ select: true }),
+    z.object({
+      kind: z.literal("choice"),
+      options: z.array(choiceSlotOption).min(1).max(20),
+    }),
     scalarSpace.omit({ effect: true }),
     dateSpace.omit({ effect: true }),
     textSpace,
@@ -165,7 +173,13 @@ function checkDate(
   if (typeof value !== "string" || !ISO_DATE.test(value)) {
     return bad(`${where}: expected a date as YYYY-MM-DD`);
   }
-  if (Number.isNaN(Date.parse(value))) return bad(`${where}: not a real date`);
+  // Date.parse rolls an impossible calendar date forward (2026-02-31 becomes
+  // 2026-03-03) instead of failing, so a round-trip through ISO is the only
+  // way to catch it.
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    return bad(`${where}: not a real date`);
+  }
   if (def.earliest && value < def.earliest) return bad(`${where}: earlier than ${def.earliest}`);
   if (def.latest && value > def.latest) return bad(`${where}: later than ${def.latest}`);
   return { ok: true };
