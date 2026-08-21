@@ -239,9 +239,16 @@ Dos cosas distintas se habían mezclado bajo «ceremonia que escala con el riesg
 - **El peso probatorio** — consecuencias por rama, hash de lo visto, delta contra
   la decisión anterior. **Sí escala.**
 
-`subject` lleva siempre un referente: `uri`, `attachments` (que cuelgan del
-mensaje `human_query` reutilizando `file_attachments`, sin maquinaria nueva) o
-`body` en línea. Sin ninguno → `422 missing_referent`.
+`subject` lleva siempre un referente: `uri` o `body` en línea. Sin ninguno →
+`422 missing_referent`.
+
+> **Nota posterior.** Este documento proponía un tercer referente,
+> `attachments`, reutilizando `file_attachments` «sin maquinaria nueva». Era
+> falso: sin resolver los ids no hay posesión que comprobar, y no existe ningún
+> orden de llamadas en el que un agente pueda subir un adjunto a una
+> conversación que `createQuery` todavía no ha creado. Los adjuntos salieron del
+> alcance en la revisión final; el porqué completo y el camino de vuelta están en
+> el spec de diseño, §3.
 
 Corolario del argumento de auditoría: **no puedes hashear lo que no tienes.** Por
 encima de `medium`, un `uri` externo a secas no basta — el referente tiene que ser

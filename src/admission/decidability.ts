@@ -28,7 +28,6 @@ export type Subject = {
   id: string;
   label: string;
   uri?: string;
-  attachments?: string[];
   body?: string;
   sha256?: string;
 };
@@ -60,9 +59,16 @@ const refuse = (
   remedy: string,
 ): AdmissionVerdict => ({ admit: false, reason, detail, remedy });
 
-/** Do we hold the referent ourselves, or are we taking the agent's word for it? */
+/**
+ * Do we hold the referent ourselves, or are we taking the agent's word for it?
+ *
+ * `body` is the only thing that qualifies. Attachments were a third referent
+ * until the final review: nothing resolved the ids, so any well-formed UUID
+ * satisfied this rule — see the note in the design spec for why they are out
+ * and what bringing them back would cost.
+ */
 function weHoldIt(subject: Subject): boolean {
-  return Boolean(subject.body) || Boolean(subject.attachments?.length);
+  return Boolean(subject.body);
 }
 
 function hasReferent(subject: Subject): boolean {
@@ -92,8 +98,8 @@ export function checkPayload(input: AdmissionInput): AdmissionVerdict {
   if (!input.self_contained && !hasReferent(subject)) {
     return refuse(
       "missing_referent",
-      `The subject '${subject.id}' carries no uri, attachments or body, so the human has nothing to look at.`,
-      "Attach the artefact, link it with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing.",
+      `The subject '${subject.id}' carries no uri or body, so the human has nothing to look at.`,
+      "Link the artefact with `uri`, inline it with `body`, or set `self_contained: true` if the question really is about nothing.",
     );
   }
 
@@ -142,7 +148,7 @@ export function checkPayload(input: AdmissionInput): AdmissionVerdict {
       return refuse(
         "external_referent_at_high_risk",
         `At ${risk} risk a bare external uri is not enough: we cannot hash what we do not hold.`,
-        "Upload the artefact as an attachment, or inline it with `body`.",
+        "Inline the artefact with `body`, so the hash is over something we hold.",
       );
     }
     if (hasReferent(subject) && !subject.sha256) {

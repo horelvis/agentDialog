@@ -7,7 +7,6 @@ export interface Subject {
   id: string;
   label: string;
   uri?: string;
-  attachments?: string[];
   body?: string;
   sha256?: string;
 }

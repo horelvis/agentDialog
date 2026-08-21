@@ -1,11 +1,16 @@
 import { z } from "zod";
 import { answerSpaceSchema, answerSchema } from "../lib/answer-space";
+import { isHttpUrl } from "../lib/url";
 
 export const subjectSchema = z.object({
   id: z.string().min(1).max(128),
   label: z.string().min(1).max(200),
-  uri: z.string().url().optional(),
-  attachments: z.array(z.string().uuid()).max(10).optional(),
+  // http/https only. `z.string().url()` alone accepts `javascript:alert(1)`
+  // and `data:text/html,…`, and this value is rendered as an `href` in the
+  // approver's own session — the one place a script must never run.
+  uri: z.string().url().refine(isHttpUrl, {
+    message: "uri must be an http(s) URL",
+  }).optional(),
   body: z.string().max(100_000).optional(),
   sha256: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
 });

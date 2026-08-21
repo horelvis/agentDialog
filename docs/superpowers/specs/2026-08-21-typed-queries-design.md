@@ -107,8 +107,7 @@ espacio de decisión abierto con otro nombre.
   "subject": {
     "id": "string, 1..128, opaco para nosotros",
     "label": "string, 1..200, legible por un humano",
-    "uri": "string opcional",
-    "attachments": ["file_id"],        // adjuntos del mensaje human_query
+    "uri": "string opcional, http(s) — otros esquemas se rechazan",
     "body": "texto en línea opcional",
     "sha256": "hex opcional, del referente tal como lo vio el agente"
   },
@@ -154,16 +153,49 @@ se dispersen por los handlers.
 | Consecuencia por rama / `effect` | — | ✓ | ✓ | ✓ |
 | Referente en posesión de AgentDialog | — | — | ✓ | ✓ |
 | `sha256` del referente | — | — | ✓ | ✓ |
-| `changes` si hay decisión previa | mostrado | ✓ | ✓ | ✓ |
+| `changes` si hay decisión previa | ✓ | ✓ | ✓ | ✓ |
 
-«Referente» es al menos uno de `uri`, `attachments` o `body`. «En posesión»
-significa `attachments` o `body`: **no se puede hashear lo que no se tiene**, y un
-`sha256` sobre un enlace ajeno es la palabra del agente.
+«Referente» es `uri` o `body`. «En posesión» significa `body`: **no se puede
+hashear lo que no se tiene**, y un `sha256` sobre un enlace ajeno es la palabra
+del agente.
 
-La última fila es deliberada: en `low` el sistema **no exige el delta al agente**,
-pero usa su propio historial para mostrarle al humano *«contestaste a esto el 12 de
-marzo: sí»*. La memoria del humano se ayuda siempre; la obligación al agente solo
-se impone donde la apuesta lo justifica.
+`uri` se restringe a `http`/`https` en el validador. `z.string().url()` acepta
+`javascript:` y `data:`, y ese valor termina en un `href` dentro de la sesión del
+aprobador — la única sesión donde no puede ejecutarse script ajeno. El render lo
+vuelve a comprobar: el validador protege lo que entra, la comprobación al pintar
+protege las filas guardadas antes de que la regla existiera.
+
+#### Por qué los adjuntos no son un referente
+
+El diseño original listaba un tercer referente, `subject.attachments`, con ids de
+`file_attachments`. Salió del alcance en la revisión final, por dos razones:
+
+1. **Nada resolvía los ids.** `weHoldIt()` devolvía `true` por longitud de array,
+   así que un UUID inventado satisfacía la regla probatoria de `high`/`critical`
+   — precisamente la regla que existe porque no se puede hashear lo que no se
+   tiene.
+2. **No hay ningún orden en el que un agente pueda obtenerlos.** Los adjuntos se
+   suben con `POST /agent/conversations/:id/upload`, pero la conversación de una
+   query la crea `createQuery`. El agente necesitaría el id de la conversación
+   antes de que la conversación exista.
+
+El camino de vuelta exige las dos cosas a la vez: resolver los ids contra
+`file_attachments` comprobando que pertenecen a la conversación de esta query, y
+acotar `getFileDownloadUrl` por conversación. Ese segundo punto es un fallo de
+autorización **pre-existente**, no una consecuencia de este trabajo, y se arregla
+en su propia rama prioritaria — no aquí.
+
+La última fila no tiene un caso `low` propio, y eso es una consecuencia y no un
+descuido: **una decisión previa eleva el riesgo a `≥ medium` por sí sola** (ver
+«Elevación del riesgo» más abajo), así que no existe el caso «hay decisión previa
+y el riesgo efectivo sigue siendo `low`». Cuando hay decisión previa el delta se
+exige, punto. Una versión anterior de este spec decía que en `low` solo se
+«mostraba»; el código nunca pudo comportarse así, y la conjunción muerta que lo
+intentaba se ha borrado.
+
+Al margen de la obligación al agente, el sistema usa siempre su propio historial
+para mostrarle al humano *«contestaste a esto el 12 de marzo»*: `prior_decision_at`
+viaja en la query. La memoria del humano se ayuda siempre.
 
 ### Elevación del riesgo
 
@@ -342,7 +374,7 @@ Los cuatro casos de uso del documento de razonamiento, más las reglas del ciclo
    humano ve el delta y la fecha de su decisión anterior.
 2. **Ticket de restaurante.** `fields` con valores propuestos; el humano corrige
    uno; el agente recibe `values` completo con la corrección.
-3. **Etiquetado sin imagen.** `subject` sin `uri`, `attachments` ni `body`, y sin
+3. **Etiquetado sin imagen.** `subject` sin `uri` ni `body`, y sin
    `self_contained` → `422 missing_referent`, a cualquier riesgo.
 4. **Juicio sin artefacto.** `self_contained: true` sin referente → admitida.
 5. Un `answer_space` de tipo `text` con `risk: "high"` → `422`.

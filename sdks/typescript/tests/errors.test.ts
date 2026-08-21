@@ -54,7 +54,7 @@ describe("422 error mapping", () => {
           message: "This subject has no referent for the human to look at.",
           reason: "missing_referent",
           detail: "This subject has no referent for the human to look at.",
-          remedy: "Add a uri, body, or attachments to subject, or set self_contained to true.",
+          remedy: "Add a uri or body to subject, or set self_contained to true.",
         },
       },
       422,

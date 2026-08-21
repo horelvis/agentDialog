@@ -26,10 +26,12 @@ function input(over: Partial<AdmissionInput> = {}): AdmissionInput {
 }
 
 describe("el referente", () => {
-  it("admits a subject with a body, a uri or attachments", () => {
+  // Two referents, and only two. Attachments were a third until the final
+  // review found that nothing resolved the ids, so any well-formed UUID
+  // satisfied the evidentiary rule below.
+  it("admits a subject with a body or a uri", () => {
     expect(checkPayload(input({ subject: { id: "a", label: "A", body: "x" } })).admit).toBe(true);
-    expect(checkPayload(input({ subject: { id: "a", label: "A", uri: "https://x" } })).admit).toBe(true);
-    expect(checkPayload(input({ subject: { id: "a", label: "A", attachments: ["f_1"] } })).admit).toBe(true);
+    expect(checkPayload(input({ subject: { id: "a", label: "A", uri: "https://x.example" } })).admit).toBe(true);
   });
 
   // The cat photo with no photo. Undecidable at any stake.
@@ -126,10 +128,10 @@ describe("el referente en posesión, por encima de medium", () => {
     if (!v.admit) expect(v.reason).toBe("external_referent_at_high_risk");
   });
 
-  it("accepts an attachment or an inline body at high risk", () => {
+  it("accepts an inline body at high risk", () => {
     expect(checkPayload(input({
       risk: "high",
-      subject: { id: "a", label: "A", attachments: ["f_1"], sha256: "abc" },
+      subject: { id: "a", label: "A", body: "el contrato entero", sha256: "abc" },
       answer_space: withConsequences,
     })).admit).toBe(true);
   });

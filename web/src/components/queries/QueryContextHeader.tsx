@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { QuerySubject, QueryChange } from "@/api/types";
-import { API_BASE } from "@/lib/constants";
+import { isHttpUrl } from "@/lib/url";
 import { cn } from "@/lib/cn";
 
 interface QueryContextHeaderProps {
   subject: QuerySubject;
   changes: QueryChange[] | null;
   priorDecisionAt: string | null;
-  conversationId: string;
 }
 
 /**
@@ -15,7 +14,7 @@ interface QueryContextHeaderProps {
  * at, and — if it renews a prior decision — what changed since then, with
  * the material changes called out from the merely cosmetic ones.
  */
-export function QueryContextHeader({ subject, changes, priorDecisionAt, conversationId }: QueryContextHeaderProps) {
+export function QueryContextHeader({ subject, changes, priorDecisionAt }: QueryContextHeaderProps) {
   return (
     <div className="space-y-3 rounded-lg border border-surface-border bg-surface-primary p-4">
       <div>
@@ -29,25 +28,32 @@ export function QueryContextHeader({ subject, changes, priorDecisionAt, conversa
         </p>
       )}
 
-      <Referent subject={subject} conversationId={conversationId} />
+      <Referent subject={subject} />
 
       {changes && changes.length > 0 && <ChangesTable changes={changes} />}
     </div>
   );
 }
 
-function Referent({ subject, conversationId }: { subject: QuerySubject; conversationId: string }) {
+function Referent({ subject }: { subject: QuerySubject }) {
   const [showBody, setShowBody] = useState(false);
-  const hasAttachments = Boolean(subject.attachments && subject.attachments.length > 0);
-  const hasAny = subject.uri || subject.body || hasAttachments;
+
+  // Checked again here, not just at the door. The validator narrows `uri` to
+  // http/https on the way in, but a row written before that rule existed can
+  // still carry `javascript:` or `data:` — and this anchor lives in the app
+  // where the human's session token does.
+  const linkable = isHttpUrl(subject.uri);
+  const hasAny = linkable || Boolean(subject.body);
 
   if (!hasAny) {
+    // Either the query really is self-contained, or its `uri` was refused
+    // above. Saying so is better than rendering a dead link.
     return <p className="text-xs text-gray-500">Self-contained — nothing else to look at.</p>;
   }
 
   return (
     <div className="space-y-2">
-      {subject.uri && (
+      {linkable && (
         <a
           href={subject.uri}
           target="_blank"
@@ -56,14 +62,6 @@ function Referent({ subject, conversationId }: { subject: QuerySubject; conversa
         >
           Open referenced link &#8599;
         </a>
-      )}
-
-      {hasAttachments && (
-        <div className="flex flex-wrap gap-2">
-          {subject.attachments!.map((id) => (
-            <AttachmentThumb key={id} conversationId={conversationId} attachmentId={id} />
-          ))}
-        </div>
       )}
 
       {subject.body && (
@@ -83,86 +81,6 @@ function Referent({ subject, conversationId }: { subject: QuerySubject; conversa
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * A subject attachment is a file-attachment id, downloadable through the
- * same conversation-scoped route the chat's FileMessage uses — the query's
- * own conversation, since the human is a participant in it. There is no
- * standalone metadata endpoint, so this fetches the file itself to learn
- * its content type before deciding whether to show a thumbnail.
- */
-function AttachmentThumb({ conversationId, attachmentId }: { conversationId: string; attachmentId: string }) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [isImage, setIsImage] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const token = localStorage.getItem("token");
-    fetch(`${API_BASE}/human/conversations/${conversationId}/files/${attachmentId}/download`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("download failed");
-        const contentType = res.headers.get("Content-Type") || "";
-        if (!cancelled) setIsImage(contentType.startsWith("image/"));
-        return res.blob();
-      })
-      .then((blob) => {
-        if (!cancelled) setBlobUrl(URL.createObjectURL(blob));
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [conversationId, attachmentId]);
-
-  useEffect(() => {
-    return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-    };
-  }, [blobUrl]);
-
-  if (failed) {
-    return (
-      <span className="rounded border border-surface-border px-2 py-1 text-xs text-gray-500">
-        Attachment unavailable
-      </span>
-    );
-  }
-
-  if (isImage && blobUrl) {
-    return (
-      <a href={blobUrl} target="_blank" rel="noreferrer">
-        <img src={blobUrl} alt="Attachment" className="h-16 w-16 rounded border border-surface-border object-cover" />
-      </a>
-    );
-  }
-
-  return (
-    <a
-      href={blobUrl ?? undefined}
-      target="_blank"
-      rel="noreferrer"
-      className={cn(
-        "flex items-center gap-1.5 rounded border border-surface-border px-2 py-1.5 text-xs text-gray-300",
-        blobUrl ? "hover:bg-surface-elevated" : "opacity-60",
-      )}
-    >
-      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-        />
-      </svg>
-      Attachment
-    </a>
   );
 }
 

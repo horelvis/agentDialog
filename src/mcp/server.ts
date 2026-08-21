@@ -16,14 +16,14 @@ export function createMcpServer() {
     `Ask a human a question they can actually decide, and get a structured answer back.
 
 WHAT YOU MUST PROVIDE:
-- subject: what this is about. A stable id you reuse for the same thing, a label the human will recognise, and a referent they can look at — an attachment, a uri, or inline body. A question about a thing without the thing is refused.
+- subject: what this is about. A stable id you reuse for the same thing, a label the human will recognise, and a referent they can look at — a uri, or the artefact inline in body. A question about a thing without the thing is refused.
 - answer_space: how they answer. Pick one of boolean, choice, scalar, date, text or fields. Free text is only accepted at low risk.
 - risk: your honest floor. The system raises it on its own when it sees money or a prior decision; it never lowers it.
 
 WHAT THE SYSTEM DEMANDS OF YOU:
 - Above low risk, every branch must say what it causes (consequence / effect).
 - If this person already decided about this subject, you must send \`changes\` saying what changed since. The system checks its own records, so omitting it does not help.
-- Above medium risk, we must hold the artefact ourselves (attachment or body) and you must send its sha256.
+- Above medium risk, we must hold the artefact ourselves (inline body, not a bare uri) and you must send its sha256.
 
 A refusal comes back as 422 with a \`remedy\` field telling you exactly what to add. Read it and retry.
 
@@ -34,7 +34,7 @@ The human may answer, or reply that they lack context — in which case the quer
       risk: z.enum(["low", "medium", "high", "critical"]).default("low")
         .describe("Stakes of the decision. Above 'low', free text is refused and consequences must be stated."),
       subject: subjectSchema
-        .describe("What the question is about: a uri, inline body, attachments, or a hash of the referent"),
+        .describe("What the question is about: a stable id, a label, and a referent — a uri or an inline body — plus its sha256 above medium risk"),
       self_contained: z.boolean().default(false)
         .describe("Set true only if the question truly needs no referent"),
       question: z.string().min(1).max(10_000)

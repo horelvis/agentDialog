@@ -86,7 +86,6 @@ function QueryCard({
           subject={query.subject}
           changes={query.changes}
           priorDecisionAt={query.priorDecisionAt}
-          conversationId={query.conversationId}
         />
       </div>
 

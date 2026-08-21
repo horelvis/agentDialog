@@ -14,15 +14,15 @@ describe("UndecidableQueryError", () => {
   it("carries every field the MCP catch block reads", () => {
     const err = new UndecidableQueryError(
       "missing_referent",
-      "The subject 'x' carries no uri, attachments or body.",
-      "Attach the artefact, link it with `uri`, or set `self_contained: true`.",
+      "The subject 'x' carries no uri or body.",
+      "Link it with `uri`, inline it with `body`, or set `self_contained: true`.",
     );
 
     expect(err.code).toBe("UNDECIDABLE_QUERY");
     expect(err.statusCode).toBe(422);
-    expect(err.message).toBe("The subject 'x' carries no uri, attachments or body.");
+    expect(err.message).toBe("The subject 'x' carries no uri or body.");
     expect(err.reason).toBe("missing_referent");
-    expect(err.remedy).toBe("Attach the artefact, link it with `uri`, or set `self_contained: true`.");
+    expect(err.remedy).toBe("Link it with `uri`, inline it with `body`, or set `self_contained: true`.");
     expect(err.priorQueryId).toBeUndefined();
   });
 
