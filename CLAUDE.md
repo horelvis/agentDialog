@@ -50,9 +50,11 @@ DATABASE_URL="postgresql://agentdialog:agentdialog@localhost:5432/agentdialog_te
 
 Every one of these cost real time. They are not hypothetical.
 
-**`bun run typecheck` at the root fails, and it is not your fault.** Six
-pre-existing errors in `src/mcp/server.ts`. Verify your own work with a scoped
-check instead. The publish workflow deliberately typechecks only the SDK.
+**`bun run typecheck` at the root used to fail regardless of your change** — six
+pre-existing errors in `src/mcp/server.ts`. That has been fixed: `bunx tsc
+--noEmit` exits 0 as of this branch. If it fails now, the change under test
+broke something real — do not wave it off as the old, known failure. The
+publish workflow still deliberately typechecks only the SDK.
 
 **Integration tests are not hermetic.** Agent registration is rate-limited to 10
 per hour, and the counter lives in Redis, which survives between runs. Run the
@@ -107,7 +109,11 @@ integrator, who is the entire audience of this product.
 
 - Human query flow: `src/services/query.service.ts`, exposed at
   `src/routes/agent/queries.ts` (REST) and `src/mcp/server.ts` (MCP)
-- Inbound email replies: `src/services/email-response.service.ts`
+- Inbound email replies: `src/services/email-response.service.ts`, reached from
+  the provider webhook (`src/routes/webhooks/email-inbound.ts`) and from the
+  IMAP poll (`src/routes/internal/email-poll.ts` →
+  `src/services/email-ingest.service.ts`). The IMAP half is a scaffold with a
+  written exit criterion — see `docs/operations.md`.
 - Auth middleware: `src/middleware/agent-auth.ts` and
   `src/middleware/human-auth.ts`
 - Design records: `docs/superpowers/specs/` and `docs/superpowers/plans/`

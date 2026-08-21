@@ -1,7 +1,7 @@
 # Ingesta de correo entrante
 
 **Fecha:** 2026-08-20, revisado el 2026-08-21
-**Estado:** aprobado, pendiente de plan de implementación
+**Estado:** implementado — ver `docs/superpowers/plans/2026-08-21-inbound-email-ingestion.md`
 
 ## Objetivo
 
