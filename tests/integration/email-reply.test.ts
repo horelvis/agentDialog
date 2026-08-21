@@ -15,7 +15,9 @@ async function createQuery(targetEmail: string) {
     headers: { "Content-Type": "application/json", Authorization: authHeader },
     body: JSON.stringify({
       query_type: "validation",
+      subject: { id: "sender-check", label: "Sender verification subject", body: "Draft release notes" },
       question: "Is this reply from the right person?",
+      answer_space: { kind: "text", max_length: 500 },
       target_human_email: targetEmail,
       timeout_minutes: 60,
     }),

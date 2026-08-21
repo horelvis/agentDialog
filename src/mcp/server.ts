@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createQuery, getQuery, listAgentQueries } from "../services/query.service";
+import { subjectSchema, changeSchema } from "../validators/query.validators";
+import { answerSpaceSchema } from "../lib/answer-space";
 
 export function createMcpServer() {
   const server = new McpServer({
@@ -17,14 +19,33 @@ IMPORTANT workflow:
 - If the human has NOT previously accepted a query from you, they will receive an invitation email they must accept first. Status will be "pending".
 - If the human has previously accepted (trusted agent), they are auto-assigned. Status will be "assigned".
 - After creating a query, use get_query to poll for the answer. Wait at least 10-30 seconds between polls.
-- Queries expire after timeout_minutes (default: 60 min).`,
+- Queries expire after timeout_minutes (default: 60 min).
+
+The query is admitted only if a human could actually decide it: give it a
+'subject' the human can look at (a uri, an inline 'body', or attachments), or
+set self_contained to true for a question that needs no referent. Give it an
+'answer_space' describing the shape of an acceptable answer — a boolean,
+a choice among options, a scalar, a date, free text, or a set of fields.
+Above 'low' risk, free text is refused and each branch must state its
+consequence. A refused query returns reason, detail and remedy so you can
+correct the payload and retry.`,
     {
       query_type: z.enum(["validation", "interpretation", "expert_query", "labeling"])
         .describe("Type of query: validation (yes/no), interpretation (explain), expert_query (domain knowledge), labeling (classify/tag)"),
+      risk: z.enum(["low", "medium", "high", "critical"]).default("low")
+        .describe("Stakes of the decision. Above 'low', free text is refused and consequences must be stated."),
+      subject: subjectSchema
+        .describe("What the question is about: a uri, inline body, attachments, or a hash of the referent"),
+      self_contained: z.boolean().default(false)
+        .describe("Set true only if the question truly needs no referent"),
       question: z.string().min(1).max(10_000)
         .describe("The question to ask the human"),
       context: z.string().max(100_000).optional()
         .describe("Additional context (code, data, etc.) to help the human answer"),
+      changes: z.array(changeSchema).max(100).optional()
+        .describe("Optional list of before/after changes this decision covers"),
+      answer_space: answerSpaceSchema
+        .describe("The closed shape the answer must take: boolean, choice, scalar, date, text or fields"),
       target_human_email: z.string().email()
         .describe("Email of the human to ask"),
       confidence: z.number().min(0).max(1).optional()
@@ -47,8 +68,13 @@ IMPORTANT workflow:
       try {
         const result = await createQuery(agentId, {
           query_type: args.query_type,
+          risk: args.risk,
+          subject: args.subject,
+          self_contained: args.self_contained,
           question: args.question,
           context: args.context,
+          changes: args.changes,
+          answer_space: args.answer_space,
           target_human_email: args.target_human_email,
           confidence: args.confidence,
           timeout_minutes: args.timeout_minutes,

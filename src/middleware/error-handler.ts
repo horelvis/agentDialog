@@ -1,17 +1,19 @@
 import type { ErrorHandler } from "hono";
-import { AppError } from "../lib/errors";
+import { AppError, UndecidableQueryError } from "../lib/errors";
 import { ZodError } from "zod";
 
 export const errorHandler: ErrorHandler = (err, c) => {
   if (err instanceof AppError) {
+    const extra: Record<string, unknown> = {};
+    if ("retryAfter" in err) extra.retryAfter = (err as any).retryAfter;
+    if (err instanceof UndecidableQueryError) {
+      extra.reason = err.reason;
+      extra.detail = err.detail;
+      extra.remedy = err.remedy;
+      if (err.priorQueryId) extra.prior_query_id = err.priorQueryId;
+    }
     return c.json(
-      {
-        error: {
-          code: err.code,
-          message: err.message,
-          ...(("retryAfter" in err) ? { retryAfter: (err as any).retryAfter } : {}),
-        },
-      },
+      { error: { code: err.code, message: err.message, ...extra } },
       err.statusCode as any,
     );
   }

@@ -7,15 +7,28 @@ import { messages } from "../db/schema/messages";
 import { humans } from "../db/schema/humans";
 import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
-import { NotFoundError, ForbiddenError, ConflictError } from "../lib/errors";
+import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError } from "../lib/errors";
 import { generateInvitationToken } from "../lib/crypto";
 import { dispatchWebhooks } from "./webhook.service";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
+import { checkPayload } from "../admission/decidability";
 import type { CreateQueryInput, RespondQueryInput } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
   const db = getDb();
+
+  // Admission runs before the transaction opens: a query that a human could not
+  // decide never becomes a row, a conversation, an invitation or an email.
+  const verdict = checkPayload({
+    risk: input.risk,
+    subject: input.subject,
+    self_contained: input.self_contained,
+    answer_space: input.answer_space,
+  });
+  if (!verdict.admit) {
+    throw new UndecidableQueryError(verdict.reason, verdict.detail, verdict.remedy);
+  }
 
   const result = await db.transaction(async (tx) => {
     // 1. Create conversation for this query
@@ -150,6 +163,11 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         status,
         question: input.question,
         context: input.context,
+        risk: input.risk,
+        subject: input.subject,
+        selfContained: input.self_contained,
+        changes: input.changes,
+        answerSpace: input.answer_space,
         confidence: input.confidence,
         timeoutMinutes: input.timeout_minutes,
         expiresAt,

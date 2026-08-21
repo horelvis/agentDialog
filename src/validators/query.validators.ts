@@ -1,9 +1,31 @@
 import { z } from "zod";
+import { answerSpaceSchema, answerSchema } from "../lib/answer-space";
+
+export const subjectSchema = z.object({
+  id: z.string().min(1).max(128),
+  label: z.string().min(1).max(200),
+  uri: z.string().url().optional(),
+  attachments: z.array(z.string().uuid()).max(10).optional(),
+  body: z.string().max(100_000).optional(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
+});
+
+export const changeSchema = z.object({
+  path: z.string().min(1).max(200),
+  before: z.string().max(2_000),
+  after: z.string().max(2_000),
+  materiality: z.enum(["minor", "material"]),
+});
 
 export const createQuerySchema = z.object({
   query_type: z.enum(["validation", "interpretation", "expert_query", "labeling"]),
+  risk: z.enum(["low", "medium", "high", "critical"]).default("low"),
+  subject: subjectSchema,
+  self_contained: z.boolean().default(false),
   question: z.string().min(1).max(10_000),
   context: z.string().max(100_000).optional(),
+  changes: z.array(changeSchema).max(100).optional(),
+  answer_space: answerSpaceSchema,
   target_human_email: z.string().email(),
   confidence: z.number().min(0).max(1).optional(),
   timeout_minutes: z.number().int().min(1).max(10080).default(60),

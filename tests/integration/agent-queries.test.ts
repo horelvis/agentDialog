@@ -12,7 +12,9 @@ describe("Agent queries REST API", () => {
       headers: { "Content-Type": "application/json", Authorization: authHeader },
       body: JSON.stringify({
         query_type: "validation",
+        subject: { id: "friday-deploy", label: "Friday deploy window", body: "Release notes for v2.3.0" },
         question: "Should we deploy on a Friday?",
+        answer_space: { kind: "text", max_length: 500 },
         target_human_email: `queries-${Date.now()}@example.com`,
         timeout_minutes: 60,
       }),
@@ -62,7 +64,9 @@ describe("Agent queries REST API", () => {
       headers: { "Content-Type": "application/json", Authorization: owner.authHeader },
       body: JSON.stringify({
         query_type: "expert_query",
+        subject: { id: "isolation-subject", label: "Isolation test subject", body: "Confidential memo excerpt" },
         question: "Private question",
+        answer_space: { kind: "text", max_length: 500 },
         target_human_email: `isolation-${Date.now()}@example.com`,
       }),
     });
@@ -83,7 +87,9 @@ describe("Agent queries REST API", () => {
       headers: { "Content-Type": "application/json", Authorization: agentA.authHeader },
       body: JSON.stringify({
         query_type: "expert_query",
+        subject: { id: "list-isolation-a", label: "Agent A subject", body: "Agent A's referent" },
         question: "Question from agent A",
+        answer_space: { kind: "text", max_length: 500 },
         target_human_email: `list-isolation-a-${Date.now()}@example.com`,
       }),
     });
@@ -94,7 +100,9 @@ describe("Agent queries REST API", () => {
       headers: { "Content-Type": "application/json", Authorization: agentB.authHeader },
       body: JSON.stringify({
         query_type: "expert_query",
+        subject: { id: "list-isolation-b", label: "Agent B subject", body: "Agent B's referent" },
         question: "Question from agent B",
+        answer_space: { kind: "text", max_length: 500 },
         target_human_email: `list-isolation-b-${Date.now()}@example.com`,
       }),
     });
