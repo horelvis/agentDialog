@@ -551,9 +551,11 @@ async function shapeHumanQuery(
   return {
     query_id: query.id,
     // The human is a participant in this conversation, so unlike shapeQuery
-    // above it is not an internal id here — it is what lets the human's own
-    // client fetch a subject attachment via
-    // GET /human/conversations/:id/files/:attachmentId/download.
+    // above this is not an internal id — it is the handle their own client
+    // uses to reach the conversation's messages and files. It was originally
+    // here so the renderer could fetch a subject attachment; attachments are
+    // out of scope now (see the design spec) and the renderer no longer takes
+    // it, but the conversation is still the human's, so it stays.
     conversation_id: query.conversationId,
     status,
     status_description: STATUS_HINTS[status] || `Unknown status: ${status}`,
