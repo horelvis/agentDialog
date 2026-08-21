@@ -148,6 +148,30 @@ describe("el referente en posesión, por encima de medium", () => {
   it("does not require a hash at medium risk", () => {
     expect(checkPayload(input({ risk: "medium", answer_space: withConsequences })).admit).toBe(true);
   });
+
+  // `self_contained` means "no referent required", not "no rules apply". A
+  // query that declares itself self-contained but still attaches a `uri` has
+  // given the human something to look at, so it owes the same evidentiary bar
+  // as any other referent.
+  it("does not exempt an attached uri from the evidentiary bar just because self_contained is set", () => {
+    const v = checkPayload(input({
+      risk: "critical",
+      self_contained: true,
+      subject: { id: "a", label: "A", uri: "https://untrusted-host.example/doc" },
+      answer_space: withConsequences,
+    }));
+    expect(v.admit).toBe(false);
+    if (!v.admit) expect(v.reason).toBe("external_referent_at_high_risk");
+  });
+
+  it("still exempts a truly self-contained query with no referent at high risk", () => {
+    expect(checkPayload(input({
+      risk: "high",
+      self_contained: true,
+      subject: { id: "a", label: "A" },
+      answer_space: withConsequences,
+    })).admit).toBe(true);
+  });
 });
 
 describe("cada rechazo trae remedio", () => {

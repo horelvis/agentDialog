@@ -129,15 +129,23 @@ export function checkPayload(input: AdmissionInput): AdmissionVerdict {
   // 4. Above medium, we must hold the referent ourselves: you cannot hash what
   //    you do not have, and a sha256 over somebody else's link is the agent's
   //    word rather than a record.
+  //
+  //    Gated on whether a referent is actually present, not on `self_contained`:
+  //    that flag means "no referent required", not "no rules apply". A query that
+  //    is truly self-contained has no referent, so `hasReferent` is false and this
+  //    rule skips cleanly. A query that declares itself self-contained but still
+  //    attaches a `uri` is not exempt - the human has something to look at, so it
+  //    must meet the same evidentiary bar as any other referent, or the record
+  //    degrades silently instead of being punished by the loop.
   if (above(risk, "medium")) {
-    if (!input.self_contained && !weHoldIt(subject)) {
+    if (hasReferent(subject) && !weHoldIt(subject)) {
       return refuse(
         "external_referent_at_high_risk",
         `At ${risk} risk a bare external uri is not enough: we cannot hash what we do not hold.`,
         "Upload the artefact as an attachment, or inline it with `body`.",
       );
     }
-    if (!input.self_contained && !subject.sha256) {
+    if (hasReferent(subject) && !subject.sha256) {
       return refuse(
         "missing_referent_hash",
         `A ${risk}-risk decision must record which exact version was decided on.`,
