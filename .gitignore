@@ -14,3 +14,7 @@ coverage/
 *.tsbuildinfo
 MARKETING-AUDIT.md
 docs-site/out/
+
+# Scratch: git worktrees and subagent-driven-development workspaces
+.worktrees/
+.superpowers/
