@@ -455,6 +455,42 @@ export async function updateQuery(queryId: string, agentId: string, input: Patch
   return updated;
 }
 
+/**
+ * The agent withdrawing a question whose context has moved on.
+ *
+ * A conditional update, so an answer that landed first always wins: losing a
+ * person's decision to a race is exactly what cannot happen in a system whose
+ * value is the record.
+ */
+export async function cancelQuery(queryId: string, agentId: string) {
+  const db = getDb();
+
+  const [updated] = await db
+    .update(humanQueries)
+    .set({ status: "cancelled", pausedAt: null, updatedAt: new Date() })
+    .where(and(
+      eq(humanQueries.id, queryId),
+      eq(humanQueries.agentId, agentId),
+      inArray(humanQueries.status, ["pending", "assigned", "needs_context"]),
+    ))
+    .returning();
+
+  if (updated) {
+    console.log(`[QUERY] Cancelled ${queryId} by agent ${agentId}`);
+    return updated;
+  }
+
+  // Nothing changed: either it is not ours, or it already reached a terminal state.
+  const [current] = await db
+    .select()
+    .from(humanQueries)
+    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.agentId, agentId)))
+    .limit(1);
+
+  if (!current) throw new NotFoundError("Query", queryId);
+  throw new ConflictError(`Query is already ${current.status} and cannot be cancelled`);
+}
+
 export async function getQuery(queryId: string, agentId: string) {
   const db = getDb();
 
