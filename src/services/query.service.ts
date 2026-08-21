@@ -274,38 +274,104 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
   if (query.status === "expired") throw new ForbiddenError("Query has expired");
   if (query.status === "cancelled") throw new ForbiddenError("Query was cancelled by the agent");
 
-  // Verify human is a participant in the conversation
-  const [participant] = await db
-    .select()
-    .from(conversationParticipants)
-    .where(
-      and(
-        eq(conversationParticipants.conversationId, query.conversationId),
-        eq(conversationParticipants.humanId, humanId),
-      ),
-    )
-    .limit(1);
+  // Entitlement. For every status but `pending` there is already a
+  // participant row — added when the invitation was accepted — and that row
+  // is what stops a stranger from answering. A `pending` query has no
+  // participant yet: nobody has accepted anything. The only thing that can
+  // stand in for that row is the same check the email path already makes in
+  // `processEmailReply` — the authenticated human's own address must be the
+  // address the query was addressed to. Falling through to "no participant,
+  // so refuse" here would leave the very first query from any agent
+  // unanswerable, which is the bug this block exists to close; weakening it
+  // to "any authenticated human may answer a pending query" would instead
+  // open a hole where anyone could resolve someone else's invitation. So a
+  // `pending` query is answerable by exactly the human it was sent to, and
+  // by nobody else.
+  const isPending = query.status === "pending";
+  if (isPending) {
+    const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+    if (!human || human.email.toLowerCase().trim() !== query.humanEmail.toLowerCase().trim()) {
+      throw new ForbiddenError("You are not the person this query was addressed to");
+    }
+  } else {
+    const [participant] = await db
+      .select()
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, query.conversationId),
+          eq(conversationParticipants.humanId, humanId),
+        ),
+      )
+      .limit(1);
 
-  if (!participant) {
-    throw new ForbiddenError("You are not a participant in this query's conversation");
+    if (!participant) {
+      throw new ForbiddenError("You are not a participant in this query's conversation");
+    }
+  }
+
+  // Answering a `pending` query is also how it gets accepted — there is no
+  // separate accept step (docs/architecture.md), and `processEmailReply`
+  // already does exactly this for the email path. Mirrored here: accept the
+  // invitation and add the participant in the same transaction as the
+  // response, so a crash between the two never leaves an answered query
+  // with no participant row, or an accepted invitation with no answer.
+  async function acceptPendingInvitation(tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+    const [invitation] = await tx
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.conversationId, query.conversationId),
+          eq(invitations.invitedHumanEmail, query.humanEmail),
+          eq(invitations.status, "pending"),
+        ),
+      )
+      .limit(1);
+
+    if (invitation) {
+      await tx
+        .update(invitations)
+        .set({ status: "accepted", updatedAt: new Date() })
+        .where(eq(invitations.id, invitation.id));
+    }
+
+    await tx
+      .insert(conversationParticipants)
+      .values({
+        conversationId: query.conversationId,
+        actorType: "human",
+        humanId,
+        role: "participant",
+      })
+      .onConflictDoNothing();
   }
 
   if (input.outcome === "insufficient_context") {
     // The turn goes back to the agent. The clock freezes because it is now the
     // agent's move: without this a query dies while the agent is fixing it, and
     // the human watches something expire that they themselves asked to clarify.
-    const [updated] = await db
-      .update(humanQueries)
-      .set({
-        status: "needs_context",
-        insufficientReason: input.reason,
-        clarificationRounds: query.clarificationRounds + 1,
-        pausedAt: new Date(),
-        humanId,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "assigned")))
-      .returning();
+    //
+    // The guard above and this WHERE must agree on which statuses are live:
+    // `isPending` decided which one applied there, so it decides which one
+    // applies here too, rather than the two drifting apart.
+    const fromStatuses: (typeof humanQueries.$inferSelect)["status"][] = isPending ? ["pending"] : ["assigned"];
+    const [updated] = await db.transaction(async (tx) => {
+      if (isPending) await acceptPendingInvitation(tx);
+
+      return tx
+        .update(humanQueries)
+        .set({
+          status: "needs_context",
+          insufficientReason: input.reason,
+          clarificationRounds: query.clarificationRounds + 1,
+          pausedAt: new Date(),
+          humanId,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(humanQueries.id, queryId), inArray(humanQueries.status, fromStatuses)))
+        .returning();
+    });
 
     if (!updated) throw new ConflictError("Query is no longer awaiting an answer");
 
@@ -326,44 +392,49 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
     throw new ValidationError(`Answer does not fit this query: ${fit.problem}`);
   }
 
-  // Send response message
-  const [responseMessage] = await db
-    .insert(messages)
-    .values({
-      conversationId: query.conversationId,
-      senderType: "human",
-      senderHumanId: humanId,
-      type: "human_query_response",
-      content: summariseAnswer(space, input.answer),
-      structuredData: {
-        queryId: query.id,
-        answer: input.answer,
-        comment: input.comment,
-        confidence: input.confidence,
-      },
-    })
-    .returning();
-
   const responseTimeMs = Date.now() - query.createdAt.getTime();
 
-  // Update query with optimistic lock — only update if still awaiting an answer
-  const [updated] = await db
-    .update(humanQueries)
-    .set({
-      status: "answered",
-      humanId,
-      responseMessageId: responseMessage.id,
-      answer: input.answer,
-      answerComment: input.comment,
-      answerConfidence: input.confidence,
-      responseTimeMs,
-      updatedAt: new Date(),
-    })
-    .where(and(
-      eq(humanQueries.id, queryId),
-      inArray(humanQueries.status, ["assigned", "needs_context"]),
-    ))
-    .returning();
+  // Same agreement as above: the statuses this update accepts from must
+  // match exactly what the guard above already verified.
+  const fromStatuses: (typeof humanQueries.$inferSelect)["status"][] = isPending ? ["pending"] : ["assigned", "needs_context"];
+
+  const [updated] = await db.transaction(async (tx) => {
+    if (isPending) await acceptPendingInvitation(tx);
+
+    // Send response message
+    const [responseMessage] = await tx
+      .insert(messages)
+      .values({
+        conversationId: query.conversationId,
+        senderType: "human",
+        senderHumanId: humanId,
+        type: "human_query_response",
+        content: summariseAnswer(space, input.answer),
+        structuredData: {
+          queryId: query.id,
+          answer: input.answer,
+          comment: input.comment,
+          confidence: input.confidence,
+        },
+      })
+      .returning();
+
+    // Update query with optimistic lock — only update if still awaiting an answer
+    return tx
+      .update(humanQueries)
+      .set({
+        status: "answered",
+        humanId,
+        responseMessageId: responseMessage.id,
+        answer: input.answer,
+        answerComment: input.comment,
+        answerConfidence: input.confidence,
+        responseTimeMs,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(humanQueries.id, queryId), inArray(humanQueries.status, fromStatuses)))
+      .returning();
+  });
 
   if (!updated) {
     throw new ConflictError("Query was already answered or its status changed");

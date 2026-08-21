@@ -3,7 +3,8 @@ import { createTestApp, createTestAgent, createTestHuman } from "../helpers";
 import { getDb } from "../../src/db";
 import { humanQueries } from "../../src/db/schema/human-queries";
 import { conversationParticipants } from "../../src/db/schema/participants";
-import { eq } from "drizzle-orm";
+import { invitations } from "../../src/db/schema/invitations";
+import { eq, and } from "drizzle-orm";
 
 const app = createTestApp();
 
@@ -118,5 +119,136 @@ describe("insufficient_context", () => {
       body: JSON.stringify({ outcome: "insufficient_context", reason: "not_my_decision" }),
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("answering a pending query (the real accept path)", () => {
+  /**
+   * Only creates the query — deliberately does not touch conversationParticipants
+   * or humanQueries.status. That is the whole point of this block: the existing
+   * `ready()` helper above sets status: "assigned" directly via SQL, which is
+   * exactly what hid the bug this suite now guards against. A human who has
+   * never accepted anything from this agent must still be able to answer their
+   * very first query, through nothing but the real HTTP surface.
+   */
+  async function createPendingQuery(email: string) {
+    const { agent, authHeader } = await createTestAgent();
+    const res = await app.request("/api/v1/agent/queries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify({
+        query_type: "validation", risk: "low",
+        subject: { id: `s-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, label: "S", body: "x" },
+        question: "¿Seguimos?", answer_space: space,
+        target_human_email: email, timeout_minutes: 60,
+      }),
+    });
+    const { data } = await res.json();
+    expect(data.status).toBe("pending");
+    return { queryId: data.query_id, conversationId: data.conversation_id, agentId: agent.id };
+  }
+
+  it("lets a first-time human answer, and accepts the invitation as a side effect", async () => {
+    const email = `first-time-${Date.now()}@example.com`;
+    const { queryId, conversationId } = await createPendingQuery(email);
+
+    // The real sign-in path: createTestHuman only succeeds because createQuery
+    // above left a pending invitation for this address — nothing here inserts
+    // a participant or touches humanQueries.
+    const human = await createTestHuman(email);
+
+    const db = getDb();
+    const [before] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
+    expect(before.status).toBe("pending");
+
+    const res = await app.request(`/api/v1/human/queries/${queryId}/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: human.authHeader },
+      body: JSON.stringify({ outcome: "answer", answer: { kind: "choice", option_ids: ["yes"] } }),
+    });
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.data.status).toBe("answered");
+
+    const [afterQuery] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
+    expect(afterQuery.status).toBe("answered");
+    expect(afterQuery.humanId).toBe(human.human.id);
+    expect(afterQuery.answer).toEqual({ kind: "choice", option_ids: ["yes"] });
+
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(and(eq(invitations.conversationId, conversationId), eq(invitations.invitedHumanEmail, email)));
+    expect(invitation.status).toBe("accepted");
+
+    const [participant] = await db
+      .select()
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, conversationId),
+          eq(conversationParticipants.humanId, human.human.id),
+        ),
+      );
+    expect(participant).toBeDefined();
+    expect(participant.actorType).toBe("human");
+  });
+
+  it("also accepts the invitation when the first answer is insufficient_context", async () => {
+    const email = `first-time-nc-${Date.now()}@example.com`;
+    const { queryId, conversationId } = await createPendingQuery(email);
+    const human = await createTestHuman(email);
+
+    const res = await app.request(`/api/v1/human/queries/${queryId}/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: human.authHeader },
+      body: JSON.stringify({ outcome: "insufficient_context", reason: "unknown_subject" }),
+    });
+    expect(res.status).toBe(200);
+
+    const db = getDb();
+    const [afterQuery] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
+    expect(afterQuery.status).toBe("needs_context");
+    expect(afterQuery.humanId).toBe(human.human.id);
+
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(and(eq(invitations.conversationId, conversationId), eq(invitations.invitedHumanEmail, email)));
+    expect(invitation.status).toBe("accepted");
+  });
+
+  it("refuses to let a different human answer someone else's pending invitation", async () => {
+    const targetEmail = `target-${Date.now()}@example.com`;
+    const { queryId } = await createPendingQuery(targetEmail);
+
+    // The stranger needs a session of their own to reach the entitlement
+    // check at all — sign-in itself is gated on having an invitation
+    // (createVerificationCode), so a true never-invited stranger cannot even
+    // authenticate. The real risk is a human who is legitimately signed in
+    // for THEIR OWN query trying to reuse that session on somebody else's
+    // pending invitation. Give them a genuine query/invitation from a
+    // second agent, then have them target the first one.
+    const strangerEmail = `stranger-${Date.now()}@example.com`;
+    await createPendingQuery(strangerEmail);
+    const stranger = await createTestHuman(strangerEmail);
+
+    const res = await app.request(`/api/v1/human/queries/${queryId}/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: stranger.authHeader },
+      body: JSON.stringify({ outcome: "answer", answer: { kind: "choice", option_ids: ["yes"] } }),
+    });
+    expect(res.status).toBe(403);
+
+    const db = getDb();
+    const [afterQuery] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
+    expect(afterQuery.status).toBe("pending");
+    expect(afterQuery.humanId).toBeNull();
+
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(and(eq(invitations.conversationId, afterQuery.conversationId), eq(invitations.invitedHumanEmail, targetEmail)));
+    expect(invitation.status).toBe("pending");
   });
 });
