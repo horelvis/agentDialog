@@ -41,7 +41,7 @@ export const getQuerySchema = z.object({
 export type GetQueryInput = z.infer<typeof getQuerySchema>;
 
 export const listQueriesSchema = z.object({
-  status: z.enum(["pending", "assigned", "answered", "expired"]).optional(),
+  status: z.enum(["pending", "assigned", "answered", "needs_context", "cancelled", "expired"]).optional(),
   limit: z.number().int().min(1).max(100).default(20),
 });
 
@@ -71,7 +71,7 @@ export type RespondQueryInput = z.infer<typeof respondQuerySchema>;
 // GET variant: query-string values always arrive as strings, so limit is coerced.
 // listQueriesSchema is left untouched because the MCP list_queries tool uses it.
 export const listQueriesQuerySchema = z.object({
-  status: z.enum(["pending", "assigned", "answered", "expired"]).optional(),
+  status: z.enum(["pending", "assigned", "answered", "needs_context", "cancelled", "expired"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 

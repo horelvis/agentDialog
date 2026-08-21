@@ -257,10 +257,12 @@ Returns queries ordered by creation date (newest first). Use status filter to fi
 - "pending": Queries waiting for human to accept invitation
 - "assigned": Queries where human accepted but hasn't answered yet
 - "answered": Completed queries with responses
+- "needs_context": Queries waiting on you — the human could not decide with what you gave them. This is the filter to reach for after any needs_context turn: it finds every query waiting on you in one call instead of polling each one individually with get_query. Clarify each with clarify_query.
+- "cancelled": Queries you withdrew with cancel_query
 - "expired": Timed-out queries`,
     {
-      status: z.enum(["pending", "assigned", "answered", "expired"]).optional()
-        .describe("Filter by query status"),
+      status: z.enum(["pending", "assigned", "answered", "needs_context", "cancelled", "expired"]).optional()
+        .describe("Filter by query status. Use \"needs_context\" to find every query currently waiting on you to clarify, in one call"),
       limit: z.number().int().min(1).max(100).default(20)
         .describe("Maximum number of queries to return"),
     },

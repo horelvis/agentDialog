@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { createTestApp, createTestAgent } from "../helpers";
+import { readyInNeedsContext } from "../helpers/queries";
+import { getDb } from "../../src/db";
+import { humanQueries } from "../../src/db/schema/human-queries";
+import { eq } from "drizzle-orm";
 
 describe("Agent queries REST API", () => {
   const app = createTestApp();
@@ -121,5 +125,28 @@ describe("Agent queries REST API", () => {
     const { data: listBData } = await listB.json();
     expect(listBData.some((q: any) => q.query_id === queryB.query_id)).toBe(true);
     expect(listBData.some((q: any) => q.query_id === queryA.query_id)).toBe(false);
+  });
+
+  // needs_context hands the turn back to the agent, whose natural next move
+  // is "list what's waiting on me" rather than polling every query it ever
+  // created one at a time. The filter has to find it, and the listing must
+  // not sweep it into "expired" along the way — its clock is paused, so a
+  // deadline that has technically passed does not mean it timed out.
+  it("finds a needs_context query via the status filter without expiring it", async () => {
+    const { queryId, agentAuth } = await readyInNeedsContext(`list-nc-${Date.now()}@example.com`);
+    const db = getDb();
+    await db.update(humanQueries)
+      .set({ expiresAt: new Date(Date.now() - 60_000) })
+      .where(eq(humanQueries.id, queryId));
+
+    const res = await app.request("/api/v1/agent/queries?status=needs_context", {
+      headers: { Authorization: agentAuth },
+    });
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+    expect(data.some((q: any) => q.query_id === queryId)).toBe(true);
+
+    const [row] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
+    expect(row.status).toBe("needs_context");
   });
 });
