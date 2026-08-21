@@ -268,148 +268,67 @@ a configuration this project no longer has. Do not run it without rewriting it.
 missing or malformed, so a misconfigured deploy fails immediately and loudly
 rather than at the first request that needs the value.
 
-### Inbound email: a scaffold with an exit criterion
+### Inbound email: tried, measured, rejected
 
-Replies to query emails are read out of the `agentdialog.app@gmail.com` mailbox
-over IMAP, by a Cloud Scheduler job that calls the API every five minutes. This
-is a bridge, not the architecture: `POST /api/v1/webhooks/email/inbound` already
-implements the provider→webhook pattern, and the day a transactional provider
-sits on a domain we own, there is nothing to build — only to configure.
+**Nothing reads inbound email.** A human answers a query in the web app. Email
+notifies them that a question is waiting and carries their sign-in code, and
+that is all it does.
 
-**Retire the scaffold when** a provider is contracted and the MX records of an
-owned domain point at it, or the volume approaches Gmail's ~500/day sending cap,
-or someone reports that query emails land in spam. Retiring it is:
+This is worth recording because the obvious cheap fix was built, reviewed and
+thrown away, and the next person to reach for it should know why.
 
-1. Configure the provider's webhook and its `INBOUND_EMAIL_WEBHOOK_SECRET`.
-2. Delete `src/lib/mailbox.ts`, `src/services/email-ingest.service.ts` and
-   `src/routes/internal/email-poll.ts`.
-3. Remove the `emailPollRoutes` import and the
-   `app.route("/api/v1/internal/email", emailPollRoutes)` mount from
-   `src/app.ts` — leaving the route file deleted but still imported there
-   breaks the build.
-4. Remove `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD` and
-   `INTERNAL_POLL_SECRET` from `src/env.ts`'s schema and from `.env.example`.
-5. Delete the Scheduler job and the `imap-password` secret.
-6. Point `REPLY_LOCAL_PART` and `REPLY_DOMAIN` back at the owned domain.
+The shortcut was to read the `agentdialog.app@gmail.com` mailbox directly over
+IMAP with an App Password, using `+` addressing so no DNS work was needed, polled
+every five minutes from Cloud Scheduler. It reached code-complete with tests. A
+whole-branch review then found three faults, and the first two are not fixable by
+being more careful:
 
-Both paths enter the domain through `processEmailReply`, so nothing in the
-webhook route or the query/email services notices — but `src/app.ts` and
-`src/env.ts` do reference the scaffold directly and need the edits above, not
-just a deletion of the service files.
+- **`\Seen` cannot be both a person's "I read this" and the system's "I processed
+  this".** The design marked a message read once ingested, and deliberately never
+  touched anyone else's mail so the mailbox stayed usable by a human. Those two
+  goals contradict: Gmail marks a message read the moment it is opened, and *Mark
+  all as read* is one click. Any reply a person opened before a poll ran was lost
+  permanently and silently, with no trace in any log.
+- **The unread backlog is re-downloaded forever.** Foreign mail is never marked
+  read, so it comes back every pass, and classification happened only after
+  fetching the full message body. A few hundred unread messages meant a few
+  hundred full downloads every five minutes, 288 times a day, against Gmail
+  IMAP's ~2.5 GB/day ceiling. Crossing it throttles the account and takes the
+  feature down, presenting as an authentication failure.
+- A reply typed *below* the quoted text — Outlook's default — stripped to an
+  empty string and was dropped as an empty answer, again silently.
 
-Written down because otherwise it becomes permanent by inertia, which is how
-almost every scaffold ends.
+The common thread is that the design modelled the mailbox as an input queue when
+it is really a shared inbox with a human co-owner. A consumer mailbox is not a
+message broker and does not become one by being polled carefully.
 
-The Scheduler job polls every five minutes; the lock that serializes overlapping
-passes (`INGEST_LOCK_KEY` in `src/services/email-ingest.service.ts`) holds it
-for `INGEST_LOCK_TTL_MS`, currently 600,000 ms (ten minutes) — two poll
-intervals, not one. A TTL shorter than the poll interval cannot block a
-scheduled poll at all: by the time the next poll fires, any pass still running
-has already outlived a shorter TTL, so the lock would already have expired. If
-you change the Scheduler's `--schedule`, change `INGEST_LOCK_TTL_MS` with it, and
-keep the TTL comfortably longer than the interval.
+The spec and plan are kept at `docs/superpowers/specs/2026-08-20-inbound-email-ingestion-design.md`
+and `docs/superpowers/plans/2026-08-21-inbound-email-ingestion.md` as a record of
+the attempt.
 
-#### One-time setup
+#### What replaces it
 
-1. In `agentdialog.app@gmail.com`, confirm IMAP is on: Settings → Forwarding and
-   POP/IMAP → Enable IMAP.
-2. Generate an App Password for that account (requires 2FA, which is on). This
-   is the same class of credential as `SMTP_PASS`, which is also an App Password.
-3. Store it in Secret Manager rather than as a plain variable:
+`POST /api/v1/webhooks/email/inbound` is still deployed and still verifies
+provider signatures. It is **dormant**: no provider posts to it, and outbound
+mail no longer carries a per-query `Reply-To` for it to match against. That is
+the route back, and it is configuration rather than construction — a
+transactional provider on a domain we own, its webhook pointed here, and
+`INBOUND_EMAIL_WEBHOOK_SECRET` set. Doing it that way also fixes the SPF and
+DKIM alignment problem described under **Email** below, which is a reason to do
+it eventually regardless of inbound.
 
-   ```bash
-   printf '%s' '<app-password>' | gcloud secrets create imap-password \
-     --project agentdialog --data-file=-
-   ```
+#### The one setting that stops replies vanishing
 
-4. Update the Cloud Run service. **`--update-env-vars`, never `--set-env-vars`** —
-   the latter would delete the nineteen variables already on the service:
+People reply to notification emails whatever the email says. Set an
+**auto-responder on the mailbox in `REPLY_TO_ADDRESS`** — Gmail: Settings →
+General → Vacation responder, on indefinitely — telling the sender their reply
+was not read and pointing them at `https://agentdialog.io`. This is the whole
+mitigation, it is a Gmail setting rather than code, and without it a reply
+disappears in exactly the silent way that got the IMAP approach rejected.
 
-   ```bash
-   gcloud run services update agentdialog-api \
-     --project agentdialog --region us-central1 \
-     --update-env-vars \
-IMAP_HOST=imap.gmail.com,IMAP_PORT=993,IMAP_USER=agentdialog.app@gmail.com,REPLY_LOCAL_PART=agentdialog.app,REPLY_DOMAIN=gmail.com,INTERNAL_POLL_SECRET=<generated> \
-     --update-secrets IMAP_PASSWORD=imap-password:latest
-   ```
-
-   Generate the poll secret with `openssl rand -hex 32`.
-
-5. Create the Scheduler job:
-
-   ```bash
-   gcloud scheduler jobs create http agentdialog-email-poll \
-     --project agentdialog --location us-central1 \
-     --schedule "*/5 * * * *" \
-     --uri "https://api.agentdialog.io/api/v1/internal/email/poll" \
-     --http-method POST \
-     --headers "x-internal-secret=<the same value>" \
-     --attempt-deadline 120s
-   ```
-
-`REPLY_LOCAL_PART` and `REPLY_DOMAIN` are what make the change take effect for
-new queries: from then on the Reply-To is `agentdialog.app+{queryId}@gmail.com`,
-which Gmail delivers to the account's inbox with no DNS involved. Queries sent
-before the change carry the old `reply+{queryId}@reply.agentdialog.io`, which
-has no MX and never arrived anyway.
-
-#### Checking it
-
-```bash
-curl -s -X POST https://api.agentdialog.io/api/v1/internal/email/poll \
-  -H "x-internal-secret: $INTERNAL_POLL_SECRET" | jq
-```
-
-`{"data":{"scanned":0,...}}` means it connected and the mailbox was empty.
-`401 UNAUTHORIZED` means the `x-internal-secret` header is missing or does not
-match `INTERNAL_POLL_SECRET` — check the Scheduler job's header first, it is
-the likely first-day mistake.
-`503 MAILBOX_NOT_CONFIGURED` means the IMAP variables did not reach the service.
-`502 MAILBOX_UNAVAILABLE` means they did and Gmail refused them — almost always
-the App Password.
-`500 INGEST_FAILED` means the pass itself threw, most likely a database
-outage; nothing is lost when this happens — any message the pass couldn't
-process is left unread, and the next pass retries it.
-
-`{"data":{"skipped":true}}` means another pass held the lock, which is normal.
-
-Counts in the summary: `processed` recorded a reply, `rejected` was a reply from
-someone other than the target, `dropped` was ours but unusable, `skipped` was
-somebody else's mail — left unread on purpose — and `deferred` will be retried
-by the next pass.
-
-#### Manual verification against the real mailbox
-
-The one path nothing automated covers: a real message, in a real Gmail inbox,
-read back by `imapflow`. Do this once after the one-time setup above, with
-`.env` pointing at the real mailbox and `bun run dev` running:
-
-1. Create a query with your own address as the recipient:
-
-   ```bash
-   curl -s -X POST http://localhost:3000/api/v1/agent/queries \
-     -H "Authorization: Bearer $AGENT_KEY" -H "Content-Type: application/json" \
-     -d '{"query_type":"validation","question":"Does the IMAP bridge work?","target_human_email":"you@example.com","timeout_minutes":60}' | jq
-   ```
-
-2. Check the email you receive: `Reply-To` should be
-   `agentdialog.app+{queryId}@gmail.com`.
-3. Reply from that same address.
-4. Trigger a pass:
-
-   ```bash
-   curl -s -X POST http://localhost:3000/api/v1/internal/email/poll \
-     -H "x-internal-secret: $INTERNAL_POLL_SECRET" | jq
-   ```
-
-   Expect `processed: 1`.
-5. Read the query back and confirm `status` is `answered` and `answer` is what
-   you wrote, with the quoted original message stripped out.
-6. Poll again: expect `scanned: 0`, because the message was marked read.
-7. Send an unrelated email to `agentdialog.app@gmail.com`, poll, and confirm it
-   is still **unread** in the mailbox (acceptance criterion 3).
-8. Reply to the query from an address other than the recipient's and confirm the
-   sender gets a mismatch notice while the query is unchanged (criterion 2).
+If `REPLY_TO_ADDRESS` is unset the email carries no `Reply-To` at all, and a
+reply goes to `SMTP_FROM` instead. Point one or the other at a mailbox that has
+the auto-responder; do not leave both pointing somewhere nobody watches.
 
 ### Three ways to deploy, and only one that is current
 
@@ -461,21 +380,21 @@ Two consequences worth knowing:
 - A consumer Gmail account caps at roughly 500 messages a day, and messages sent
   from a `@gmail.com` address on behalf of `agentdialog.io` have no aligned SPF
   or DKIM, which costs deliverability.
-- **Inbound email is not commissioned yet.** By default, query emails carry a
-  `Reply-To` of `reply+{queryId}@reply.agentdialog.io`, but neither
-  `agentdialog.io` nor `reply.agentdialog.io` has an MX record — confirmed
-  against two resolvers — so a human's reply bounces and reaches nothing.
-  `POST /api/v1/webhooks/email/inbound` is deployed and reachable, but no
-  provider ever calls it. An IMAP-polling scaffold that reads a Gmail inbox
-  instead exists and is code-complete; see "Inbound email: a scaffold with an
-  exit criterion" above for what turning it on requires. Until that one-time
-  setup runs, the feature the landing page sells is not operational.
+- **Inbound email is not read at all, by design.** Query emails no longer carry a
+  per-query `Reply-To`, and the product no longer tells anyone to answer by
+  replying. Neither `agentdialog.io` nor `reply.agentdialog.io` has an MX record
+  — confirmed against two resolvers — so a reply to either would reach nothing
+  anyway. See "Inbound email: tried, measured, rejected" above for why the
+  IMAP workaround was abandoned and what the route back looks like.
 
 ## Things that have bitten, and how to recognise them
 
-**`bun run typecheck` at the root used to fail regardless of your change** —
-six pre-existing errors in `src/mcp/server.ts`. That has been fixed: `bunx tsc
---noEmit` exits 0 as of this branch. If it fails now, the change under test
+**`bun run typecheck` at the root was long documented as failing regardless of
+your change** — six pre-existing errors in `src/mcp/server.ts`. It no longer
+does: `bunx tsc --noEmit` exits 0, verified on `main` as well as here, and
+nothing in this repository's recent history changed `src/mcp/server.ts` to make
+that happen — the errors were most likely environmental. Treat a failure now as
+real. If it fails, the change under test
 broke something real — do not wave it off as the old, known failure. This
 still means `Dockerfile.cloudrun` — which runs it — is sensitive to any zod
 resolution change; see the `overrides` entry in the root `package.json`.

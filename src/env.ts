@@ -43,26 +43,18 @@ export const envSchema = z.object({
   WEBHOOK_TIMEOUT_MS: z.coerce.number().default(10000),
   WEBHOOK_MAX_RETRIES: z.coerce.number().default(3),
 
+  // Reply addressing, used only by the dormant provider webhook. Nothing sends
+  // a per-query Reply-To today: inbound email is not ingested at all, so a
+  // reply reaches a person, not the system. See REPLY_TO_ADDRESS below.
   REPLY_DOMAIN: z.string().default("reply.agentdialog.io"),
-  // The local part of the reply address. Defaults to "reply" so today's
-  // behaviour is unchanged; production sets it to the Gmail account name while
-  // the mailbox is a Gmail inbox reached by plus addressing.
   REPLY_LOCAL_PART: z.string().default("reply"),
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().optional(),
   INBOUND_EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).default("resend"),
 
-  // Inbound mailbox, read over IMAP. Optional on purpose: with these unset the
-  // poll endpoint answers 503 and nothing else changes behaviour. This is the
-  // bridge until a transactional provider posts to the inbound webhook.
-  IMAP_HOST: z.string().optional(),
-  IMAP_PORT: z.coerce.number().default(993),
-  IMAP_USER: z.string().optional(),
-  IMAP_PASSWORD: z.string().optional(),
-
-  // Shared secret for POST /api/v1/internal/email/poll. Cloud Scheduler cannot
-  // sign a request like a mail provider does, so a header secret is what there
-  // is. With it unset the endpoint refuses every request, in every environment.
-  INTERNAL_POLL_SECRET: z.string().optional(),
+  // Where a human's reply to a notification actually lands. Nothing reads it
+  // programmatically — it is a real mailbox with an auto-responder telling the
+  // sender to answer in the app. Unset means the email carries no Reply-To.
+  REPLY_TO_ADDRESS: z.string().optional(),
 }).superRefine((env, ctx) => {
   // The inbound email webhook records a human's answer to an agent's query and
   // auto-accepts their invitation. Without a signing secret the endpoint has no

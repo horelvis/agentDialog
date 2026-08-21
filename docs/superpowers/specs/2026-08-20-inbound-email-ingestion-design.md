@@ -1,7 +1,11 @@
 # Ingesta de correo entrante
 
 **Fecha:** 2026-08-20, revisado el 2026-08-21
-**Estado:** implementado — ver `docs/superpowers/plans/2026-08-21-inbound-email-ingestion.md`
+**Estado:** **RECHAZADO** el 2026-08-21, después de implementarlo entero. El
+andamio se construyó, se revisó y se retiró; el correo entrante no se lee. Lo
+que falló y por qué no se arregla con más cuidado está en `docs/operations.md`,
+sección «Inbound email: tried, measured, rejected». Este documento se conserva
+como registro del intento, no como diseño vigente.
 
 ## Objetivo
 

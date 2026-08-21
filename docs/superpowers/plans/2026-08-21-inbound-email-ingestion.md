@@ -1,5 +1,11 @@
 # Ingesta de correo entrante por IMAP — Plan de implementación
 
+> **ESTE PLAN SE EJECUTÓ Y LUEGO SE REVIRTIÓ.** Las siete tareas se completaron y
+> pasaron su revisión; la revisión de rama completa encontró después tres fallos
+> —dos de ellos no arreglables con más cuidado— y el andamio entero se retiró.
+> Se conserva como registro del intento, no como trabajo pendiente. Ver
+> `docs/operations.md`, sección «Inbound email: tried, measured, rejected».
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Que la respuesta de un humano a un email de query llegue al agente que preguntó, leyendo el buzón `agentdialog.app@gmail.com` por IMAP.

@@ -1,6 +1,13 @@
 import { env } from "../env";
 
 /**
+ * DORMANT. Nothing sends a per-query Reply-To today — inbound email is not read
+ * at all, and a human answers in the web app. `classifyRecipient` is still
+ * reachable from the provider webhook, which no provider calls; the builder has
+ * no caller. Both halves are kept together deliberately, because splitting them
+ * is what caused the bug this module was written to fix, and because they are
+ * what a transactional provider would switch back on. See docs/operations.md.
+ *
  * Building the Reply-To address and reading the query id back out of the
  * human's reply are two halves of one contract. They used to live in two files
  * — the sender in query-email.service.ts, the reader in the inbound webhook —

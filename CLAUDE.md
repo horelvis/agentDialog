@@ -1,7 +1,8 @@
 # AgentDialog — notes for agents working in this repo
 
-Agent-first messaging: AI agents ask humans questions, humans answer by replying
-to an email. Bun + Hono + PostgreSQL/Drizzle + Redis on the backend, React on the
+Agent-first messaging: AI agents ask humans questions, humans answer in the web
+chat. Email notifies them and carries their sign-in code; nothing reads inbound
+mail. Bun + Hono + PostgreSQL/Drizzle + Redis on the backend, React on the
 landing page, Fumadocs for the public docs, and a published TypeScript SDK.
 
 ## Layout
@@ -50,11 +51,12 @@ DATABASE_URL="postgresql://agentdialog:agentdialog@localhost:5432/agentdialog_te
 
 Every one of these cost real time. They are not hypothetical.
 
-**`bun run typecheck` at the root used to fail regardless of your change** — six
-pre-existing errors in `src/mcp/server.ts`. That has been fixed: `bunx tsc
---noEmit` exits 0 as of this branch. If it fails now, the change under test
-broke something real — do not wave it off as the old, known failure. The
-publish workflow still deliberately typechecks only the SDK.
+**`bun run typecheck` at the root was long documented as failing regardless of
+your change** — six pre-existing errors in `src/mcp/server.ts`. It no longer
+does: `bunx tsc --noEmit` exits 0, and no recent commit touched
+`src/mcp/server.ts` to make that happen, so the errors were most likely
+environmental. Treat a failure now as real rather than waving it off as the
+old, known one. The publish workflow still deliberately typechecks only the SDK.
 
 **Integration tests are not hermetic.** Agent registration is rate-limited to 10
 per hour, and the counter lives in Redis, which survives between runs. Run the
@@ -109,11 +111,13 @@ integrator, who is the entire audience of this product.
 
 - Human query flow: `src/services/query.service.ts`, exposed at
   `src/routes/agent/queries.ts` (REST) and `src/mcp/server.ts` (MCP)
-- Inbound email replies: `src/services/email-response.service.ts`, reached from
-  the provider webhook (`src/routes/webhooks/email-inbound.ts`) and from the
-  IMAP poll (`src/routes/internal/email-poll.ts` →
-  `src/services/email-ingest.service.ts`). The IMAP half is a scaffold with a
-  written exit criterion — see `docs/operations.md`.
+- Human answers: `src/routes/human/queries.ts` → `respondQuery` in
+  `src/services/query.service.ts`. The web chat is the only live path.
+- Inbound email: **dormant**. `src/services/email-response.service.ts` is reached
+  only from the provider webhook (`src/routes/webhooks/email-inbound.ts`), which
+  nothing calls, and outbound mail no longer carries a per-query `Reply-To` for
+  it to match. An IMAP-polling workaround was built and rejected — read
+  `docs/operations.md` before reaching for that idea again.
 - Auth middleware: `src/middleware/agent-auth.ts` and
   `src/middleware/human-auth.ts`
 - Design records: `docs/superpowers/specs/` and `docs/superpowers/plans/`

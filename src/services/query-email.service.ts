@@ -1,5 +1,4 @@
 import { sendEmail } from "../lib/email";
-import { buildReplyToAddress } from "../lib/reply-address";
 import { env } from "../env";
 
 interface SendQueryEmailInput {
@@ -43,7 +42,11 @@ function formatExpiry(date: Date): string {
 
 export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolean> {
   const e = env();
-  const replyTo = buildReplyToAddress(input.queryId);
+  // Not a per-query address: inbound email is not ingested, so a reply reaches
+  // a person rather than the system. REPLY_TO_ADDRESS is a real mailbox with an
+  // auto-responder pointing the sender back to the app. Unset means no Reply-To
+  // at all, which is better than one nobody reads.
+  const replyTo = e.REPLY_TO_ADDRESS;
   const appUrl = `${e.APP_URL}/app/queries`;
   const typeLabel = QUERY_TYPE_LABELS[input.queryType] || input.queryType;
 
@@ -89,19 +92,15 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
 
         ${contextHtml}
 
-        <div style="margin: 24px 0; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; text-align: center;">
-          <div style="font-size: 15px; font-weight: 600; color: #166534;">Reply directly to this email to send your answer</div>
-          <div style="font-size: 13px; color: #4ade80; margin-top: 4px;">Just hit reply and type your response</div>
-        </div>
-
-        <div style="text-align: center; margin: 16px 0;">
-          <span style="color: #9ca3af; font-size: 13px;">or</span>
+        <div style="text-align: center; margin: 24px 0 12px;">
+          <a href="${appUrl}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: 600;">
+            Answer this question
+          </a>
         </div>
 
         <div style="text-align: center; margin-bottom: 20px;">
-          <a href="${appUrl}" style="display: inline-block; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
-            Respond in the app
-          </a>
+          <div style="font-size: 13px; color: #6b7280;">We'll email you a sign-in code — there is no password to remember.</div>
+          <div style="font-size: 12px; color: #9ca3af; margin-top: 6px;">Replying to this email will not reach ${escapeHtml(input.agentDisplayName)}.</div>
         </div>
 
         <div style="border-top: 1px solid #f0f0f0; padding-top: 16px; color: #9ca3af; font-size: 12px; text-align: center;">
@@ -119,9 +118,10 @@ Question:
 ${input.question}
 ${contextText}
 ---
-Reply directly to this email to send your answer.
+Answer this question: ${appUrl}
 
-Or respond in the app: ${appUrl}
+We'll email you a sign-in code — there is no password to remember.
+Replying to this email will not reach ${input.agentDisplayName}.
 
 Expires: ${formatExpiry(input.expiresAt)}
 `;
@@ -132,38 +132,5 @@ Expires: ${formatExpiry(input.expiresAt)}
     html,
     text,
     replyTo,
-  });
-}
-
-/**
- * Tell whoever replied that the question was not addressed to them.
- *
- * The notice deliberately does not name the query, the question or the person
- * it was meant for: the sender has already shown they are not that person.
- * Silence would be worse — a reply that vanishes with no explanation reads as a
- * broken product — but this is all that can safely be said.
- */
-export async function sendSenderMismatchNotice(toEmail: string): Promise<boolean> {
-  const e = env();
-
-  return sendEmail({
-    to: toEmail,
-    subject: `[${e.APP_NAME}] Your reply could not be delivered`,
-    html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="padding: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;">
-          <div style="font-size: 15px; font-weight: 600; color: #92400e;">Your reply was not recorded</div>
-          <div style="font-size: 14px; color: #78350f; margin-top: 8px; line-height: 1.5;">
-            This question was addressed to someone else, so only they can answer it.
-            If it was forwarded to you, please reply to the person who sent it to you instead.
-          </div>
-        </div>
-        <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 16px;">${e.APP_NAME}</p>
-      </div>
-    `,
-    text:
-      "Your reply was not recorded.\n\n" +
-      "This question was addressed to someone else, so only they can answer it. " +
-      "If it was forwarded to you, please reply to the person who sent it to you instead.\n",
   });
 }
