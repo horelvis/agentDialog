@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/hono";
-import { createQuery, getQuery, listAgentQueries } from "../../services/query.service";
+import { createQuery, getQuery, listAgentQueries, updateQuery } from "../../services/query.service";
 import { validateBody, validateQuery } from "../../middleware/validate";
-import { createQuerySchema, listQueriesQuerySchema } from "../../validators/query.validators";
+import { createQuerySchema, listQueriesQuerySchema, patchQuerySchema } from "../../validators/query.validators";
 
 const app = new Hono<AppEnv>();
 
@@ -23,6 +23,13 @@ app.get("/", validateQuery(listQueriesQuerySchema), async (c) => {
 app.get("/:id", async (c) => {
   const agentId = c.get("agentId");
   const query = await getQuery(c.req.param("id"), agentId);
+  return c.json({ data: query });
+});
+
+app.patch("/:id", validateBody(patchQuerySchema), async (c) => {
+  const agentId = c.get("agentId");
+  const input = c.get("validatedBody");
+  const query = await updateQuery(c.req.param("id"), agentId, input);
   return c.json({ data: query });
 });
 

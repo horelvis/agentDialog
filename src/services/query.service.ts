@@ -12,10 +12,10 @@ import { generateInvitationToken } from "../lib/crypto";
 import { dispatchWebhooks } from "./webhook.service";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
-import { checkPayload } from "../admission/decidability";
+import { checkPayload, type Subject, type Risk } from "../admission/decidability";
 import { findPriorDecision, elevateRisk } from "../admission/history";
 import { validateAnswerAgainstSpace, type AnswerSpace, type Answer } from "../lib/answer-space";
-import type { CreateQueryInput, RespondQueryInput } from "../validators/query.validators";
+import type { CreateQueryInput, RespondQueryInput, PatchQueryInput } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
   const db = getDb();
@@ -380,6 +380,78 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
     console.error(`[QUERY] Webhook dispatch failed for ${queryId}:`, err);
   });
 
+  return updated;
+}
+
+const MAX_CLARIFICATION_ROUNDS = 2;
+
+/**
+ * The agent supplying what the human said was missing. Only valid from
+ * needs_context, and it goes through admission exactly like a creation does.
+ */
+export async function updateQuery(queryId: string, agentId: string, input: PatchQueryInput) {
+  const db = getDb();
+
+  const [query] = await db
+    .select()
+    .from(humanQueries)
+    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.agentId, agentId)))
+    .limit(1);
+
+  if (!query) throw new NotFoundError("Query", queryId);
+  if (query.status !== "needs_context") {
+    throw new ConflictError(`Query is ${query.status}, so there is nothing to clarify`);
+  }
+
+  if (query.clarificationRounds >= MAX_CLARIFICATION_ROUNDS) {
+    // Unfreeze on the way out. The clock only pauses while the agent can still
+    // act; leaving it paused here would freeze the query for ever.
+    await db.update(humanQueries)
+      .set({ pausedAt: null, updatedAt: new Date() })
+      .where(eq(humanQueries.id, queryId));
+
+    throw new UndecidableQueryError(
+      "clarification_rounds_exhausted",
+      `This query has already been clarified ${MAX_CLARIFICATION_ROUNDS} times.`,
+      "Create a new query instead of clarifying this one again.",
+    );
+  }
+
+  const subject = (input.subject ?? query.subject) as Subject;
+  const answerSpace = (input.answer_space ?? query.answerSpace) as unknown as AnswerSpace;
+  const verdict = checkPayload({
+    risk: query.risk as Risk,
+    subject,
+    self_contained: query.selfContained,
+    answer_space: answerSpace,
+  });
+  if (!verdict.admit) {
+    throw new UndecidableQueryError(verdict.reason, verdict.detail, verdict.remedy);
+  }
+
+  // Give back the time the agent spent holding the turn.
+  const pausedMs = query.pausedAt ? Date.now() - query.pausedAt.getTime() : 0;
+
+  const [updated] = await db
+    .update(humanQueries)
+    .set({
+      status: "assigned",
+      subject: subject as unknown as Record<string, unknown>,
+      answerSpace,
+      changes: input.changes ?? query.changes,
+      question: input.question ?? query.question,
+      context: input.context ?? query.context,
+      expiresAt: new Date(query.expiresAt.getTime() + pausedMs),
+      pausedAt: null,
+      insufficientReason: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "needs_context")))
+    .returning();
+
+  if (!updated) throw new ConflictError("Query changed while it was being clarified");
+
+  console.log(`[QUERY] Clarified ${queryId} (round ${query.clarificationRounds})`);
   return updated;
 }
 

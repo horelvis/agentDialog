@@ -76,3 +76,13 @@ export const listQueriesQuerySchema = z.object({
 });
 
 export type ListQueriesQueryInput = z.infer<typeof listQueriesQuerySchema>;
+
+export const patchQuerySchema = z.object({
+  subject: subjectSchema.optional(),
+  changes: z.array(changeSchema).max(100).optional(),
+  answer_space: answerSpaceSchema.optional(),
+  question: z.string().min(1).max(10_000).optional(),
+  context: z.string().max(100_000).optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: "nothing to update" });
+
+export type PatchQueryInput = z.infer<typeof patchQuerySchema>;
