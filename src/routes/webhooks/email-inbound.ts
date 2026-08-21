@@ -5,6 +5,7 @@ import {
   verifyResendWebhook,
   verifySendGridWebhook,
 } from "../../lib/email-webhook-verify";
+import { classifyRecipient } from "../../lib/reply-address";
 import { processEmailReply } from "../../services/email-response.service";
 
 const app = new Hono();
@@ -104,12 +105,15 @@ app.post("/inbound", async (c) => {
     return c.json({ ok: true }); // Don't retry
   }
 
-  // 3. Extract queryId from reply-to address
-  const queryId = extractQueryId(toAddress);
-  if (!queryId) {
-    console.warn(`[EMAIL-INBOUND] Could not extract queryId from: ${toAddress}`);
+  // 3. Extract queryId from the reply address
+  const match = classifyRecipient(toAddress);
+  if (match.kind !== "reply") {
+    console.warn(
+      `[EMAIL-INBOUND] Not a reply address (${match.kind}): ${toAddress}`,
+    );
     return c.json({ ok: true }); // Don't retry
   }
+  const queryId = match.queryId;
 
   // 4. Process the reply
   try {
@@ -162,14 +166,6 @@ function extractFromAddress(data: any): string | null {
   // SendGrid: data.envelope.from
   if (data.envelope?.from) return data.envelope.from;
   return null;
-}
-
-/**
- * Extract queryId from a reply address like "reply+{queryId}@reply.agentdialog.io"
- */
-function extractQueryId(toAddress: string): string | null {
-  const match = toAddress.match(/reply\+([^@]+)@/);
-  return match ? match[1] : null;
 }
 
 export default app;

@@ -44,6 +44,10 @@ export const envSchema = z.object({
   WEBHOOK_MAX_RETRIES: z.coerce.number().default(3),
 
   REPLY_DOMAIN: z.string().default("reply.agentdialog.io"),
+  // The local part of the reply address. Defaults to "reply" so today's
+  // behaviour is unchanged; production sets it to the Gmail account name while
+  // the mailbox is a Gmail inbox reached by plus addressing.
+  REPLY_LOCAL_PART: z.string().default("reply"),
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().optional(),
   INBOUND_EMAIL_PROVIDER: z.enum(["resend", "sendgrid"]).default("resend"),
 }).superRefine((env, ctx) => {

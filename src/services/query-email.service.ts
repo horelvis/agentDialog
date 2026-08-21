@@ -1,4 +1,5 @@
 import { sendEmail } from "../lib/email";
+import { buildReplyToAddress } from "../lib/reply-address";
 import { env } from "../env";
 
 interface SendQueryEmailInput {
@@ -42,7 +43,7 @@ function formatExpiry(date: Date): string {
 
 export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolean> {
   const e = env();
-  const replyTo = `reply+${input.queryId}@${e.REPLY_DOMAIN}`;
+  const replyTo = buildReplyToAddress(input.queryId);
   const appUrl = `${e.APP_URL}/app/queries`;
   const typeLabel = QUERY_TYPE_LABELS[input.queryType] || input.queryType;
 
