@@ -15,13 +15,22 @@ const riskSchema = z.enum(["low", "medium", "high", "critical"]);
 const subjectSchema = z.object({
   id: z.string().describe("A stable id you reuse for the same thing"),
   label: z.string().describe("A human-readable label"),
-  uri: z.string().optional(),
-  attachments: z.array(z.string()).optional(),
-  body: z.string().optional(),
-  sha256: z.string().optional(),
+  uri: z.string().optional().describe("An http(s) link to the referent"),
+  body: z.string().optional().describe("The referent inline, if there is no stable link"),
+  sha256: z.string().optional().describe("Hash of the referent as you read it. Required above medium risk."),
 }).describe(
-  "What the question is about: a stable id, a label, and a referent (uri, body, or attachments) the human can look at",
+  "What the question is about: a stable id, a label, and a referent the human can look at — a uri, or the artefact inline in body",
 );
+
+// The two fields a 422 can demand. Without them on the tool surface, a model
+// handed `prior_decision_without_delta` or a genuine `missing_referent` has
+// nowhere to put the fix its own remedy just asked for.
+const changeSchema = z.object({
+  path: z.string().describe('What changed, e.g. "price"'),
+  before: z.string(),
+  after: z.string(),
+  materiality: z.enum(["minor", "material"]),
+});
 
 const labelsSchema = z.object({ t: z.string(), f: z.string() });
 const choiceOptionSchema = z.object({
@@ -87,7 +96,7 @@ export function askHumanTool(client: AgentDialog, options: AskHumanOptions = {})
   return new DynamicStructuredTool({
     name: "ask_human",
     description:
-      "Ask a human a question they can actually decide, and get a query id back immediately. The human answers by email, which takes minutes or hours, so this does not wait. Use check_answer later.",
+      "Ask a human a question they can actually decide, and get a query id back immediately. The human answers by email, which takes minutes or hours, so this does not wait. Use check_answer later. If the call comes back 422 with reason prior_decision_without_delta, retry with `changes`; if it comes back missing_referent and the question genuinely needs nothing to look at, retry with `selfContained: true`.",
     schema: z.object({
       question: z.string().describe("The question to ask the human"),
       queryType: queryTypeSchema.describe(
@@ -99,6 +108,12 @@ export function askHumanTool(client: AgentDialog, options: AskHumanOptions = {})
       targetHumanEmail: z.string().optional().describe("Email of the human to ask"),
       risk: riskSchema.optional().describe(
         "Stakes of the decision. Defaults to low. The server raises it on its own; it never lowers it.",
+      ),
+      changes: z.array(changeSchema).optional().describe(
+        "What changed since this person last decided about this subject. Required when a 422 comes back with reason prior_decision_without_delta.",
+      ),
+      selfContained: z.boolean().optional().describe(
+        "Set true only when the question genuinely needs nothing to look at — the answer to a missing_referent 422 on a judgement call, not a way around supplying the artefact.",
       ),
     }),
     func: async (args) => {
@@ -116,6 +131,8 @@ export function askHumanTool(client: AgentDialog, options: AskHumanOptions = {})
         context: args.context,
         targetHumanEmail: email,
         risk: args.risk,
+        changes: args.changes,
+        selfContained: args.selfContained,
         timeoutMinutes: options.timeoutMinutes,
       });
       return JSON.stringify({

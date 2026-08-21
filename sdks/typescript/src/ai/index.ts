@@ -1,7 +1,7 @@
 // Vercel AI SDK adapter. Built against ai@7 (inputSchema shape, AI SDK v5+).
 import { tool, jsonSchema } from "ai";
 import type { AgentDialog } from "../client.js";
-import type { AnswerSpace, QueryType, Risk, Subject } from "../queries.js";
+import type { AnswerSpace, Change, QueryType, Risk, Subject } from "../queries.js";
 
 export interface AskHumanOptions {
   /** Used when the model does not supply a target email. */
@@ -17,6 +17,12 @@ interface AskHumanArgs {
   context?: string;
   targetHumanEmail?: string;
   risk?: Risk;
+  // The two fields a 422 can demand. Without them on the tool surface, a
+  // model that receives `prior_decision_without_delta` or a genuine
+  // `missing_referent` judgement has no way to comply with the remedy it
+  // was just handed.
+  changes?: Change[];
+  selfContained?: boolean;
 }
 
 const ASK_HUMAN_DESCRIPTION = `Ask a human a question they can actually decide, and get a query id back immediately.
@@ -26,10 +32,15 @@ wait for them. It returns a query id; use check_answer later to see whether
 they have replied.
 
 subject is what the question is about — a stable id, a label the human will
-recognise, and a referent they can look at (uri, body, or attachments).
-answerSpace is the shape the answer must take: boolean, choice, scalar,
+recognise, and a referent they can look at: a uri, or the artefact inline in
+body. answerSpace is the shape the answer must take: boolean, choice, scalar,
 date, text, or fields. Above "low" risk, a question without a referent or
-without stated consequences is refused with a 422 telling you what to add.`;
+without stated consequences is refused with a 422 telling you what to add.
+
+Two refusals are answered with the other two fields. If the 422 says
+prior_decision_without_delta, retry with changes listing what moved since the
+human last decided. If it says missing_referent and the question genuinely
+needs nothing to look at, retry with selfContained: true.`;
 
 // A generic "object" schema, not a fully-typed oneOf per answer_space kind:
 // the server is the authority on the catalogue and rejects anything that
@@ -56,14 +67,13 @@ export function askHumanTool(client: AgentDialog, options: AskHumanOptions = {})
         subject: {
           type: "object",
           description:
-            "What the question is about: a stable id, a label, and a referent (uri, body, or attachments) the human can look at",
+            "What the question is about: a stable id, a label, and a referent the human can look at — a uri, or the artefact inline in body",
           properties: {
             id: { type: "string" },
             label: { type: "string" },
-            uri: { type: "string" },
-            attachments: { type: "array", items: { type: "string" } },
-            body: { type: "string" },
-            sha256: { type: "string" },
+            uri: { type: "string", description: "An http(s) link to the referent" },
+            body: { type: "string", description: "The referent inline, if there is no stable link" },
+            sha256: { type: "string", description: "Hash of the referent as you read it. Required above medium risk." },
           },
           required: ["id", "label"],
         },
@@ -77,6 +87,26 @@ export function askHumanTool(client: AgentDialog, options: AskHumanOptions = {})
           type: "string",
           enum: ["low", "medium", "high", "critical"],
           description: "Stakes of the decision. Defaults to low. The server raises it on its own; it never lowers it.",
+        },
+        changes: {
+          type: "array",
+          description:
+            "What changed since this person last decided about this subject. Required when a 422 comes back with reason prior_decision_without_delta.",
+          items: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "What changed, e.g. \"price\"" },
+              before: { type: "string" },
+              after: { type: "string" },
+              materiality: { type: "string", enum: ["minor", "material"] },
+            },
+            required: ["path", "before", "after", "materiality"],
+          },
+        },
+        selfContained: {
+          type: "boolean",
+          description:
+            "Set true only when the question genuinely needs nothing to look at — it is the answer to a missing_referent 422 on a judgement call, not a way around attaching the artefact.",
         },
       },
       required: ["question", "queryType", "subject", "answerSpace"],
@@ -96,6 +126,8 @@ export function askHumanTool(client: AgentDialog, options: AskHumanOptions = {})
         context: args.context,
         targetHumanEmail: email,
         risk: args.risk,
+        changes: args.changes,
+        selfContained: args.selfContained,
         timeoutMinutes: options.timeoutMinutes,
       });
       return {

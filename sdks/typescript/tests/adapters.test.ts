@@ -59,6 +59,27 @@ describe("Vercel AI SDK adapter", () => {
     expect(result.answer).toEqual({ kind: "boolean", value: true });
   });
 
+  // The remedy on a 422 tells the model to send `changes` or declare itself
+  // self-contained. If the tool surface has nowhere to put them, the remedy
+  // is unfollowable — so the two fields must reach the wire.
+  it("askHumanTool forwards changes and selfContained to the API", async () => {
+    const calls = mockFetch({
+      data: { query_id: "q3", status: "pending", conversation_id: "c3", expires_at: "2026-08-20T12:00:00.000Z" },
+    });
+    const tool = askHumanTool(client, { defaultEmail: "owner@example.com" });
+    await tool.execute!(
+      {
+        question: "Renew?", queryType: "validation", subject, answerSpace,
+        changes: [{ path: "price", before: "100", after: "120", materiality: "material" as const }],
+        selfContained: true,
+      },
+      {} as any,
+    );
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body.changes).toEqual([{ path: "price", before: "100", after: "120", materiality: "material" }]);
+    expect(body.self_contained).toBe(true);
+  });
+
   it("askHumanTool rejects when no email is available", async () => {
     mockFetch({ data: {} });
     const tool = askHumanTool(client);
@@ -77,5 +98,23 @@ describe("LangChain adapter", () => {
     expect(tool.name).toBe("ask_human");
     const raw = await tool.invoke({ question: "Ship it?", queryType: "validation", subject, answerSpace });
     expect(JSON.parse(raw).queryId).toBe("q2");
+  });
+
+  // Same as the AI SDK adapter: the schema must ACCEPT these two (zod strips
+  // whatever it does not declare, so an undeclared field never reaches func)
+  // and func must pass them on.
+  it("forwards changes and selfContained to the API", async () => {
+    const calls = mockFetch({
+      data: { query_id: "q4", status: "pending", conversation_id: "c4", expires_at: "2026-08-20T12:00:00.000Z" },
+    });
+    const tool = lcAskHumanTool(client, { defaultEmail: "owner@example.com" });
+    await tool.invoke({
+      question: "Renew?", queryType: "validation", subject, answerSpace,
+      changes: [{ path: "price", before: "100", after: "120", materiality: "material" }],
+      selfContained: true,
+    });
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body.changes).toEqual([{ path: "price", before: "100", after: "120", materiality: "material" }]);
+    expect(body.self_contained).toBe(true);
   });
 });
