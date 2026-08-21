@@ -203,10 +203,16 @@ puede esquivar.
 `remedy` no es cortesía: quien recibe este error es **un agente**, y solo puede
 corregirse y reintentar si el error dice qué falta.
 
-Códigos de `reason`: `missing_referent`, `missing_answer_space`,
-`text_answer_above_low_risk`, `fields_all_text_above_low_risk`,
-`missing_consequences`, `external_referent_at_high_risk`,
+Códigos de `reason`: `missing_referent`, `text_answer_above_low_risk`,
+`fields_all_text_above_low_risk`, `missing_consequences`,
+`external_referent_at_high_risk`, `missing_referent_hash`,
 `prior_decision_without_delta`, `clarification_rounds_exhausted`.
+
+Un `answer_space` ausente o fuera del catálogo **no** produce
+`UNDECIDABLE_QUERY`: lo rechaza zod antes, con el `422 VALIDATION_ERROR`
+genérico. Son dos clases distintas de error y conviene no fingir que son una —
+uno dice «esto no es un payload válido» y el otro «esto es válido pero un humano
+no podría contestarlo».
 
 ## 4. El ciclo de vida
 
