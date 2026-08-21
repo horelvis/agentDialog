@@ -278,12 +278,24 @@ sits on a domain we own, there is nothing to build — only to configure.
 
 **Retire the scaffold when** a provider is contracted and the MX records of an
 owned domain point at it, or the volume approaches Gmail's ~500/day sending cap,
-or someone reports that query emails land in spam. Retiring it is: configure the
-provider's webhook and its `INBOUND_EMAIL_WEBHOOK_SECRET`, delete
-`src/lib/mailbox.ts`, `src/services/email-ingest.service.ts` and
-`src/routes/internal/email-poll.ts`, delete the Scheduler job, and point
-`REPLY_LOCAL_PART` and `REPLY_DOMAIN` back at the owned domain. Both paths enter
-the domain through `processEmailReply`, so nothing else notices.
+or someone reports that query emails land in spam. Retiring it is:
+
+1. Configure the provider's webhook and its `INBOUND_EMAIL_WEBHOOK_SECRET`.
+2. Delete `src/lib/mailbox.ts`, `src/services/email-ingest.service.ts` and
+   `src/routes/internal/email-poll.ts`.
+3. Remove the `emailPollRoutes` import and the
+   `app.route("/api/v1/internal/email", emailPollRoutes)` mount from
+   `src/app.ts` — leaving the route file deleted but still imported there
+   breaks the build.
+4. Remove `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD` and
+   `INTERNAL_POLL_SECRET` from `src/env.ts`'s schema and from `.env.example`.
+5. Delete the Scheduler job and the `imap-password` secret.
+6. Point `REPLY_LOCAL_PART` and `REPLY_DOMAIN` back at the owned domain.
+
+Both paths enter the domain through `processEmailReply`, so nothing in the
+webhook route or the query/email services notices — but `src/app.ts` and
+`src/env.ts` do reference the scaffold directly and need the edits above, not
+just a deletion of the service files.
 
 Written down because otherwise it becomes permanent by inertia, which is how
 almost every scaffold ends.
@@ -349,9 +361,15 @@ curl -s -X POST https://api.agentdialog.io/api/v1/internal/email/poll \
 ```
 
 `{"data":{"scanned":0,...}}` means it connected and the mailbox was empty.
+`401 UNAUTHORIZED` means the `x-internal-secret` header is missing or does not
+match `INTERNAL_POLL_SECRET` — check the Scheduler job's header first, it is
+the likely first-day mistake.
 `503 MAILBOX_NOT_CONFIGURED` means the IMAP variables did not reach the service.
 `502 MAILBOX_UNAVAILABLE` means they did and Gmail refused them — almost always
 the App Password.
+`500 INGEST_FAILED` means the pass itself threw, most likely a database
+outage; nothing is lost when this happens — any message the pass couldn't
+process is left unread, and the next pass retries it.
 
 `{"data":{"skipped":true}}` means another pass held the lock, which is normal.
 
@@ -455,10 +473,12 @@ Two consequences worth knowing:
 
 ## Things that have bitten, and how to recognise them
 
-**`bun run typecheck` fails at the root.** Six pre-existing errors in
-`src/mcp/server.ts`. It is not your change. It also means
-`Dockerfile.cloudrun` — which runs it — is sensitive to any zod resolution
-change; see the `overrides` entry in the root `package.json`.
+**`bun run typecheck` at the root used to fail regardless of your change** —
+six pre-existing errors in `src/mcp/server.ts`. That has been fixed: `bunx tsc
+--noEmit` exits 0 as of this branch. If it fails now, the change under test
+broke something real — do not wave it off as the old, known failure. This
+still means `Dockerfile.cloudrun` — which runs it — is sensitive to any zod
+resolution change; see the `overrides` entry in the root `package.json`.
 
 **A Docker build resolving unexpected dependency versions.** The `COPY` globs
 must be `bun.lock*`. Bun 1.4 writes a text lockfile, and the old `bun.lockb*`

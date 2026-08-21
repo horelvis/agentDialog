@@ -14,9 +14,12 @@ const app = new Hono();
  *
  * This is the scaffold half of inbound email, and it is temporary by design:
  * the day a transactional provider posts to /api/v1/webhooks/email/inbound,
- * this file, src/lib/mailbox.ts, src/services/email-ingest.service.ts and the
- * Scheduler job are deleted, and nothing else changes. See
- * docs/superpowers/specs/2026-08-20-inbound-email-ingestion-design.md.
+ * this file, src/lib/mailbox.ts and src/services/email-ingest.service.ts are
+ * deleted, along with the Scheduler job. That also means removing this file's
+ * import and mount in src/app.ts, and the IMAP_* / INTERNAL_POLL_SECRET
+ * fields from src/env.ts and .env.example — it is not a clean deletion of
+ * just the service files. See the full retirement checklist in
+ * docs/operations.md ("Inbound email: a scaffold with an exit criterion").
  */
 app.post("/poll", async (c) => {
   const e = env();
