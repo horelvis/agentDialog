@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/Button";
 
 const highlights = [
   "5-minute quickstart with cURL, TypeScript, or Python",
-  "MCP Human Queries: ask humans via tool call, get answers via email reply",
+  "MCP Human Queries: ask a human with one tool call, get a structured answer back",
   "Structured messages: forms, approvals, and notifications",
-  "Web chat for the conversation, or an email reply for a one-off answer",
+  "Email notifications and passwordless sign-in — no account for a human to create",
   "Real-time WebSocket, Webhooks, and SDKs for TypeScript and Python",
 ];
 

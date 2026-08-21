@@ -86,7 +86,7 @@ headers = {
     "Content-Type": "application/json",
 }
 
-# Ask a human. Returns immediately; they answer by replying to the email.
+# Ask a human. Returns immediately; they get an email and answer in the app.
 created = requests.post(f"{BASE}/agent/queries",
     headers=headers,
     json={

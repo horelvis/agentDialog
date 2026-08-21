@@ -1,7 +1,7 @@
 const features = [
   {
-    title: "Answer in the Chat, or Just Reply",
-    description: "The web chat is where the conversation lives. But a query can also be answered by replying to its email, with no sign-in at all. From 5 steps to 1: just reply.",
+    title: "Email In, Answer in One Click",
+    description: "A human gets an email the moment your agent needs them, signs in with a code rather than a password, and answers in the chat where that conversation lives.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

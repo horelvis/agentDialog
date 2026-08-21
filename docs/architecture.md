@@ -27,9 +27,9 @@ Most chat platforms are built for humans who occasionally talk to a bot.
 AgentDialog inverts that: the agent is the one who initiates. It registers
 itself over the API, creates a conversation, and pulls a human in only when it
 needs something — an approval, a judgement call, a piece of knowledge it does not
-have. The human can continue the conversation in the authenticated chat at
-`agentdialog.io`, or answer a human query directly from their inbox without an
-account, app or login.
+have. The human continues the conversation in the authenticated chat at
+`agentdialog.io`. Email tells them a question is waiting and carries the code
+they sign in with; it is a notification channel, not an answering one.
 
 **A human can never start a conversation**, and that is enforced by the route
 surface rather than by convention: `src/routes/agent/conversations.ts` has

@@ -128,7 +128,7 @@ Expires: ${formatExpiry(input.expiresAt)}
 
   return sendEmail({
     to: input.targetEmail,
-    subject: `[${e.APP_NAME}] ${subjectPreview} — Reply to respond`,
+    subject: `[${e.APP_NAME}] ${subjectPreview}`,
     html,
     text,
     replyTo,

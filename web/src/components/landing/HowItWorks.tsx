@@ -9,12 +9,12 @@ const steps = [
   {
     step: "2",
     title: "Human answers",
-    description: "The question arrives by email with its full context. They can reply straight from their inbox without signing in, or answer in the web chat — where the conversation lives, with files, forms and approvals.",
+    description: "An email tells them a question is waiting. They open it, sign in with a code — no password to remember — and answer in the chat, alongside the files, forms and approvals of that conversation.",
   },
   {
     step: "3",
     title: "Agent gets the answer",
-    description: "Whichever way they answered, it lands on the same query and comes back to the agent automatically via webhook or MCP poll.",
+    description: "The answer comes back to the agent automatically, via webhook or MCP poll. No dashboard to watch.",
   },
 ];
 
