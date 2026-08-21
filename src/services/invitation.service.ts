@@ -6,6 +6,7 @@ import { conversationParticipants } from "../db/schema/participants";
 import { humans } from "../db/schema/humans";
 import { generateInvitationToken } from "../lib/crypto";
 import { NotFoundError, ConflictError, ForbiddenError } from "../lib/errors";
+import { sameEmail } from "../lib/email-identity";
 import { getOrCreateHuman } from "./human.service";
 import type { CreateInvitationInput } from "../validators/invitation.validators";
 
@@ -132,19 +133,50 @@ export async function acceptInvitation(token: string, humanId: string) {
     throw new ForbiddenError("Invitation has expired");
   }
 
+  // The fourth place the ownership rule has to hold, and until now the one
+  // where it did not. Holding the token was enough to create the participant
+  // row — and from that row on, `respondQuery`, `listHumanQueries` and
+  // `getQueryForHuman` all take the participant branch, where none of the
+  // three email checks apply. So forwarding a query email let whoever
+  // received it sign up, accept, and answer a decision addressed to somebody
+  // else. `processEmailReply` was hardened against exactly this scenario; the
+  // web path was not.
+  const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+  if (!sameEmail(human?.email, invitation.invitedHumanEmail)) {
+    throw new ForbiddenError("This invitation was sent to a different address");
+  }
+
   // Update invitation status
   await db
     .update(invitations)
     .set({ status: "accepted", updatedAt: new Date() })
     .where(eq(invitations.id, invitation.id));
 
-  // Add human as participant
-  await db.insert(conversationParticipants).values({
-    conversationId: invitation.conversationId,
-    actorType: "human",
-    humanId,
-    role: "participant",
-  });
+  // Check-then-insert, the same guard respondQuery's acceptPendingInvitation
+  // uses. There is still no unique constraint on (conversation_id, human_id),
+  // so `.onConflictDoNothing()` would have nothing to conflict against and be
+  // a silent no-op. One protected writer and one unprotected one is the worst
+  // of the three options available: it looks fixed while duplicates keep
+  // arriving through the other door.
+  const [existingParticipant] = await db
+    .select({ id: conversationParticipants.id })
+    .from(conversationParticipants)
+    .where(
+      and(
+        eq(conversationParticipants.conversationId, invitation.conversationId),
+        eq(conversationParticipants.humanId, humanId),
+      ),
+    )
+    .limit(1);
+
+  if (!existingParticipant) {
+    await db.insert(conversationParticipants).values({
+      conversationId: invitation.conversationId,
+      actorType: "human",
+      humanId,
+      role: "participant",
+    });
+  }
 
   return invitation;
 }

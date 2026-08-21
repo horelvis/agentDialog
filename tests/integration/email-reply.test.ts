@@ -1,13 +1,18 @@
 import { describe, expect, it } from "bun:test";
 import { createTestApp, createTestAgent } from "../helpers";
 import { processEmailReply } from "../../src/services/email-response.service";
+import { getDb } from "../../src/db";
+import { humanQueries } from "../../src/db/schema/human-queries";
+import { invitations } from "../../src/db/schema/invitations";
+import { conversationParticipants } from "../../src/db/schema/participants";
+import { and, eq } from "drizzle-orm";
 
 /**
  * The sender check used to warn and carry on, so anyone the query email was
  * forwarded to could answer in the target's name and the agent could not tell.
  */
 
-async function createQuery(targetEmail: string) {
+async function createQuery(targetEmail: string, over: Record<string, unknown> = {}) {
   const app = createTestApp();
   const { authHeader } = await createTestAgent();
   const res = await app.request("/api/v1/agent/queries", {
@@ -20,6 +25,7 @@ async function createQuery(targetEmail: string) {
       answer_space: { kind: "text", max_length: 500 },
       target_human_email: targetEmail,
       timeout_minutes: 60,
+      ...over,
     }),
   });
   expect(res.status).toBe(201);
@@ -88,6 +94,56 @@ describe("processEmailReply sender verification", () => {
       replyText: "Fine by me.",
     });
     expect(result).toEqual({ success: true, query_id: queryId });
+  });
+
+  /**
+   * I5. An email reply is always free text, and `validateAnswerAgainstSpace`
+   * refuses `{kind:"text"}` for every space but `text`. The refusal used to
+   * come AFTER the invitation had been accepted, the participant row inserted
+   * and the query moved to `assigned` — a 422 escaping the handler with all
+   * the side effects already applied.
+   */
+  it("refuses a non-text answer space without touching anything first", async () => {
+    const target = `target-${Date.now()}-typed@example.com`;
+    const { app, authHeader, queryId } = await createQuery(target, {
+      answer_space: {
+        kind: "choice",
+        select: "one",
+        options: [{ id: "ship", label: "Ship" }, { id: "hold", label: "Hold" }],
+      },
+    });
+
+    const result = await processEmailReply({
+      queryId,
+      senderEmail: target,
+      replyText: "Ship it.",
+    });
+    expect(result).toEqual({ answer_space_not_text: true, kind: "choice" });
+
+    // The point of the fix: nothing moved. The query is still `pending`, so
+    // the invitation was not accepted and no participant row was created.
+    const res = await app.request(`/api/v1/agent/queries/${queryId}`, {
+      headers: { Authorization: authHeader },
+    });
+    const { data } = await res.json();
+    expect(data.status).toBe("pending");
+    expect(data.answer).toBeNull();
+
+    const db = getDb();
+    const [row] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
+    expect(row.humanId).toBeNull();
+
+    const invitationRows = await db.select().from(invitations)
+      .where(eq(invitations.conversationId, row.conversationId));
+    expect(invitationRows).toHaveLength(1);
+    expect(invitationRows[0].status).toBe("pending");
+
+    const participants = await db.select().from(conversationParticipants)
+      .where(and(
+        eq(conversationParticipants.conversationId, row.conversationId),
+        eq(conversationParticipants.actorType, "human"),
+      ));
+    expect(participants).toHaveLength(0);
   });
 
   it("reports a query that does not exist", async () => {

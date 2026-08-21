@@ -9,6 +9,7 @@ import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
 import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError, ValidationError } from "../lib/errors";
 import { generateInvitationToken } from "../lib/crypto";
+import { canonicaliseEmail, sameEmail } from "../lib/email-identity";
 import { dispatchWebhooks } from "./webhook.service";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
@@ -29,7 +30,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
   // joins it against `humanQueries.humanEmail`, and normalising only one side
   // would break that join for any mixed-case address instead of just moving
   // the bug.
-  const targetEmail = input.target_human_email.toLowerCase().trim();
+  const targetEmail = canonicaliseEmail(input.target_human_email);
 
   // Admission runs before the transaction opens: a query that a human could not
   // decide never becomes a row, a conversation, an invitation or an email.
@@ -295,7 +296,7 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
   const isPending = query.status === "pending";
   if (isPending) {
     const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
-    if (!human || human.email.toLowerCase().trim() !== query.humanEmail.toLowerCase().trim()) {
+    if (!sameEmail(human?.email, query.humanEmail)) {
       throw new ForbiddenError("You are not the person this query was addressed to");
     }
   } else {
@@ -797,7 +798,7 @@ export async function listHumanQueries(humanId: string) {
     visibility.push(
       and(
         eq(humanQueries.status, "pending"),
-        eq(humanQueries.humanEmail, human.email.toLowerCase().trim()),
+        eq(humanQueries.humanEmail, canonicaliseEmail(human.email)),
       ),
     );
   }
@@ -872,7 +873,7 @@ export async function getQueryForHuman(queryId: string, humanId: string) {
     if (query.status !== "pending") throw new NotFoundError("Query", queryId);
 
     const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
-    if (!human || human.email.toLowerCase().trim() !== query.humanEmail.toLowerCase().trim()) {
+    if (!sameEmail(human?.email, query.humanEmail)) {
       throw new NotFoundError("Query", queryId);
     }
   }

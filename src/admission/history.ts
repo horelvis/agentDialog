@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { humanQueries } from "../db/schema/human-queries";
 import { env } from "../env";
+import { canonicaliseEmail } from "../lib/email-identity";
 import { atLeast, type Risk } from "./decidability";
 import type { AnswerSpace } from "../lib/answer-space";
 
@@ -37,7 +38,7 @@ export async function findPriorDecision(
     .where(
       and(
         eq(humanQueries.agentId, agentId),
-        eq(humanQueries.humanEmail, humanEmail.toLowerCase().trim()),
+        eq(humanQueries.humanEmail, canonicaliseEmail(humanEmail)),
         eq(humanQueries.status, "answered"),
         sql`${humanQueries.subject}->>'id' = ${subjectId}`,
       ),
