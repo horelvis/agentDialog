@@ -77,12 +77,18 @@ export const listQueriesQuerySchema = z.object({
 
 export type ListQueriesQueryInput = z.infer<typeof listQueriesQuerySchema>;
 
-export const patchQuerySchema = z.object({
+// Kept separate from `patchQuerySchema` so the MCP `clarify_query` tool can
+// build its argument schema from the exact same field definitions, rather
+// than duplicating them and risking drift.
+export const patchQueryFields = {
   subject: subjectSchema.optional(),
   changes: z.array(changeSchema).max(100).optional(),
   answer_space: answerSpaceSchema.optional(),
   question: z.string().min(1).max(10_000).optional(),
   context: z.string().max(100_000).optional(),
-}).refine((v) => Object.keys(v).length > 0, { message: "nothing to update" });
+};
+
+export const patchQuerySchema = z.object(patchQueryFields)
+  .refine((v) => Object.keys(v).length > 0, { message: "nothing to update" });
 
 export type PatchQueryInput = z.infer<typeof patchQuerySchema>;

@@ -520,6 +520,8 @@ export async function getQuery(queryId: string, agentId: string) {
     pending: "The human has been invited but hasn't accepted the invitation yet. They need to open the link in their email and answer in the app — answering automatically accepts the invitation. Keep polling — wait 10-30 seconds before checking again.",
     assigned: "The human has accepted the invitation and can see your query, but hasn't submitted their answer yet. Keep polling — wait 10-30 seconds before checking again.",
     answered: "The human has responded. Their answer is in the 'answer' field below. No further polling needed.",
+    needs_context: "The human could not decide with what you gave them. Read `insufficient_reason`, then clarify the query with what is missing. The clock is paused while you do.",
+    cancelled: "You withdrew this query. Create a new one if you still need an answer.",
     expired: "The query has expired without a response. The human did not answer in time. You may create a new query if needed.",
   };
 
@@ -535,6 +537,10 @@ export async function getQuery(queryId: string, agentId: string) {
     comment: effectiveStatus === "answered" ? query.answerComment : null,
     human_confidence: effectiveStatus === "answered" ? query.answerConfidence : null,
     response_time_ms: effectiveStatus === "answered" ? query.responseTimeMs : null,
+    // The needs_context hint tells the agent to read this field, so it has to
+    // actually be here — a status row on its own doesn't say what the human
+    // was missing.
+    insufficient_reason: effectiveStatus === "needs_context" ? query.insufficientReason : null,
     created_at: query.createdAt.toISOString(),
     expires_at: query.expiresAt.toISOString(),
   };

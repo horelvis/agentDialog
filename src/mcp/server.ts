@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { createQuery, getQuery, listAgentQueries } from "../services/query.service";
-import { subjectSchema, changeSchema } from "../validators/query.validators";
+import { createQuery, getQuery, listAgentQueries, updateQuery, cancelQuery } from "../services/query.service";
+import { subjectSchema, changeSchema, patchQueryFields } from "../validators/query.validators";
 import { answerSpaceSchema } from "../lib/answer-space";
 
 export function createMcpServer() {
@@ -13,22 +13,21 @@ export function createMcpServer() {
   // Tool: human_query
   server.tool(
     "human_query",
-    `Create a query for a human to answer. Creates a conversation, invites the human, and sends the question. Returns a query_id to poll for the response.
+    `Ask a human a question they can actually decide, and get a structured answer back.
 
-IMPORTANT workflow:
-- If the human has NOT previously accepted a query from you, they will receive an invitation email they must accept first. Status will be "pending".
-- If the human has previously accepted (trusted agent), they are auto-assigned. Status will be "assigned".
-- After creating a query, use get_query to poll for the answer. Wait at least 10-30 seconds between polls.
-- Queries expire after timeout_minutes (default: 60 min).
+WHAT YOU MUST PROVIDE:
+- subject: what this is about. A stable id you reuse for the same thing, a label the human will recognise, and a referent they can look at — an attachment, a uri, or inline body. A question about a thing without the thing is refused.
+- answer_space: how they answer. Pick one of boolean, choice, scalar, date, text or fields. Free text is only accepted at low risk.
+- risk: your honest floor. The system raises it on its own when it sees money or a prior decision; it never lowers it.
 
-The query is admitted only if a human could actually decide it: give it a
-'subject' the human can look at (a uri, an inline 'body', or attachments), or
-set self_contained to true for a question that needs no referent. Give it an
-'answer_space' describing the shape of an acceptable answer — a boolean,
-a choice among options, a scalar, a date, free text, or a set of fields.
-Above 'low' risk, free text is refused and each branch must state its
-consequence. A refused query returns reason, detail and remedy so you can
-correct the payload and retry.`,
+WHAT THE SYSTEM DEMANDS OF YOU:
+- Above low risk, every branch must say what it causes (consequence / effect).
+- If this person already decided about this subject, you must send \`changes\` saying what changed since. The system checks its own records, so omitting it does not help.
+- Above medium risk, we must hold the artefact ourselves (attachment or body) and you must send its sha256.
+
+A refusal comes back as 422 with a \`remedy\` field telling you exactly what to add. Read it and retry.
+
+The human may answer, or reply that they lack context — in which case the query returns to you as needs_context and you clarify with clarify_query.`,
     {
       query_type: z.enum(["validation", "interpretation", "expert_query", "labeling"])
         .describe("Type of query: validation (yes/no), interpretation (explain), expert_query (domain knowledge), labeling (classify/tag)"),
@@ -99,6 +98,112 @@ correct the payload and retry.`,
     },
   );
 
+  // Tool: clarify_query
+  server.tool(
+    "clarify_query",
+    `Supply what a human said was missing, after get_query reports status "needs_context".
+
+Only valid from that status — calling it on any other query is refused. The
+query's clock is paused while it sits in needs_context, so there is no rush,
+but there is a limit on how many times a single query may be clarified; once
+that cap is reached the query is refused with a remedy telling you to open a
+new query instead.
+
+Send only the fields that address what the human flagged as missing:
+subject (if the referent itself needs fixing), changes (if this is a delta on
+a prior decision), answer_space, question or context. Anything you omit keeps
+its previous value. On success the query returns to "assigned" and the human
+can answer again.`,
+    {
+      query_id: z.string().uuid().describe("The query ID, currently in needs_context"),
+      subject: patchQueryFields.subject
+        .describe("Replacement referent, if the human said they could not find or trust it"),
+      changes: patchQueryFields.changes
+        .describe("Before/after delta, if the human said this looks like a prior decision they need updated"),
+      answer_space: patchQueryFields.answer_space
+        .describe("Replacement answer shape, if the human said they could not answer in the one offered"),
+      question: patchQueryFields.question
+        .describe("Reworded question, if the human said the original was unclear"),
+      context: patchQueryFields.context
+        .describe("Additional context to resolve what the human flagged as missing"),
+    },
+    async (args, extra) => {
+      const agentId = (extra as any).agentId as string;
+      if (!agentId) {
+        console.warn("[MCP:TOOL] clarify_query called without agentId");
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: "Authentication required" }) }],
+          isError: true,
+        };
+      }
+
+      console.log(`[MCP:TOOL] clarify_query called by ${agentId} (queryId: ${args.query_id})`);
+
+      try {
+        const { query_id, ...patch } = args;
+        const result = await updateQuery(query_id, agentId, patch);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+      } catch (err: any) {
+        // Same reasoning as human_query: a refusal is actionable, so hand the
+        // agent the whole shape rather than just the message.
+        const payload = err?.code === "UNDECIDABLE_QUERY"
+          ? { error: err.message, code: err.code, reason: err.reason,
+              remedy: err.remedy, prior_query_id: err.priorQueryId }
+          : { error: err.message };
+        console.error(`[MCP:TOOL] clarify_query error for ${agentId}:`, err);
+        return {
+          content: [{ type: "text", text: JSON.stringify(payload) }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // Tool: cancel_query
+  server.tool(
+    "cancel_query",
+    `Withdraw a query whose context has moved on, before the human answers.
+
+An answer that already landed wins: if the human answered first, this call
+returns a conflict rather than silently discarding their decision, so check
+the result rather than assuming the withdrawal took effect. Once cancelled,
+the query is closed for good — create a new one if you still need an answer.`,
+    {
+      query_id: z.string().uuid().describe("The query ID to withdraw"),
+    },
+    async (args, extra) => {
+      const agentId = (extra as any).agentId as string;
+      if (!agentId) {
+        console.warn("[MCP:TOOL] cancel_query called without agentId");
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: "Authentication required" }) }],
+          isError: true,
+        };
+      }
+
+      console.log(`[MCP:TOOL] cancel_query called by ${agentId} (queryId: ${args.query_id})`);
+
+      try {
+        const result = await cancelQuery(args.query_id, agentId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+      } catch (err: any) {
+        const payload = err?.code === "UNDECIDABLE_QUERY"
+          ? { error: err.message, code: err.code, reason: err.reason,
+              remedy: err.remedy, prior_query_id: err.priorQueryId }
+          : { error: err.message };
+        console.error(`[MCP:TOOL] cancel_query error for ${agentId}:`, err);
+        return {
+          content: [{ type: "text", text: JSON.stringify(payload) }],
+          isError: true,
+        };
+      }
+    },
+  );
+
   // Tool: get_query
   server.tool(
     "get_query",
@@ -108,6 +213,8 @@ Status meanings:
 - "pending": The human has been invited but hasn't accepted the invitation yet. They need to check their email and accept first.
 - "assigned": The human has accepted (or was auto-trusted) and can see the query, but hasn't answered yet.
 - "answered": The human has responded. Check the "answer" field for their response.
+- "needs_context": The human could not decide with what you gave them. Read the reason and use clarify_query to supply what is missing. The clock is paused until you do.
+- "cancelled": You withdrew this query with cancel_query.
 - "expired": The timeout elapsed without a response. The query is closed.
 
 Polling tips: Wait 10-30 seconds between checks. If status is "pending" for a long time, the human may not have seen the invitation email.`,
