@@ -37,13 +37,18 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
   // History first: it decides both the effective risk and whether a delta is
   // owed, and the payload rules are judged at the ELEVATED risk, not the
   // declared one.
-  const prior = await findPriorDecision(agentId, input.target_human_email, input.subject.id);
+  const prior = await findPriorDecision(agentId, targetEmail, input.subject.id);
   const risk = elevateRisk(input.risk, {
     hasPriorDecision: prior !== null,
     answerSpace: input.answer_space,
   });
 
-  if (prior && risk !== "low" && (!input.changes || input.changes.length === 0)) {
+  // No `risk !== "low"` here: a prior decision elevates to at least `medium`
+  // on its own, so that conjunction was always true whenever `prior` was set.
+  // The spec used to describe a `low`-risk branch where the delta was merely
+  // shown rather than demanded; the code could never reach it, and the spec
+  // has been corrected to say what this does.
+  if (prior && (!input.changes || input.changes.length === 0)) {
     throw new UndecidableQueryError(
       "prior_decision_without_delta",
       `This person decided about '${input.subject.id}' on ${prior.decidedAt.toISOString().slice(0, 10)}.`,
@@ -105,7 +110,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
     const [human] = await tx
       .select()
       .from(humans)
-      .where(eq(humans.email, input.target_human_email))
+      .where(eq(humans.email, targetEmail))
       .limit(1);
 
     if (human) {
@@ -116,7 +121,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         .where(
           and(
             eq(invitations.invitedByAgentId, agentId),
-            eq(invitations.invitedHumanEmail, input.target_human_email),
+            eq(invitations.invitedHumanEmail, targetEmail),
             eq(invitations.status, "accepted"),
           ),
         )
@@ -151,12 +156,12 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
 
           humanId = human.id;
           status = "assigned";
-          console.log(`[QUERY] Auto-accepted: ${input.target_human_email} trusts agent ${agentId}`);
+          console.log(`[QUERY] Auto-accepted: ${targetEmail} trusts agent ${agentId}`);
         } else {
-          console.log(`[QUERY] Trust revoked: ${input.target_human_email} revoked agent ${agentId}`);
+          console.log(`[QUERY] Trust revoked: ${targetEmail} revoked agent ${agentId}`);
         }
       } else {
-        console.log(`[QUERY] No prior trust: ${input.target_human_email} has no accepted invitations from agent ${agentId}`);
+        console.log(`[QUERY] No prior trust: ${targetEmail} has no accepted invitations from agent ${agentId}`);
       }
     }
 
@@ -236,16 +241,16 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       queryType: input.query_type,
       subject: input.subject,
       changes: input.changes,
-      targetEmail: input.target_human_email,
+      targetEmail,
       expiresAt,
       invitationToken: token,
     });
-    console.log(`[QUERY] Query email sent to ${input.target_human_email}`);
+    console.log(`[QUERY] Query email sent to ${targetEmail}`);
   } catch (emailErr) {
-    console.error(`[QUERY] Email FAILED for ${input.target_human_email}:`, emailErr);
+    console.error(`[QUERY] Email FAILED for ${targetEmail}:`, emailErr);
   }
 
-  console.log(`[QUERY] Created ${query.id} for ${input.target_human_email} (status: ${status}, type: ${input.query_type}, agent: ${agentId})`);
+  console.log(`[QUERY] Created ${query.id} for ${targetEmail} (status: ${status}, type: ${input.query_type}, agent: ${agentId})`);
 
   return {
     query_id: query.id,
@@ -592,9 +597,13 @@ export async function updateQuery(queryId: string, agentId: string, input: Patch
   if (query.clarificationRounds >= MAX_CLARIFICATION_ROUNDS) {
     // Unfreeze on the way out. The clock only pauses while the agent can still
     // act; leaving it paused here would freeze the query for ever.
+    //
+    // Guarded on the status, exactly like the successful branch below: the
+    // human may have answered, or the agent cancelled, between the SELECT
+    // above and this write, and neither should be dragged back to unpaused.
     await db.update(humanQueries)
       .set({ pausedAt: null, updatedAt: new Date() })
-      .where(eq(humanQueries.id, queryId));
+      .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "needs_context")));
 
     throw new UndecidableQueryError(
       "clarification_rounds_exhausted",
@@ -605,8 +614,29 @@ export async function updateQuery(queryId: string, agentId: string, input: Patch
 
   const subject = (input.subject ?? query.subject) as Subject;
   const answerSpace = (input.answer_space ?? query.answerSpace) as unknown as AnswerSpace;
+
+  // Re-run elevation on the patched payload, and persist the result.
+  //
+  // A PATCH is exempt from prior-decision DETECTION - demanding a delta from a
+  // query that is being clarified would be circular, since the human asked for
+  // the clarification. That exemption was applied as "the PATCH skips history
+  // altogether", which let the monetary half of elevation be laundered away: a
+  // cheap `low` query, a request for context, then a PATCH swapping
+  // `answer_space` for {kind:"scalar", unit:"EUR", max:50000}. The risk stayed
+  // `low`, so no consequences, no hash and no held referent were required.
+  //
+  // Elevation from an amount needs no history at all, so it is recomputed here
+  // from the payload as patched. `hasPriorDecision` carries the floor the row
+  // already holds rather than a fresh lookup: `atLeast` never lowers, so a
+  // query that was elevated to `medium` on creation stays there.
+  const storedRisk = query.risk as Risk;
+  const risk = elevateRisk(storedRisk, {
+    hasPriorDecision: false,
+    answerSpace,
+  });
+
   const verdict = checkPayload({
-    risk: query.risk as Risk,
+    risk,
     subject,
     self_contained: query.selfContained,
     answer_space: answerSpace,
@@ -623,6 +653,7 @@ export async function updateQuery(queryId: string, agentId: string, input: Patch
     .set({
       status: "assigned",
       subject,
+      risk,
       answerSpace,
       changes: input.changes ?? query.changes,
       question: input.question ?? query.question,
@@ -688,18 +719,22 @@ export async function getQuery(queryId: string, agentId: string) {
 
   if (!query) throw new NotFoundError("Query", queryId);
 
-  // Lazy expire check
+  // Lazy expire check. Guarded on the status we read, so an answer that
+  // landed between the SELECT and this UPDATE is not overwritten with
+  // `expired` — losing a person's decision to a race is the one thing this
+  // system may not do.
   let effectiveStatus = query.status;
-  if (
-    (query.status === "pending" || query.status === "assigned") &&
-    new Date() > query.expiresAt
-  ) {
-    await db
+  if (isExpirable(query) && new Date() > query.expiresAt) {
+    const [expired] = await db
       .update(humanQueries)
       .set({ status: "expired", updatedAt: new Date() })
-      .where(eq(humanQueries.id, queryId));
-    effectiveStatus = "expired";
-    console.log(`[QUERY] Expired: ${queryId} (was ${query.status})`);
+      .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, query.status)))
+      .returning({ id: humanQueries.id });
+
+    if (expired) {
+      effectiveStatus = "expired";
+      console.log(`[QUERY] Expired: ${queryId} (was ${query.status})`);
+    }
   }
 
   return shapeQuery(query, effectiveStatus);
@@ -768,30 +803,41 @@ export async function listHumanQueries(humanId: string) {
   }
   if (visibility.length === 0) return [];
 
+  // `needs_context` is fetched but never shown: the turn is the agent's, so
+  // the human has nothing to do with it. It is here only so this sweep can
+  // expire an abandoned one — see EXPIRABLE_STATUSES. Without that, the only
+  // sweep that runs on the human's side skipped it and it never died.
   const rows = await db
     .select()
     .from(humanQueries)
     .where(
       and(
-        inArray(humanQueries.status, ["pending", "assigned"]),
+        inArray(humanQueries.status, [...EXPIRABLE_STATUSES]),
         or(...visibility),
       ),
     )
     .orderBy(desc(humanQueries.createdAt));
 
-  // Batch expire in a single UPDATE instead of N individual queries
+  // Batch expire in a single UPDATE instead of N individual queries. Guarded
+  // on the statuses we read, so a row that moved on in the meantime is left
+  // alone rather than stomped.
   const now = new Date();
-  const expiredIds = rows.filter((q) => now > q.expiresAt).map((q) => q.id);
+  const expiredIds = rows.filter((q) => isExpirable(q) && now > q.expiresAt).map((q) => q.id);
 
   if (expiredIds.length > 0) {
     await db
       .update(humanQueries)
       .set({ status: "expired", updatedAt: now })
-      .where(inArray(humanQueries.id, expiredIds));
+      .where(and(
+        inArray(humanQueries.id, expiredIds),
+        inArray(humanQueries.status, [...EXPIRABLE_STATUSES]),
+      ));
     console.log(`[QUERY] Batch expired ${expiredIds.length} queries`);
   }
 
-  const visible = rows.filter((q) => now <= q.expiresAt);
+  const visible = rows.filter(
+    (q) => now <= q.expiresAt && (q.status === "pending" || q.status === "assigned"),
+  );
   return Promise.all(visible.map((q) => shapeHumanQuery(q, { includePriorDecision: true })));
 }
 
@@ -832,6 +878,27 @@ export async function getQueryForHuman(queryId: string, humanId: string) {
   }
 
   return shapeHumanQuery(query, { includePriorDecision: true });
+}
+
+/**
+ * Which statuses a sweep may expire.
+ *
+ * `needs_context` belongs here. The spec is explicit that the pause only
+ * applies while the agent can still act — with the clarification rounds
+ * exhausted, "the pause is not applied and the query expires normally" — and
+ * without this a query whose PATCH ran out, or that the agent simply
+ * abandoned, sat in `needs_context` for ever with an `expires_at` in the past
+ * that nothing would ever act on.
+ *
+ * A *paused* `needs_context` query is deliberately excluded: the clock is
+ * frozen while the turn is genuinely the agent's, which is the whole point of
+ * `paused_at`.
+ */
+const EXPIRABLE_STATUSES = ["pending", "assigned", "needs_context"] as const;
+
+function isExpirable(query: Pick<typeof humanQueries.$inferSelect, "status" | "pausedAt">): boolean {
+  if (query.status === "pending" || query.status === "assigned") return true;
+  return query.status === "needs_context" && query.pausedAt === null;
 }
 
 /** A one-line rendering of a typed answer, for the conversation transcript. */

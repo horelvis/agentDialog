@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { createTestApp, createTestAgent } from "../helpers";
+import { createTestApp, createTestAgent, createTestHuman } from "../helpers";
 import { respondQuery } from "../../src/services/query.service";
 import { getDb } from "../../src/db";
 import { humanQueries } from "../../src/db/schema/human-queries";
+import { invitations } from "../../src/db/schema/invitations";
+import { conversationParticipants } from "../../src/db/schema/participants";
 import { eq } from "drizzle-orm";
 
 /**
@@ -120,6 +122,55 @@ describe("decisión previa sobre el mismo asunto", () => {
     const second = await create(authHeader, payload({ target_human_email: mixedCaseEmail }));
     expect(second.status).toBe(422);
     expect((await second.json()).error.reason).toBe("prior_decision_without_delta");
+  });
+});
+
+/**
+ * I2. `createQuery` canonicalises the address before it writes it, but the
+ * three trust lookups kept searching with whatever casing the agent sent. An
+ * agent that wrote `Direccion@Empresa.es` therefore stored a lowercase row and
+ * then searched for a capitalised one, found no prior accepted invitation, and
+ * that person lost auto-trust permanently.
+ */
+describe("auto-confianza y mayúsculas", () => {
+  it("auto-assigns a trusted human even when the agent capitalises the address", async () => {
+    const { authHeader } = await createTestAgent();
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const lower = `trust-${stamp}@example.com`;
+    const mixed = `Trust-${stamp}@Example.com`;
+
+    // The human has been asked once already and accepted — set up through the
+    // normal path, so the invitation row is whatever createQuery writes.
+    const first = await create(authHeader, payload({
+      subject: { id: `trust-a-${stamp}`, label: "A", body: "x" },
+      target_human_email: lower,
+    }));
+    expect(first.status).toBe(201);
+
+    // Signing in requires an invitation, so this comes after the first query.
+    const human = await createTestHuman(lower);
+    const db = getDb();
+    const [firstRow] = await db.select().from(humanQueries)
+      .where(eq(humanQueries.id, (await first.json()).data.query_id));
+    await db.update(invitations)
+      .set({ status: "accepted" })
+      .where(eq(invitations.conversationId, firstRow.conversationId));
+    await db.insert(conversationParticipants).values({
+      conversationId: firstRow.conversationId,
+      actorType: "human",
+      humanId: human.human.id,
+      role: "participant",
+    }).onConflictDoNothing();
+
+    // Now the same agent asks the same person again, capitalised. Trust must
+    // still be found: the query comes back `assigned`, not `pending`.
+    const second = await create(authHeader, payload({
+      subject: { id: `trust-b-${stamp}`, label: "B", body: "x" },
+      target_human_email: mixed,
+    }));
+    expect(second.status).toBe(201);
+    const { data } = await second.json();
+    expect(data.status).toBe("assigned");
   });
 });
 
