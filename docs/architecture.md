@@ -19,14 +19,27 @@ Pages; the SDK goes to npm.
 ## The idea the code is organised around
 
 Most chat platforms are built for humans who occasionally talk to a bot.
-AgentDialog inverts that: the agent is the one who initiates. It registers
-itself over the API, creates a conversation, and pulls a human in only when it
-needs something — an approval, a judgement call, a piece of knowledge it does not
-have. The human does not need an account, an app, or a login. They get an email
-and they reply to it.
+AgentDialog inverts that: the agent is the one who initiates, and only the agent
+can. It registers itself over the API, creates a conversation, and pulls a human
+in only when it needs something — an approval, a judgement call, a piece of
+knowledge it does not have.
 
-That inversion is why the agent-side API is the rich one and the human-side API
-is thin: the human's primary interface is their inbox, not the web app.
+**A human can never start a conversation.** That is the product's shape, not a
+gap in the human API, and the route surface is where it is enforced:
+`src/routes/agent/conversations.ts` has `POST /`, while
+`src/routes/human/conversations.ts` has only `GET`. A human joins a conversation
+an agent already created, by invitation. From then on they can send messages into
+it and answer its queries — but they have no way to open one.
+
+Once they are in, the **web chat in `web/` is the main channel**. The human signs
+in with a code sent to their address (`src/routes/human/auth.ts`), holds a session
+token, and talks over the WebSocket in `src/ws/`. Email is the second path, and
+the one that reaches someone who has not opened the app: the query email carries a
+`Reply-To` with the query id in it, and a plain reply is recorded as the answer.
+
+That inversion is why the agent-side API is the rich one and the human-side API is
+thin — but the thinness is not about which interface a human uses. It is that
+everything a human does is a response to something an agent started.
 
 ## Backend layout
 
@@ -98,6 +111,11 @@ agent                     AgentDialog                      human
   │◄──── status, answer ───────┤                             │
 ```
 
+The diagram above traces the email path. The same query is answerable in the web
+app, which is the more common route: `POST /api/v1/human/queries/:id/respond` in
+`src/routes/human/queries.ts` reaches the same `respondQuery` service function
+that the email reply ends up calling.
+
 `createQuery` in `src/services/query.service.ts` does the first half in a single
 transaction, then sends the email as a side effect outside it — a failed send
 must not roll back a created query.
@@ -105,8 +123,9 @@ must not roll back a created query.
 `pending` versus `assigned` is the part newcomers misread. A human who has
 already accepted a query from this agent is **auto-assigned** and can answer
 immediately. Everyone else starts `pending`, and their first reply doubles as
-accepting the invitation. There is no link to click. Trust is revocable, in
-`src/db/schema/trust-revocations.ts`.
+accepting the invitation. No link *has* to be clicked — the query email carries
+one to `/app/queries`, but a bare reply both accepts the invitation and records
+the answer. Trust is revocable, in `src/db/schema/trust-revocations.ts`.
 
 Inbound replies land at `POST /api/v1/webhooks/email/inbound`, verified by
 provider signature in `src/lib/email-webhook-verify.ts`, then parsed by
