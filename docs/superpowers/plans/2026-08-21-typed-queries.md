@@ -648,10 +648,10 @@ describe("consequences", () => {
   });
 
   it("requires both branches of a boolean above low risk", () => {
-    const half: AnswerSpace = {
-      kind: "boolean", labels: { t: "Sí", f: "No" },
-    };
-    expect(checkPayload(input({ risk: "medium", answer_space: half }).admit).valueOf()).toBe(false);
+    const half: AnswerSpace = { kind: "boolean", labels: { t: "Sí", f: "No" } };
+    const v = checkPayload(input({ risk: "medium", answer_space: half }));
+    expect(v.admit).toBe(false);
+    if (!v.admit) expect(v.reason).toBe("missing_consequences");
   });
 
   it("requires a single effect on continuous spaces above low risk", () => {
@@ -885,8 +885,6 @@ export function checkPayload(input: AdmissionInput): AdmissionVerdict {
 
 Run: `bun test tests/unit/decidability.test.ts`
 Expected: PASS
-
-Nota: el test «requires both branches of a boolean above low risk» está escrito de forma retorcida (`.admit).valueOf()`). Si te resulta confuso, reescríbelo como los demás con `expect(v.admit).toBe(false)`; el comportamiento comprobado es el mismo.
 
 - [ ] **Step 5: Suite completa, typecheck y commit**
 
