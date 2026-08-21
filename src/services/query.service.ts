@@ -19,6 +19,17 @@ import type { CreateQueryInput, RespondQueryInput } from "../validators/query.va
 export async function createQuery(agentId: string, input: CreateQueryInput) {
   const db = getDb();
 
+  // Canonicalised once and reused for every row that persists this address.
+  // `findPriorDecision` searches by a lowercased, trimmed email — if the
+  // stored address kept its original casing, a second question about the
+  // same subject from an agent that capitalised it differently would find no
+  // prior decision, silently bypassing the very rule this exists to enforce.
+  // `invitedHumanEmail` must be canonicalised the same way: `processEmailReply`
+  // joins it against `humanQueries.humanEmail`, and normalising only one side
+  // would break that join for any mixed-case address instead of just moving
+  // the bug.
+  const targetEmail = input.target_human_email.toLowerCase().trim();
+
   // Admission runs before the transaction opens: a query that a human could not
   // decide never becomes a row, a conversation, an invitation or an email.
   //
@@ -79,7 +90,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       .values({
         conversationId: conversation.id,
         invitedByAgentId: agentId,
-        invitedHumanEmail: input.target_human_email,
+        invitedHumanEmail: targetEmail,
         token,
         message: input.question,
         expiresAt: invitationExpiresAt,
@@ -175,7 +186,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       .insert(humanQueries)
       .values({
         agentId,
-        humanEmail: input.target_human_email,
+        humanEmail: targetEmail,
         humanId,
         conversationId: conversation.id,
         queryMessageId: queryMessage.id,

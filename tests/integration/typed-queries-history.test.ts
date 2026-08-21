@@ -102,6 +102,25 @@ describe("decisión previa sobre el mismo asunto", () => {
     const second = await create(b.authHeader, payload({ target_human_email: email }));
     expect(second.status).toBe(201);
   });
+
+  it("finds the prior decision regardless of how the address is capitalised", async () => {
+    const { authHeader } = await createTestAgent();
+    const mixedCaseEmail = `Mixed-${Date.now()}@Example.com`;
+
+    const first = await create(authHeader, payload({ target_human_email: mixedCaseEmail }));
+    expect(first.status).toBe(201);
+    const { data } = await first.json();
+
+    const db = getDb();
+    await db.update(humanQueries)
+      .set({ status: "answered", answer: { kind: "choice", option_ids: ["yes"] } })
+      .where(eq(humanQueries.id, data.query_id));
+
+    // Same subject, same person, same casing as before — the delta must still be demanded.
+    const second = await create(authHeader, payload({ target_human_email: mixedCaseEmail }));
+    expect(second.status).toBe(422);
+    expect((await second.json()).error.reason).toBe("prior_decision_without_delta");
+  });
 });
 
 describe("elevación del riesgo", () => {
