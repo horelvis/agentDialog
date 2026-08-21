@@ -62,7 +62,10 @@ describe("processEmailReply sender verification", () => {
     });
     const { data } = await res.json();
     expect(data.status).toBe("answered");
-    expect(data.answer).toBe("Yes, ship it.");
+    // Interim shape until the typed answer-space work (Task 6) lands: answer
+    // is now jsonb, and respondQuery wraps every plain-text answer as
+    // {kind:"text", value:...} rather than storing the bare string.
+    expect(data.answer).toEqual({ kind: "text", value: "Yes, ship it." });
 
     // A second pass over the same message must not disturb the answer.
     const again = await processEmailReply({

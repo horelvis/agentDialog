@@ -21,7 +21,11 @@ export const humanQueries = pgTable("human_queries", {
   subject: jsonb("subject").$type<Record<string, unknown>>().notNull().default({}),
   selfContained: boolean("self_contained").notNull().default(false),
   changes: jsonb("changes").$type<Array<Record<string, unknown>>>(),
-  answerSpace: jsonb("answer_space").$type<Record<string, unknown>>().notNull().default({}),
+  // Defaults to the text space: a row written by code that predates the
+  // typed answer-space work is genuinely a prose query, and this is its
+  // honest description — the same one the migration gives legacy rows.
+  answerSpace: jsonb("answer_space").$type<Record<string, unknown>>().notNull()
+    .default({ kind: "text", max_length: 32000 }),
   clarificationRounds: integer("clarification_rounds").notNull().default(0),
   pausedAt: timestamp("paused_at", { withTimezone: true }),
   insufficientReason: varchar("insufficient_reason", { length: 64 }),

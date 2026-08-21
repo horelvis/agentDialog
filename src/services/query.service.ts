@@ -268,7 +268,10 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
       status: "answered",
       humanId,
       responseMessageId: responseMessage.id,
-      answer: input.answer,
+      // Interim shape until the typed answer-space work (Task 6) lands and
+      // replaces this with the real structured answer. `answer` is jsonb;
+      // this keeps every row's answer honestly typed as text in the meantime.
+      answer: { kind: "text", value: input.answer },
       answerComment: input.comment,
       answerConfidence: input.confidence,
       responseTimeMs,

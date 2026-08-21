@@ -57,6 +57,13 @@
       "when": 1773400000000,
       "tag": "0007_typed_queries",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773400100000,
+      "tag": "0008_answer_space_text_default",
+      "breakpoints": true
     }
   ]
 }
