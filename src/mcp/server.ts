@@ -84,9 +84,15 @@ correct the payload and retry.`,
           content: [{ type: "text", text: JSON.stringify(result) }],
         };
       } catch (err: any) {
+        // A refusal is actionable, so hand the agent the whole shape rather than
+        // just the message: reason and remedy are what let it retry correctly.
+        const payload = err?.code === "UNDECIDABLE_QUERY"
+          ? { error: err.message, code: err.code, reason: err.reason,
+              remedy: err.remedy, prior_query_id: err.priorQueryId }
+          : { error: err.message };
         console.error(`[MCP:TOOL] human_query error for ${agentId}:`, err);
         return {
-          content: [{ type: "text", text: JSON.stringify({ error: err.message }) }],
+          content: [{ type: "text", text: JSON.stringify(payload) }],
           isError: true,
         };
       }
