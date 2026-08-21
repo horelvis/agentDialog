@@ -82,11 +82,15 @@ describe("root entry point, from dist", () => {
     const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
     const created = await client.createQuery({
       queryType: "validation",
+      subject: { id: "deploy-v2.3", label: "Deploy v2.3 to production" },
+      answerSpace: { kind: "boolean", labels: { t: "Yes", f: "No" } },
       question: "Ship it?",
       targetHumanEmail: "someone@example.com",
     });
 
-    expect(JSON.parse(String(calls[0].init.body)).target_human_email).toBe("someone@example.com");
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body.target_human_email).toBe("someone@example.com");
+    expect(body.answer_space).toEqual({ kind: "boolean", labels: { t: "Yes", f: "No" } });
     expect(created.queryId).toBe("q1");
     expect(created.conversationId).toBe("c1");
   });
@@ -129,7 +133,15 @@ describe("adapter subpaths, from dist", () => {
 
     const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
     const tool = askHumanTool(client, { defaultEmail: "owner@example.com" });
-    const result = await tool.execute({ question: "Ship it?", queryType: "validation" }, {});
+    const result = await tool.execute(
+      {
+        question: "Ship it?",
+        queryType: "validation",
+        subject: { id: "deploy-v2.3", label: "Deploy v2.3 to production" },
+        answerSpace: { kind: "boolean", labels: { t: "Yes", f: "No" } },
+      },
+      {},
+    );
 
     expect(result.queryId).toBe("q2");
     expect(calls[0].url).toBe("https://example.test/api/v1/agent/queries");

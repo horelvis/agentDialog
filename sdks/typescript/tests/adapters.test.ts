@@ -20,6 +20,9 @@ function mockFetch(payload: unknown) {
 
 const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
 
+const subject = { id: "deploy-v2.3", label: "Deploy v2.3 to production" };
+const answerSpace = { kind: "boolean" as const, labels: { t: "Yes", f: "No" } };
+
 describe("Vercel AI SDK adapter", () => {
   it("askHumanTool creates a query and returns the id", async () => {
     const calls = mockFetch({
@@ -27,7 +30,7 @@ describe("Vercel AI SDK adapter", () => {
     });
     const tool = askHumanTool(client, { defaultEmail: "owner@example.com" });
     const result = await tool.execute!(
-      { question: "Ship it?", queryType: "validation" },
+      { question: "Ship it?", queryType: "validation", subject, answerSpace },
       {} as any,
     );
     expect(result.queryId).toBe("q1");
@@ -35,6 +38,8 @@ describe("Vercel AI SDK adapter", () => {
     const body = JSON.parse(String(calls[0].init.body));
     expect(body.target_human_email).toBe("owner@example.com");
     expect(body.question).toBe("Ship it?");
+    expect(body.subject).toEqual(subject);
+    expect(body.answer_space).toEqual({ kind: "boolean", labels: { t: "Yes", f: "No" } });
   });
 
   it("checkAnswerTool reads a query", async () => {
@@ -42,22 +47,22 @@ describe("Vercel AI SDK adapter", () => {
       data: {
         query_id: "q1", status: "answered", query_type: "validation",
         question: "Ship it?", context: null, confidence: null,
-        answer: "yes", comment: null, human_confidence: null,
-        response_time_ms: null,
+        answer: { kind: "boolean", value: true }, comment: null, human_confidence: null,
+        response_time_ms: null, insufficient_reason: null,
         created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
       },
     });
     const tool = checkAnswerTool(client);
     const result = await tool.execute!({ queryId: "q1" }, {} as any);
     expect(result.status).toBe("answered");
-    expect(result.answer).toBe("yes");
+    expect(result.answer).toEqual({ kind: "boolean", value: true });
   });
 
   it("askHumanTool rejects when no email is available", async () => {
     mockFetch({ data: {} });
     const tool = askHumanTool(client);
     await expect(
-      tool.execute!({ question: "Ship it?", queryType: "validation" }, {} as any),
+      tool.execute!({ question: "Ship it?", queryType: "validation", subject, answerSpace }, {} as any),
     ).rejects.toThrow(/target email/i);
   });
 });
@@ -69,7 +74,7 @@ describe("LangChain adapter", () => {
     });
     const tool = lcAskHumanTool(client, { defaultEmail: "owner@example.com" });
     expect(tool.name).toBe("ask_human");
-    const raw = await tool.invoke({ question: "Ship it?", queryType: "validation" });
+    const raw = await tool.invoke({ question: "Ship it?", queryType: "validation", subject, answerSpace });
     expect(JSON.parse(raw).queryId).toBe("q2");
   });
 });

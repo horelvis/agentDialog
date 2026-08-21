@@ -32,11 +32,13 @@ import type {
 } from "./types.js";
 import {
   toCreateQueryBody,
+  toClarifyQueryBody,
   fromCreatedQueryWire,
   fromQueryWire,
   fromQuerySummaryWire,
 } from "./queries.js";
 import type {
+  ClarifyQueryInput,
   CreateQueryInput,
   CreatedQuery,
   CreatedQueryWire,
@@ -230,6 +232,31 @@ export class AgentDialog {
       `/agent/queries${buildQuery(params)}`,
     );
     return wire.map(fromQuerySummaryWire);
+  }
+
+  /**
+   * Supply what the human said was missing, after `getQuery` reports
+   * `status: "needs_context"`. Only valid from that status. On success the
+   * query returns to `assigned` and the human can answer again.
+   */
+  async clarifyQuery(queryId: string, input: ClarifyQueryInput): Promise<Query> {
+    const wire = await this.request<QueryWire>(
+      "PATCH",
+      `/agent/queries/${queryId}`,
+      toClarifyQueryBody(input),
+    );
+    return fromQueryWire(wire);
+  }
+
+  /**
+   * Withdraw a question whose context has moved on, before the human
+   * answers. An answer that already landed wins: if the human answered
+   * first, this rejects with a conflict rather than discarding their
+   * decision.
+   */
+  async cancelQuery(queryId: string): Promise<Query> {
+    const wire = await this.request<QueryWire>("POST", `/agent/queries/${queryId}/cancel`);
+    return fromQueryWire(wire);
   }
 
   /**

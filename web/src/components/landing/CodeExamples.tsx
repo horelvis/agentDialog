@@ -15,13 +15,23 @@ const tabs = [
 // Behind the scenes, Claude calls:
 human_query({
   query_type: "validation",
+  subject: {
+    id: "q4-revenue-figure",
+    label: "Q4 revenue figure",
+  },
+  answer_space: {
+    kind: "boolean",
+    labels: { t: "Correct", f: "Incorrect" },
+  },
   question: "Does this revenue data look correct?",
   context: "Q4 revenue: $2.3M (+15% YoY)...",
-  target_human_email: "sarah@company.com",
+  target_human_email: "sarah@example.com",
   timeout_minutes: 30,
 })
-// → Sarah gets an email, replies "Yes, confirmed"
-// → Agent polls get_query → gets the answer`,
+// → Sarah gets an email, answers "Correct" in the app
+// → Agent polls get_query → gets the typed answer
+// → If Sarah says she lacks context instead, the query comes back
+//   "needs_context" and Claude calls clarify_query to fix it`,
   },
   {
     label: "cURL",
@@ -57,12 +67,16 @@ const client = new AgentDialog({ apiKey: "mge_ag_..." });
 // Ask a human. They get an email and answer in the app.
 const { queryId } = await client.createQuery({
   queryType: "validation",
-  question: "Deploy v2.3 to production?",
+  subject: { id: "release-2.3", label: "Release 2.3 to Fictional Corp" },
+  answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
+  question: "Deploy release 2.3 to production?",
   targetHumanEmail: "oncall@example.com",
 });
 
-const answer = await client.waitForAnswer(queryId);
-console.log(answer.answer); // "yes, go ahead"`,
+const query = await client.waitForAnswer(queryId);
+if (query.status === "answered" && query.answer?.kind === "boolean") {
+  console.log(query.answer.value ? "Ship it" : "Hold");
+}`,
   },
   {
     label: "Python",
@@ -75,9 +89,21 @@ headers = {"Authorization": "Bearer mge_ag_..."}
 # Ask a human. Returns right away — they get an email and answer in the app.
 created = requests.post(f"{BASE}/agent/queries", headers=headers, json={
     "query_type": "expert_query",
+    "subject": {
+        "id": "orders-index-choice",
+        "label": "Index choice for orders.id lookups",
+    },
+    "answer_space": {
+        "kind": "choice",
+        "select": "one",
+        "options": [
+            {"id": "btree", "label": "B-tree"},
+            {"id": "hash", "label": "Hash index"},
+        ],
+    },
     "question": "Should we use a B-tree or a hash index?",
     "context": "Table: orders (50M rows), query: WHERE id = ?",
-    "target_human_email": "dba@company.com",
+    "target_human_email": "dba@example.com",
     "timeout_minutes": 30,
 }).json()["data"]
 
@@ -86,7 +112,7 @@ while True:
         f"{BASE}/agent/queries/{created['query_id']}", headers=headers
     ).json()["data"]
     if query["status"] in ("answered", "expired"):
-        print(query["answer"])
+        print(query["answer"])  # e.g. {"kind": "choice", "option_ids": ["btree"]}
         break
     time.sleep(15)`,
   },

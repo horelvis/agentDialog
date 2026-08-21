@@ -17,27 +17,81 @@ passwordless sign-in code — it is not itself a way to answer.
 <Steps>
   <Step>
     ### Agent creates the query
-    The agent calls `POST /agent/queries` (or the SDK's `client.createQuery()`) with a `question`, a `target_human_email`, and how long to wait before giving up.
+    The agent calls `POST /agent/queries` (or the SDK's `client.createQuery()`) with a `question`, a `subject` (what this is about, with something the human can look at), an `answer_space` (the closed shape the answer must take), and a `target_human_email`. AgentDialog checks the request against an **admission gate** before it becomes a query — see below.
   </Step>
   <Step>
     ### Human receives an email
     AgentDialog creates a conversation behind the scenes and emails the human the question and context, with a link into the app. If they aren't already signed in, the email carries their passwordless sign-in code.
   </Step>
   <Step>
-    ### Human answers in the app
-    They sign in (or resume their session), open the query, and respond — `POST /human/queries/{id}/respond`. If this is their first query from this agent, opening it doubles as accepting the invitation.
+    ### Human answers, or says they can't
+    They sign in (or resume their session), open the query, and either answer it in the shape `answer_space` declared, or tell AgentDialog they don't have what they need to decide. The first time doubles as accepting the invitation.
   </Step>
   <Step>
-    ### Agent reads the answer
-    The agent polls `GET /agent/queries/{id}` (or the SDK's `client.getQuery()` / `client.waitForAnswer()`) until `status` is `answered`, then reads `answer`.
+    ### Agent reads the answer, or clarifies
+    The agent polls `GET /agent/queries/{id}` (or the SDK's `client.getQuery()` / `client.waitForAnswer()`). If `status` is `answered`, it reads the typed `answer`. If it's `needs_context`, the agent reads why and calls `clarifyQuery` (`PATCH /agent/queries/{id}`) to supply what was missing, which hands the query back to the human.
   </Step>
 </Steps>
 
+## The admission gate
+
+A query is not free text in either direction. `answer_space` is one of six
+closed shapes — `boolean`, `choice`, `scalar`, `date`, `text`, or `fields` —
+so an agent can't hand a human an open-ended question and call it structured.
+`subject` is what the question is about: a stable id, a label, and a
+referent the human can actually look at (a `uri`, an inline `body`, or
+`attachments`).
+
+Before a request becomes a query, AgentDialog checks it can actually be
+decided:
+
+- **A subject needs a referent.** A question about "the contract" without
+  the contract attached is refused, unless `self_contained` is true.
+- **Risk raises the bar.** Above `low`, every branch of the `answer_space`
+  must state its consequence — what happens if the human picks it — and free
+  text is refused outright (a `text` answer space is `low`-risk only).
+  `risk` is a floor the agent declares; AgentDialog raises it on its own when
+  it detects money or a prior decision on the same subject, and never lowers
+  it.
+- **A repeat decision needs a delta.** If this human already decided about
+  this `subject` from this agent, a new query above `low` risk must send
+  `changes` — what's different since then — or it's refused.
+- **Above `medium` risk, the referent must be self-hosted.** AgentDialog
+  needs to hold the artefact itself (an `attachment` or inline `body`) with
+  its `sha256`, not just a `uri` that might change under it.
+
+A refusal comes back as `422` with `reason`, `detail`, and `remedy` — the
+remedy says exactly what to add. This is not a validation nicety: it is what
+makes it possible to check, mechanically, that a query is something a human
+could actually decide before it ever reaches one.
+
+## `needs_context` and `cancelled`
+
+Passing the admission gate doesn't guarantee the human agrees they have
+enough to go on. If they don't, they answer with **"I can't decide with what
+you gave me"** instead of a value, and the query moves to `needs_context`
+with a machine-readable `insufficient_reason` (`unknown_subject`,
+`missing_delta`, `unclear_consequences`, `referent_unreachable`, or
+`not_my_decision`). The query's expiry clock pauses — it is now the agent's
+turn, not the human's.
+
+The agent responds by calling `clarifyQuery` (`PATCH /agent/queries/{id}`)
+with whatever addresses the gap: a replacement `subject`, `changes`,
+`answer_space`, or a reworded `question`/`context`. Only the fields sent
+change; the rest carry over. On success the query returns to `assigned` and
+the clock resumes from where it paused. There's a cap on how many times a
+single query can be clarified — past it, the remedy is to open a new query.
+
+An agent can also withdraw a question outright with `cancelQuery`
+(`POST /agent/queries/{id}/cancel`), before the human answers. It's a race
+the agent always loses gracefully: if the human's answer landed first,
+`cancelQuery` returns `409` rather than discarding their decision.
+
 ## `pending` vs `assigned`
 
-Every query has one of four statuses: `pending`, `assigned`, `answered`, or
-`expired`. The distinction that trips people up is between the first two,
-and it comes down to **auto-trust**.
+A query has one of six statuses: `pending`, `assigned`, `needs_context`,
+`answered`, `cancelled`, or `expired`. The distinction that trips people up
+is between the first two, and it comes down to **auto-trust**.
 
 When an agent creates a query, AgentDialog checks whether the target human
 has previously **accepted an invitation from that same agent** and not since
@@ -58,7 +112,10 @@ an `assigned` query means they've seen it and simply haven't answered.
 Once a human answers, `answered` is terminal — the SDK's `waitForAnswer`
 stops polling there. If no one answers before `timeout_minutes` elapses, the
 query becomes `expired`, which is also terminal: the agent should treat it
-as "no answer" and, if it still needs input, create a new query.
+as "no answer" and, if it still needs input, create a new query. `cancelled`
+is likewise terminal, reached only by the agent calling `cancelQuery`.
+`needs_context` is the one non-terminal status besides `pending`/`assigned` —
+see above for how a query gets there and back.
 
 <Callout type="info">
   Trust is per agent, not global. A human who trusts Agent A starts fresh at
@@ -77,5 +134,5 @@ signed in, to learn a question is waiting.
 ## See also
 
 - [Queries API reference](/docs/api-reference/agent/queries) for the exact request and response shapes.
-- [TypeScript SDK](/docs/sdks/typescript) for `createQuery` and `waitForAnswer`.
+- [TypeScript SDK](/docs/sdks/typescript) for `createQuery`, `clarifyQuery`, `cancelQuery`, and `waitForAnswer`.
 - [Invitations](/docs/concepts/invitations) for how the underlying accept/decline mechanism works outside of queries.

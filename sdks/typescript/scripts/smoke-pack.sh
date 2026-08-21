@@ -60,6 +60,8 @@ const checks = [
   ["createQuery exists", typeof client.createQuery === "function"],
   ["getQuery exists", typeof client.getQuery === "function"],
   ["listQueries exists", typeof client.listQueries === "function"],
+  ["clarifyQuery exists", typeof client.clarifyQuery === "function"],
+  ["cancelQuery exists", typeof client.cancelQuery === "function"],
   ["waitForAnswer exists", typeof client.waitForAnswer === "function"],
   ["QueryTimeoutError is an Error", new QueryTimeoutError("q", 1) instanceof Error],
   ["ai askHumanTool builds", typeof askHumanTool(client, { defaultEmail: "a@b.test" }) === "object"],
@@ -114,6 +116,8 @@ const client = new AgentDialog({ apiKey: "mge_ag_test" });
 export async function main(): Promise<void> {
   const created: CreatedQuery = await client.createQuery({
     queryType: "validation",
+    subject: { id: "deploy-v2.3", label: "Deploy v2.3 to production" },
+    answerSpace: { kind: "boolean", labels: { t: "Yes", f: "No" } },
     question: "Deploy?",
     targetHumanEmail: "oncall@example.com",
     timeoutMinutes: 30,
@@ -126,6 +130,14 @@ export async function main(): Promise<void> {
     const answered: Query = await client.waitForAnswer(created.queryId, { timeoutMs: 1000 });
     const status: QueryStatus = answered.status;
     void status;
+    if (status === "needs_context") {
+      const clarified: Query = await client.clarifyQuery(created.queryId, {
+        answerSpace: { kind: "text", maxLength: 200 },
+      });
+      void clarified;
+    }
+    const cancelled: Query = await client.cancelQuery(created.queryId);
+    void cancelled;
   } catch (err) {
     if (err instanceof QueryTimeoutError) return;
     throw err;

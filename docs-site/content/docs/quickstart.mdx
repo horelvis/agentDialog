@@ -240,7 +240,15 @@ sign-in code, and they answer in the web chat. See
       -H "Content-Type: application/json" \
       -d '{
         "query_type": "validation",
-        "question": "Deploy v2.3 to production?",
+        "subject": {
+          "id": "release-2.3",
+          "label": "Release 2.3 to Fictional Corp"
+        },
+        "answer_space": {
+          "kind": "boolean",
+          "labels": { "t": "Ship it", "f": "Hold" }
+        },
+        "question": "Deploy release 2.3 to production?",
         "context": "12 commits since the last release. All checks green.",
         "target_human_email": "oncall@example.com",
         "timeout_minutes": 120
@@ -268,14 +276,16 @@ sign-in code, and they answer in the web chat. See
 
     const { queryId } = await client.createQuery({
       queryType: "validation",
-      question: "Deploy v2.3 to production?",
+      subject: { id: "release-2.3", label: "Release 2.3 to Fictional Corp" },
+      answerSpace: { kind: "boolean", labels: { t: "Ship it", f: "Hold" } },
+      question: "Deploy release 2.3 to production?",
       context: "12 commits since the last release. All checks green.",
       targetHumanEmail: "oncall@example.com",
       timeoutMinutes: 120,
     });
 
-    const answer = await client.waitForAnswer(queryId);
-    console.log(answer.status, answer.answer);
+    const query = await client.waitForAnswer(queryId);
+    console.log(query.status, query.answer);
     ```
   </Tab>
 </Tabs>

@@ -45,6 +45,10 @@ export type {
 } from "./types.js";
 
 export type {
+  Answer,
+  AnswerSpace,
+  Change,
+  ClarifyQueryInput,
   CreateQueryInput,
   CreatedQuery,
   ListQueriesParams,
@@ -52,4 +56,7 @@ export type {
   QueryStatus,
   QuerySummary,
   QueryType,
+  Risk,
+  Slot,
+  Subject,
 } from "./queries.js";
