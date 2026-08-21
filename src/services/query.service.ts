@@ -7,13 +7,14 @@ import { messages } from "../db/schema/messages";
 import { humans } from "../db/schema/humans";
 import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
-import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError } from "../lib/errors";
+import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError, ValidationError } from "../lib/errors";
 import { generateInvitationToken } from "../lib/crypto";
 import { dispatchWebhooks } from "./webhook.service";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
 import { checkPayload } from "../admission/decidability";
 import { findPriorDecision, elevateRisk } from "../admission/history";
+import { validateAnswerAgainstSpace, type AnswerSpace, type Answer } from "../lib/answer-space";
 import type { CreateQueryInput, RespondQueryInput } from "../validators/query.validators";
 
 export async function createQuery(agentId: string, input: CreateQueryInput) {
@@ -267,12 +268,9 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
 
   if (!query) throw new NotFoundError("Query", queryId);
 
-  if (query.status === "answered") {
-    throw new ForbiddenError("Query has already been answered");
-  }
-  if (query.status === "expired") {
-    throw new ForbiddenError("Query has expired");
-  }
+  if (query.status === "answered") throw new ForbiddenError("Query has already been answered");
+  if (query.status === "expired") throw new ForbiddenError("Query has expired");
+  if (query.status === "cancelled") throw new ForbiddenError("Query was cancelled by the agent");
 
   // Verify human is a participant in the conversation
   const [participant] = await db
@@ -290,6 +288,42 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
     throw new ForbiddenError("You are not a participant in this query's conversation");
   }
 
+  if (input.outcome === "insufficient_context") {
+    // The turn goes back to the agent. The clock freezes because it is now the
+    // agent's move: without this a query dies while the agent is fixing it, and
+    // the human watches something expire that they themselves asked to clarify.
+    const [updated] = await db
+      .update(humanQueries)
+      .set({
+        status: "needs_context",
+        insufficientReason: input.reason,
+        clarificationRounds: query.clarificationRounds + 1,
+        pausedAt: new Date(),
+        humanId,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "assigned")))
+      .returning();
+
+    if (!updated) throw new ConflictError("Query is no longer awaiting an answer");
+
+    dispatchWebhooks(query.agentId, "query.needs_context", {
+      query_id: query.id,
+      status: "needs_context",
+      reason: input.reason,
+      note: input.note,
+    }).catch((err) => console.error(`[QUERY] Webhook dispatch failed for ${queryId}:`, err));
+
+    return updated;
+  }
+
+  // From here, outcome === "answer".
+  const space = query.answerSpace as unknown as AnswerSpace;
+  const fit = validateAnswerAgainstSpace(space, input.answer);
+  if (!fit.ok) {
+    throw new ValidationError(`Answer does not fit this query: ${fit.problem}`);
+  }
+
   // Send response message
   const [responseMessage] = await db
     .insert(messages)
@@ -298,7 +332,7 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
       senderType: "human",
       senderHumanId: humanId,
       type: "human_query_response",
-      content: input.answer,
+      content: summariseAnswer(space, input.answer),
       structuredData: {
         queryId: query.id,
         answer: input.answer,
@@ -310,23 +344,23 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
 
   const responseTimeMs = Date.now() - query.createdAt.getTime();
 
-  // Update query with optimistic lock — only update if still in "assigned" status
+  // Update query with optimistic lock — only update if still awaiting an answer
   const [updated] = await db
     .update(humanQueries)
     .set({
       status: "answered",
       humanId,
       responseMessageId: responseMessage.id,
-      // Interim shape until the typed answer-space work (Task 6) lands and
-      // replaces this with the real structured answer. `answer` is jsonb;
-      // this keeps every row's answer honestly typed as text in the meantime.
-      answer: { kind: "text", value: input.answer },
+      answer: input.answer,
       answerComment: input.comment,
       answerConfidence: input.confidence,
       responseTimeMs,
       updatedAt: new Date(),
     })
-    .where(and(eq(humanQueries.id, queryId), eq(humanQueries.status, "assigned")))
+    .where(and(
+      eq(humanQueries.id, queryId),
+      inArray(humanQueries.status, ["assigned", "needs_context"]),
+    ))
     .returning();
 
   if (!updated) {
@@ -492,4 +526,27 @@ export async function getQueryForHuman(queryId: string, humanId: string) {
   if (!participant) throw new NotFoundError("Query", queryId);
 
   return query;
+}
+
+/** A one-line rendering of a typed answer, for the conversation transcript. */
+function summariseAnswer(space: AnswerSpace, answer: Answer): string {
+  switch (answer.kind) {
+    case "boolean":
+      return space.kind === "boolean"
+        ? (answer.value ? space.labels.t : space.labels.f)
+        : String(answer.value);
+    case "choice": {
+      if (space.kind !== "choice") return answer.option_ids.join(", ");
+      const byId = new Map(space.options.map((o) => [o.id, o.label]));
+      return answer.option_ids.map((id) => byId.get(id) ?? id).join(", ");
+    }
+    case "scalar":
+      return space.kind === "scalar" ? `${answer.value} ${space.unit}` : String(answer.value);
+    case "date":
+      return answer.value;
+    case "text":
+      return answer.value;
+    case "fields":
+      return Object.entries(answer.values).map(([k, v]) => `${k}: ${v}`).join("; ");
+  }
 }

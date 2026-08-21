@@ -141,9 +141,12 @@ export async function processEmailReply(
     return { empty_reply: true };
   }
 
-  // 6. Respond to query
+  // 6. Respond to query. An email reply is always free text, regardless of
+  // what the query's answer_space declares — there is no way to make someone
+  // pick from a rendered choice list inside a mail client.
   await respondQuery(query.id, human.id, {
-    answer: answer.trim(),
+    outcome: "answer",
+    answer: { kind: "text", value: answer.trim() },
     comment: "Responded via email reply",
   });
 

@@ -47,11 +47,24 @@ export const listQueriesSchema = z.object({
 
 export type ListQueriesInput = z.infer<typeof listQueriesSchema>;
 
-export const respondQuerySchema = z.object({
-  answer: z.string().min(1).max(32_000),
-  comment: z.string().max(32_000).optional(),
-  confidence: z.number().min(0).max(1).optional(),
-});
+export const INSUFFICIENT_REASONS = [
+  "unknown_subject", "missing_delta", "unclear_consequences",
+  "referent_unreachable", "not_my_decision",
+] as const;
+
+export const respondQuerySchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("answer"),
+    answer: answerSchema,
+    comment: z.string().max(32_000).optional(),
+    confidence: z.number().min(0).max(1).optional(),
+  }),
+  z.object({
+    outcome: z.literal("insufficient_context"),
+    reason: z.enum(INSUFFICIENT_REASONS),
+    note: z.string().max(2_000).optional(),
+  }),
+]);
 
 export type RespondQueryInput = z.infer<typeof respondQuerySchema>;
 

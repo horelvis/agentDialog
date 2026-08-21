@@ -64,9 +64,9 @@ describe("processEmailReply sender verification", () => {
     });
     const { data } = await res.json();
     expect(data.status).toBe("answered");
-    // Interim shape until the typed answer-space work (Task 6) lands: answer
-    // is now jsonb, and respondQuery wraps every plain-text answer as
-    // {kind:"text", value:...} rather than storing the bare string.
+    // An email reply is always free text — there is no way to make someone
+    // pick from a rendered choice list inside a mail client — so it is always
+    // wrapped as a {kind:"text", value:...} typed answer.
     expect(data.answer).toEqual({ kind: "text", value: "Yes, ship it." });
 
     // A second pass over the same message must not disturb the answer.
