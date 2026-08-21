@@ -157,11 +157,18 @@ async function markRead(client: MailboxClient, uid: number): Promise<void> {
 const INGEST_LOCK_KEY = "lock:email-ingest";
 
 /**
- * Two minutes: four times the five-minute poll interval would be pointless, and
- * anything shorter than a slow pass would let a second one start on top of it.
- * A pass that dies without releasing the lock costs one skipped interval.
+ * Ten minutes: two poll intervals. Below one poll interval the lock could
+ * never block a scheduled poll at all — any pass still running when the next
+ * poll fires has, by definition, already outlived a TTL shorter than that
+ * interval, so the lock would already have expired. Two intervals means a
+ * pass has to overrun by more than double before the lock lapses, and a
+ * holder that dies without releasing blocks at most two intervals. That
+ * costs nothing perceptible — a human reply is delayed by minutes at worst
+ * against a wait that is already minutes to hours — against the alternative
+ * of concurrent passes racing past Gmail's connection ceiling. If the poll
+ * interval changes, this should change with it.
  */
-const INGEST_LOCK_TTL_MS = 120_000;
+const INGEST_LOCK_TTL_MS = 600_000;
 
 /**
  * One pass, under the lock. Returns null when another pass is already running,
