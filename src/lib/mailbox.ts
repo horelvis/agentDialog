@@ -93,7 +93,16 @@ export async function openMailbox(config: ImapConfig): Promise<MailboxClient> {
   });
 
   await client.connect();
-  const lock = await client.getMailboxLock("INBOX");
+
+  let lock;
+  try {
+    lock = await client.getMailboxLock("INBOX");
+  } catch (err) {
+    // connect() already opened the socket; without a lock the caller never
+    // gets a client back to close it, so close it here before re-throwing.
+    await client.logout().catch(() => client.close());
+    throw err;
+  }
 
   return {
     async listUnread() {
