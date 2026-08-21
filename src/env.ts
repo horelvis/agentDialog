@@ -58,6 +58,11 @@ export const envSchema = z.object({
   IMAP_PORT: z.coerce.number().default(993),
   IMAP_USER: z.string().optional(),
   IMAP_PASSWORD: z.string().optional(),
+
+  // Shared secret for POST /api/v1/internal/email/poll. Cloud Scheduler cannot
+  // sign a request like a mail provider does, so a header secret is what there
+  // is. With it unset the endpoint refuses every request, in every environment.
+  INTERNAL_POLL_SECRET: z.string().optional(),
 }).superRefine((env, ctx) => {
   // The inbound email webhook records a human's answer to an agent's query and
   // auto-accepts their invitation. Without a signing secret the endpoint has no

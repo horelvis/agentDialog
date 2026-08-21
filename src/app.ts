@@ -37,6 +37,7 @@ import humanTrustedAgentsRoutes from "./routes/human/trusted-agents";
 import humanQueryRoutes from "./routes/human/queries";
 import mcpRoutes from "./routes/mcp";
 import emailInboundRoutes from "./routes/webhooks/email-inbound";
+import emailPollRoutes from "./routes/internal/email-poll";
 import {
   getProtectedResourceMetadata,
   getAuthServerMetadata,
@@ -69,6 +70,9 @@ export function createApp() {
 
   // Webhook routes (public, verified by provider signature)
   app.route("/api/v1/webhooks/email", emailInboundRoutes);
+
+  // Internal routes (called by Cloud Scheduler, authenticated by shared secret)
+  app.route("/api/v1/internal/email", emailPollRoutes);
 
   // Agent routes - register (no auth)
   app.route("/api/v1/agent/register", agentRegisterRoutes);
