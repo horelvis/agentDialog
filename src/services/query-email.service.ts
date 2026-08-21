@@ -134,3 +134,36 @@ Expires: ${formatExpiry(input.expiresAt)}
     replyTo,
   });
 }
+
+/**
+ * Tell whoever replied that the question was not addressed to them.
+ *
+ * The notice deliberately does not name the query, the question or the person
+ * it was meant for: the sender has already shown they are not that person.
+ * Silence would be worse — a reply that vanishes with no explanation reads as a
+ * broken product — but this is all that can safely be said.
+ */
+export async function sendSenderMismatchNotice(toEmail: string): Promise<boolean> {
+  const e = env();
+
+  return sendEmail({
+    to: toEmail,
+    subject: `[${e.APP_NAME}] Your reply could not be delivered`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="padding: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;">
+          <div style="font-size: 15px; font-weight: 600; color: #92400e;">Your reply was not recorded</div>
+          <div style="font-size: 14px; color: #78350f; margin-top: 8px; line-height: 1.5;">
+            This question was addressed to someone else, so only they can answer it.
+            If it was forwarded to you, please reply to the person who sent it to you instead.
+          </div>
+        </div>
+        <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 16px;">${e.APP_NAME}</p>
+      </div>
+    `,
+    text:
+      "Your reply was not recorded.\n\n" +
+      "This question was addressed to someone else, so only they can answer it. " +
+      "If it was forwarded to you, please reply to the person who sent it to you instead.\n",
+  });
+}
