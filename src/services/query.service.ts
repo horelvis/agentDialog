@@ -1,4 +1,4 @@
-import { eq, and, lt, desc, inArray } from "drizzle-orm";
+import { eq, and, or, lt, desc, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { humanQueries } from "../db/schema/human-queries";
 import { conversations } from "../db/schema/conversations";
@@ -336,15 +336,32 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
         .where(eq(invitations.id, invitation.id));
     }
 
-    await tx
-      .insert(conversationParticipants)
-      .values({
+    // No unique constraint exists on (conversation_id, human_id) — recorded
+    // as a data-model gap for the final review, not fixed here (a schema
+    // change on the last day of this plan, against a database that may
+    // already hold duplicates, is a bad trade). Until it exists,
+    // .onConflictDoNothing() has nothing to conflict against and is a
+    // silent no-op, so a duplicate participant row is prevented here
+    // explicitly instead — check-then-insert inside this same transaction.
+    const [existingParticipant] = await tx
+      .select({ id: conversationParticipants.id })
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, query.conversationId),
+          eq(conversationParticipants.humanId, humanId),
+        ),
+      )
+      .limit(1);
+
+    if (!existingParticipant) {
+      await tx.insert(conversationParticipants).values({
         conversationId: query.conversationId,
         actorType: "human",
         humanId,
         role: "participant",
-      })
-      .onConflictDoNothing();
+      });
+    }
   }
 
   if (input.outcome === "insufficient_context") {
@@ -728,15 +745,36 @@ export async function listHumanQueries(humanId: string) {
     .where(eq(conversationParticipants.humanId, humanId));
 
   const conversationIds = participantRows.map((r) => r.conversationId);
-  if (conversationIds.length === 0) return [];
+
+  // A pending query has no participant row yet — nobody has accepted it.
+  // Without this branch it is invisible here even though respondQuery
+  // (correctly) lets this same human answer it, which is no visibility at
+  // all: the real UI only ever calls this list. Visible by the same
+  // entitlement respondQuery uses — the query's own target address, not a
+  // participant row.
+  const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+
+  const visibility = [];
+  if (conversationIds.length > 0) {
+    visibility.push(inArray(humanQueries.conversationId, conversationIds));
+  }
+  if (human) {
+    visibility.push(
+      and(
+        eq(humanQueries.status, "pending"),
+        eq(humanQueries.humanEmail, human.email.toLowerCase().trim()),
+      ),
+    );
+  }
+  if (visibility.length === 0) return [];
 
   const rows = await db
     .select()
     .from(humanQueries)
     .where(
       and(
-        inArray(humanQueries.conversationId, conversationIds),
         inArray(humanQueries.status, ["pending", "assigned"]),
+        or(...visibility),
       ),
     )
     .orderBy(desc(humanQueries.createdAt));
@@ -780,7 +818,18 @@ export async function getQueryForHuman(queryId: string, humanId: string) {
     )
     .limit(1);
 
-  if (!participant) throw new NotFoundError("Query", queryId);
+  if (!participant) {
+    // No participant row yet — only visible if this is a pending query
+    // addressed to exactly this human, the same entitlement respondQuery
+    // uses. Anything else (wrong human, or a status a participant row
+    // would otherwise gate) stays a 404 rather than leaking existence.
+    if (query.status !== "pending") throw new NotFoundError("Query", queryId);
+
+    const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+    if (!human || human.email.toLowerCase().trim() !== query.humanEmail.toLowerCase().trim()) {
+      throw new NotFoundError("Query", queryId);
+    }
+  }
 
   return shapeHumanQuery(query, { includePriorDecision: true });
 }

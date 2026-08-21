@@ -148,7 +148,7 @@ describe("answering a pending query (the real accept path)", () => {
     return { queryId: data.query_id, conversationId: data.conversation_id, agentId: agent.id };
   }
 
-  it("lets a first-time human answer, and accepts the invitation as a side effect", async () => {
+  it("is visible to a first-time human through the real read path, and answering accepts it", async () => {
     const email = `first-time-${Date.now()}@example.com`;
     const { queryId, conversationId } = await createPendingQuery(email);
 
@@ -160,6 +160,24 @@ describe("answering a pending query (the real accept path)", () => {
     const db = getDb();
     const [before] = await db.select().from(humanQueries).where(eq(humanQueries.id, queryId));
     expect(before.status).toBe("pending");
+
+    // The real UI never learns a queryId out of band — it lists, then opens.
+    // Both reads must work with no participant row yet, the same entitlement
+    // respondQuery uses (the query's own target address).
+    const listRes = await app.request("/api/v1/human/queries", {
+      headers: { Authorization: human.authHeader },
+    });
+    expect(listRes.status).toBe(200);
+    const listBody = await listRes.json();
+    expect(listBody.data.map((q: { query_id: string }) => q.query_id)).toContain(queryId);
+
+    const getRes = await app.request(`/api/v1/human/queries/${queryId}`, {
+      headers: { Authorization: human.authHeader },
+    });
+    expect(getRes.status).toBe(200);
+    const getBody = await getRes.json();
+    expect(getBody.data.query_id).toBe(queryId);
+    expect(getBody.data.status).toBe("pending");
 
     const res = await app.request(`/api/v1/human/queries/${queryId}/respond`, {
       method: "POST",
@@ -181,7 +199,7 @@ describe("answering a pending query (the real accept path)", () => {
       .where(and(eq(invitations.conversationId, conversationId), eq(invitations.invitedHumanEmail, email)));
     expect(invitation.status).toBe("accepted");
 
-    const [participant] = await db
+    const participantRows = await db
       .select()
       .from(conversationParticipants)
       .where(
@@ -190,8 +208,50 @@ describe("answering a pending query (the real accept path)", () => {
           eq(conversationParticipants.humanId, human.human.id),
         ),
       );
-    expect(participant).toBeDefined();
-    expect(participant.actorType).toBe("human");
+    expect(participantRows).toHaveLength(1);
+    expect(participantRows[0].actorType).toBe("human");
+  });
+
+  it("does not leave a duplicate participant row when the invitation was already accepted separately", async () => {
+    // Reproduces the exact shape of the finding: a human who reaches the
+    // query through /app/invitations (POST .../accept, which already
+    // inserts a participant row via acceptInvitation) and then answers.
+    // Without the explicit existence check, acceptPendingInvitation's own
+    // insert would add a second row for the same (conversation, human) pair,
+    // since conversation_participants has no unique constraint to fall back on.
+    const email = `already-accepted-${Date.now()}@example.com`;
+    const { queryId, conversationId } = await createPendingQuery(email);
+    const human = await createTestHuman(email);
+
+    const db = getDb();
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(and(eq(invitations.conversationId, conversationId), eq(invitations.invitedHumanEmail, email)));
+
+    const acceptRes = await app.request(`/api/v1/human/invitations/${invitation.token}/accept`, {
+      method: "POST",
+      headers: { Authorization: human.authHeader },
+    });
+    expect(acceptRes.status).toBe(200);
+
+    const res = await app.request(`/api/v1/human/queries/${queryId}/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: human.authHeader },
+      body: JSON.stringify({ outcome: "answer", answer: { kind: "choice", option_ids: ["yes"] } }),
+    });
+    expect(res.status).toBe(200);
+
+    const participantRows = await db
+      .select()
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, conversationId),
+          eq(conversationParticipants.humanId, human.human.id),
+        ),
+      );
+    expect(participantRows).toHaveLength(1);
   });
 
   it("also accepts the invitation when the first answer is insufficient_context", async () => {
