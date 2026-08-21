@@ -234,15 +234,39 @@ All errors extend `AgentDialogError`:
 | `ForbiddenError` | 403 | Not authorized for this resource |
 | `NotFoundError` | 404 | Resource not found |
 | `ValidationError` | 422 | Invalid input (check `.details`) |
+| `UndecidableQueryError` | 422 | The [admission gate](https://docs.agentdialog.io/docs/concepts/queries) refused a `createQuery` or `clarifyQuery` — see below |
 | `RateLimitError` | 429 | Rate limited (auto-retried 3x) |
 | `ServerError` | 500 | Server error |
 | `QueryTimeoutError` | 408 | `waitForAnswer`'s own `timeoutMs` elapsed before the query was answered or expired |
 
-`createQuery` and `clarifyQuery` also throw `ValidationError` when the
-[admission gate](https://docs.agentdialog.io/docs/concepts/queries) refuses a
-question a human could not decide — a subject with nothing to look at, a
-risk above `low` with no stated consequences, and the like. `err.message`
-carries the specific reason and what to add before retrying.
+### When a question can't be asked
+
+`createQuery` and `clarifyQuery` throw `UndecidableQueryError` — not a plain
+`ValidationError` — when the admission gate refuses a question a human could
+not actually decide: a subject with nothing to look at, a risk above `low`
+with no stated consequences, a repeat decision with no `changes`, and the
+like. It is a distinct class of `422` on purpose: one means "this payload is
+malformed", the other means "this payload is valid and still not answerable".
+
+The receiver of that refusal is an agent, not a person reading documentation,
+so the error carries what it needs to correct itself and retry rather than a
+message to parse:
+
+```typescript
+import { AgentDialog, UndecidableQueryError } from "@agentdialog/sdk";
+
+try {
+  await client.createQuery({ /* ... */ });
+} catch (err) {
+  if (err instanceof UndecidableQueryError) {
+    console.log(err.reason);         // e.g. "missing_referent"
+    console.log(err.remedy);         // what to add before retrying
+    console.log(err.priorQueryId);   // set only for a repeat-decision refusal
+  } else {
+    throw err;
+  }
+}
+```
 
 ## License
 

@@ -4,6 +4,7 @@ import {
   ForbiddenError,
   NotFoundError,
   ValidationError,
+  UndecidableQueryError,
   RateLimitError,
   ServerError,
   QueryTimeoutError,
@@ -407,6 +408,12 @@ function errorFromResponse(status: number, body: any): AgentDialogError {
     case 404:
       return new NotFoundError(message);
     case 422:
+      // The admission gate's refusal (UNDECIDABLE_QUERY) is a distinct class
+      // of 422 from an ordinary malformed payload: it carries reason/remedy
+      // that an agent needs to retry correctly, not just a message to log.
+      if (err.code === "UNDECIDABLE_QUERY") {
+        return new UndecidableQueryError(message, err.reason, err.remedy, err.prior_query_id);
+      }
       return new ValidationError(message, details);
     case 429:
       return new RateLimitError(message, err.retryAfter ?? 1);

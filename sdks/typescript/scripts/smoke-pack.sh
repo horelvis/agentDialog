@@ -49,7 +49,7 @@ echo ""
 
 echo "==> Runtime resolution (Node ESM, no bundler)"
 cat > consumer.mjs <<'JS'
-import { AgentDialog, QueryTimeoutError } from "@agentdialog/sdk";
+import { AgentDialog, QueryTimeoutError, UndecidableQueryError } from "@agentdialog/sdk";
 import { askHumanTool, checkAnswerTool } from "@agentdialog/sdk/ai";
 import { askHumanTool as lcAsk } from "@agentdialog/sdk/langchain";
 
@@ -64,6 +64,10 @@ const checks = [
   ["cancelQuery exists", typeof client.cancelQuery === "function"],
   ["waitForAnswer exists", typeof client.waitForAnswer === "function"],
   ["QueryTimeoutError is an Error", new QueryTimeoutError("q", 1) instanceof Error],
+  ["UndecidableQueryError carries reason/remedy", (() => {
+    const e = new UndecidableQueryError("msg", "missing_referent", "add a uri", "q0");
+    return e instanceof Error && e.reason === "missing_referent" && e.remedy === "add a uri" && e.priorQueryId === "q0";
+  })()],
   ["ai askHumanTool builds", typeof askHumanTool(client, { defaultEmail: "a@b.test" }) === "object"],
   ["ai checkAnswerTool builds", typeof checkAnswerTool(client) === "object"],
   ["langchain askHumanTool builds", lcAsk(client, { defaultEmail: "a@b.test" }).name === "ask_human"],
@@ -108,7 +112,7 @@ cat > tsconfig.core.json <<'JSON'
 JSON
 
 cat > consumer-core.ts <<'TS'
-import { AgentDialog, QueryTimeoutError } from "@agentdialog/sdk";
+import { AgentDialog, QueryTimeoutError, UndecidableQueryError } from "@agentdialog/sdk";
 import type { Query, QueryStatus, CreatedQuery, QuerySummary } from "@agentdialog/sdk";
 
 const client = new AgentDialog({ apiKey: "mge_ag_test" });
@@ -140,6 +144,13 @@ export async function main(): Promise<void> {
     void cancelled;
   } catch (err) {
     if (err instanceof QueryTimeoutError) return;
+    if (err instanceof UndecidableQueryError) {
+      const reason: string = err.reason;
+      const remedy: string = err.remedy;
+      const priorQueryId: string | undefined = err.priorQueryId;
+      void reason; void remedy; void priorQueryId;
+      return;
+    }
     throw err;
   }
 }

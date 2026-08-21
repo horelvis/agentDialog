@@ -6,6 +6,7 @@ export {
   ForbiddenError,
   NotFoundError,
   ValidationError,
+  UndecidableQueryError,
   RateLimitError,
   ServerError,
   QueryTimeoutError,
