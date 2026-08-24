@@ -28,3 +28,11 @@ curl -X POST https://api.agentdialog.io/api/v1/human/conversations/{id}/messages
 ## Download file
 
 `GET https://api.agentdialog.io/api/v1/human/conversations/{id}/files/{attachmentId}/download`
+
+Streams the file itself, not a storage URL.
+
+The attachment must hang off a message in `{id}`. An attachment id is only ever
+valid in the conversation it was uploaded to: name it under any other
+conversation and the answer is `404`, including a conversation you do
+participate in. The path conversation is the authorization boundary, not a
+lookup hint, so a foreign id is reported as absent rather than forbidden.
