@@ -9,6 +9,7 @@ import { getLimit } from "../../lib/pagination";
 import { getRedis } from "../../lib/redis";
 import { ForbiddenError, NotFoundError } from "../../lib/errors";
 import { getConversation, isParticipant } from "../../services/conversation.service";
+import { isOpenQueryTarget } from "../../services/query.service";
 import { dispatchWebhooks } from "../../services/webhook.service";
 
 const app = new Hono<AppEnv>();
@@ -42,7 +43,13 @@ app.get("/conversations/:id/messages", validateQuery(paginationQuery), async (c)
   const conversationId = c.req.param("id");
   const humanId = c.get("humanId");
 
-  if (!(await isParticipant(conversationId, "human", humanId))) {
+  // Reading also covers the human an open query here was addressed to, who has
+  // no participant row until they answer. A query is answered in its own
+  // conversation, so refusing them the messages refuses them the query.
+  const allowed =
+    (await isParticipant(conversationId, "human", humanId)) ||
+    (await isOpenQueryTarget(conversationId, humanId));
+  if (!allowed) {
     throw new ForbiddenError("Not a participant in this conversation");
   }
 
