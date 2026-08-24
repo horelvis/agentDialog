@@ -23,7 +23,7 @@ switching it to Bun.
 
 ```bash
 bun run dev              # API on :3000, hot reload
-bun test                 # everything
+bun test tests/          # the backend suite (see the trap on `bun test`)
 bun test tests/unit      # no database needed
 bun run db:migrate       # apply migrations
 bun run typecheck        # SEE THE TRAP BELOW
@@ -85,6 +85,15 @@ server does not know, and a client reads that as "open a new session". Returning
 400 instead leaves it stuck until somebody reconnects it by hand, which is what
 `src/mcp/transport.ts` used to do by handing the request to a fresh, uninitialised
 transport. Keep the 404 branch.
+
+**A bare `bun test` at the root is not "everything", it is more than can
+run.** From the repo root Bun also collects `sdks/typescript/packaged/`, which
+asserts against the SDK's built output in `sdks/typescript/dist/`. Nothing at the
+root builds that, and git does not track it, so it exists only on a machine that
+has run the SDK build at some point — where those tests quietly pass against a
+stale artifact, and on a clean checkout they fail with `ENOENT`. CI runs
+`bun test tests/`; `publish-sdk.yml` owns `packaged/` and builds before running
+it. This was found by CI on its first run, having passed locally all day.
 
 **Integration tests are not hermetic.** Agent registration is rate-limited to 10
 per hour, and the counter lives in Redis, which survives between runs. Run the

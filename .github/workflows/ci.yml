@@ -84,10 +84,17 @@ jobs:
         env:
           DATABASE_URL: postgresql://agentdialog:agentdialog@localhost:5432/agentdialog_test
 
+      # `tests/`, not a bare `bun test`. From the repo root that also collects
+      # sdks/typescript/packaged/, which asserts against the SDK's built output
+      # in dist/ — an artifact no root command produces and git does not track,
+      # so it exists only on a machine that has run the SDK build. It passes
+      # locally and fails on any clean checkout. publish-sdk.yml owns those
+      # tests and builds before running them.
+      #
       # Redis starts empty on every run, so the registration rate limit that
       # makes local reruns flaky cannot bite here.
       - name: Test
-        run: bun test
+        run: bun test tests/
 
       - name: Typecheck
         run: bunx tsc --noEmit
