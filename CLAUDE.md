@@ -23,7 +23,7 @@ switching it to Bun.
 
 ```bash
 bun run dev              # API on :3000, hot reload
-bun test tests/          # the backend suite (see the trap on `bun test`)
+bun test tests/unit tests/integration   # the backend suite — SEE THE TRAP
 bun test tests/unit      # no database needed
 bun run db:migrate       # apply migrations
 bun run typecheck        # SEE THE TRAP BELOW
@@ -87,13 +87,19 @@ server does not know, and a client reads that as "open a new session". Returning
 transport. Keep the 404 branch.
 
 **A bare `bun test` at the root is not "everything", it is more than can
-run.** From the repo root Bun also collects `sdks/typescript/packaged/`, which
-asserts against the SDK's built output in `sdks/typescript/dist/`. Nothing at the
-root builds that, and git does not track it, so it exists only on a machine that
-has run the SDK build at some point — where those tests quietly pass against a
-stale artifact, and on a clean checkout they fail with `ENOENT`. CI runs
-`bun test tests/`; `publish-sdk.yml` owns `packaged/` and builds before running
-it. This was found by CI on its first run, having passed locally all day.
+run — and `bun test tests/` does not fix it.** Bun's arguments are substring
+filters over each file's path, not directories, so `tests/` also matches
+`sdks/typescript/tests/`. From the root, Bun collects the SDK's suite, which
+needs `sdks/typescript/node_modules`, and `sdks/typescript/packaged/`, which
+asserts against the built output in `dist/`. Neither is produced by any root
+command and git tracks neither, so both exist only on a machine that has worked
+on the SDK — where they quietly pass, and on a clean checkout fail with
+`Cannot find package 'ai'` and `ENOENT`. That is why local runs reported 224
+passing all day when a fresh clone reproduces **190**.
+
+Name both paths: `bun test tests/unit tests/integration`. CI runs that, gives the
+SDK its own job with its own install, and leaves `packaged/` to
+`publish-sdk.yml`, which builds first. Found by CI on its first two runs.
 
 **Integration tests are not hermetic.** Agent registration is rate-limited to 10
 per hour, and the counter lives in Redis, which survives between runs. Run the
