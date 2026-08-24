@@ -23,11 +23,15 @@ switching it to Bun.
 
 ```bash
 bun run dev              # API on :3000, hot reload
-bun test                 # everything
+bun test tests/unit tests/integration   # the backend suite — SEE THE TRAP
 bun test tests/unit      # no database needed
 bun run db:migrate       # apply migrations
 bun run typecheck        # SEE THE TRAP BELOW
 ```
+
+`.github/workflows/ci.yml` runs all of that on every pull request — the whole
+suite against Postgres, Redis and MinIO, then typecheck and biome. It does not
+block a merge on its own; that needs branch protection enabling on the repo.
 
 Setup from scratch:
 
@@ -81,6 +85,21 @@ server does not know, and a client reads that as "open a new session". Returning
 400 instead leaves it stuck until somebody reconnects it by hand, which is what
 `src/mcp/transport.ts` used to do by handing the request to a fresh, uninitialised
 transport. Keep the 404 branch.
+
+**A bare `bun test` at the root is not "everything", it is more than can
+run — and `bun test tests/` does not fix it.** Bun's arguments are substring
+filters over each file's path, not directories, so `tests/` also matches
+`sdks/typescript/tests/`. From the root, Bun collects the SDK's suite, which
+needs `sdks/typescript/node_modules`, and `sdks/typescript/packaged/`, which
+asserts against the built output in `dist/`. Neither is produced by any root
+command and git tracks neither, so both exist only on a machine that has worked
+on the SDK — where they quietly pass, and on a clean checkout fail with
+`Cannot find package 'ai'` and `ENOENT`. That is why local runs reported 224
+passing all day when a fresh clone reproduces **190**.
+
+Name both paths: `bun test tests/unit tests/integration`. CI runs that, gives the
+SDK its own job with its own install, and leaves `packaged/` to
+`publish-sdk.yml`, which builds first. Found by CI on its first two runs.
 
 **Integration tests are not hermetic.** Agent registration is rate-limited to 10
 per hour, and the counter lives in Redis, which survives between runs. Run the

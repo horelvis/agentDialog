@@ -56,13 +56,38 @@ by a different build than the one that ends up serving traffic.
 
 ### Verifying a deploy
 
+The workflow verifies itself. After the Cloud Run step it runs
+`scripts/smoke-mcp.sh`, which calls an MCP tool the way a client does —
+`initialize`, then `tools/call` — and fails the workflow if the tool cannot see
+its caller or if an unknown session id answers anything but `404`.
+
+The deploy is already live when it runs. It does not roll anything back; it
+makes a broken deploy visible instead of silent. Between v0.7.0 and v0.8.3 every
+MCP tool answered `Authentication required` for four days while nothing reported
+a problem.
+
+It needs `MCP_SMOKE_API_KEY`: the API key of a dedicated agent registered once
+against production. **There is no endpoint that deletes an agent**, so register
+one and reuse it — do not have CI create one per deploy, which would also burn
+the 10-per-hour registration limit. Without the secret the step fails and says
+so.
+
+Run it by hand against any environment:
+
+```bash
+MCP_SMOKE_API_KEY=mge_ag_... bash scripts/smoke-mcp.sh https://api.agentdialog.io
+```
+
+For the dependencies rather than the product:
+
 ```bash
 curl -s https://api.agentdialog.io/health
 ```
 
 Returns `status`, per-dependency checks for database and Redis, and live
-WebSocket counts. If a route you just shipped answers `404` instead of `401`, the
-deploy did not include it.
+WebSocket counts. It says nothing about whether an agent can use the product —
+it reported `healthy` throughout the outage above. If a route you just shipped
+answers `404` instead of `401`, the deploy did not include it.
 
 ### Deploying by hand
 

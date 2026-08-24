@@ -1,0 +1,131 @@
+name: CI
+
+# Nothing ran the backend suite before this. The checks on a pull request built
+# the landing page and the docs site, so a change could reach main, be released
+# and be deployed without a single backend test having run. Two faults shipped
+# that way in v0.7.0 and stayed in production for four days.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test, typecheck, lint
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: agentdialog
+          POSTGRES_PASSWORD: agentdialog
+          # tests/setup.ts points at agentdialog_test. Creating the database
+          # here means the suite needs no CREATE DATABASE step of its own.
+          POSTGRES_DB: agentdialog_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentdialog"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # MinIO needs `server /data` as its command, which a service container
+      # cannot express, so it runs as a step. The suite does need it: the file
+      # download tests create the bucket and upload through it.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio server /data
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live >/dev/null; then
+              echo "MinIO ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MinIO did not become ready"
+          docker logs minio
+          exit 1
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # Migrations need a database and nothing else; see PR #11.
+      - name: Migrate the test database
+        run: bun run scripts/migrate.ts
+        env:
+          DATABASE_URL: postgresql://agentdialog:agentdialog@localhost:5432/agentdialog_test
+
+      # Both paths are named because `bun test`'s arguments are substring
+      # filters over a file's path, not directories. A bare `bun test` from the
+      # root also collects sdks/typescript/, and `tests/` still matches
+      # sdks/typescript/tests/ — both of which need that package installed and
+      # built, which no root command does. The SDK gets its own job below.
+      #
+      # Redis starts empty on every run, so the registration rate limit that
+      # makes local reruns flaky cannot bite here.
+      - name: Test
+        run: bun test tests/unit tests/integration
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Lint
+        run: bunx biome check src/
+
+  # The SDK has its own dependencies and its own suite. Without this job,
+  # scoping the backend job above would simply move the blind spot: nothing
+  # would run these until a release tag, which is the last moment to find out.
+  # publish-sdk.yml still owns packaged/, which needs a build first.
+  sdk:
+    name: SDK test and typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install SDK dependencies
+        working-directory: sdks/typescript
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck SDK
+        working-directory: sdks/typescript
+        run: bunx tsc --noEmit
+
+      - name: Test SDK
+        working-directory: sdks/typescript
+        run: bun test tests
