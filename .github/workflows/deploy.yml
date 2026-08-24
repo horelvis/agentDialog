@@ -73,6 +73,16 @@ jobs:
             --concurrency=80
             --session-affinity
 
+      # /health reports the database and Redis. It does not report whether an
+      # agent can use the product: it said healthy for the four days every MCP
+      # tool answered "Authentication required". This calls a tool the way a
+      # client does, and fails the workflow if it cannot. The deploy is already
+      # live by then — the point is that a broken one stops being invisible.
+      - name: Smoke-test MCP against the deployed service
+        env:
+          MCP_SMOKE_API_KEY: ${{ secrets.MCP_SMOKE_API_KEY }}
+        run: bash scripts/smoke-mcp.sh https://api.agentdialog.io
+
       - name: Output deployment URL
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \

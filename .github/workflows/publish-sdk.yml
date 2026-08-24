@@ -35,11 +35,11 @@ jobs:
         run: npm install -g npm@^11.5.1
 
       # Root dependencies here only serve the root unit test step below.
-      # The root bun.lock is intentionally not committed (repo policy), so
-      # --frozen-lockfile would fail; sdks/typescript/bun.lock IS committed
-      # and keeps --frozen-lockfile, since that's the package we publish.
+      # An earlier comment claimed the root bun.lock was deliberately not
+      # committed. It is committed, and so are web/ and sdks/typescript/, so
+      # this install pins like every other one in the repo.
       - name: Install root dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Test
         run: bun test tests/unit

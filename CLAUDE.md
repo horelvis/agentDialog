@@ -29,6 +29,10 @@ bun run db:migrate       # apply migrations
 bun run typecheck        # SEE THE TRAP BELOW
 ```
 
+`.github/workflows/ci.yml` runs all of that on every pull request — the whole
+suite against Postgres, Redis and MinIO, then typecheck and biome. It does not
+block a merge on its own; that needs branch protection enabling on the repo.
+
 Setup from scratch:
 
 ```bash
