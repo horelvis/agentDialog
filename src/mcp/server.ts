@@ -4,6 +4,19 @@ import { createQuery, getQuery, listAgentQueries, updateQuery, cancelQuery } fro
 import { subjectSchema, changeSchema, patchQueryFields, patchQuerySchema } from "../validators/query.validators";
 import { answerSpaceSchema } from "../lib/answer-space";
 
+/**
+ * The agent the transport authenticated for THIS request.
+ *
+ * It arrives inside `authInfo` because that is the only part of the
+ * transport's `extra` the SDK forwards to a tool handler; see
+ * `authInfoFor` in ../mcp/transport.ts. Reading it from anywhere else
+ * silently yields undefined, which is how every tool came to answer
+ * "Authentication required" in production.
+ */
+function callerAgentId(extra: unknown): string | undefined {
+  return (extra as { authInfo?: { extra?: { agentId?: string } } })?.authInfo?.extra?.agentId;
+}
+
 export function createMcpServer() {
   const server = new McpServer({
     name: "AgentDialog",
@@ -53,7 +66,7 @@ The human may answer, or reply that they lack context — in which case the quer
         .describe("Minutes to wait for a response before the query expires"),
     },
     async (args, extra) => {
-      const agentId = (extra as any).agentId as string;
+      const agentId = callerAgentId(extra);
       if (!agentId) {
         console.warn("[MCP:TOOL] human_query called without agentId");
         return {
@@ -130,7 +143,7 @@ again.`,
         .describe("Additional context to resolve what the human flagged as missing"),
     },
     async (args, extra) => {
-      const agentId = (extra as any).agentId as string;
+      const agentId = callerAgentId(extra);
       if (!agentId) {
         console.warn("[MCP:TOOL] clarify_query called without agentId");
         return {
@@ -193,7 +206,7 @@ the query is closed for good — create a new one if you still need an answer.`,
       query_id: z.string().uuid().describe("The query ID to withdraw"),
     },
     async (args, extra) => {
-      const agentId = (extra as any).agentId as string;
+      const agentId = callerAgentId(extra);
       if (!agentId) {
         console.warn("[MCP:TOOL] cancel_query called without agentId");
         return {
@@ -240,7 +253,7 @@ Polling tips: Wait 10-30 seconds between checks. If status is "pending" for a lo
       query_id: z.string().uuid().describe("The query ID returned by human_query"),
     },
     async (args, extra) => {
-      const agentId = (extra as any).agentId as string;
+      const agentId = callerAgentId(extra);
       if (!agentId) {
         console.warn("[MCP:TOOL] get_query called without agentId");
         return {
@@ -285,7 +298,7 @@ Returns queries ordered by creation date (newest first). Use status filter to fi
         .describe("Maximum number of queries to return"),
     },
     async (args, extra) => {
-      const agentId = (extra as any).agentId as string;
+      const agentId = callerAgentId(extra);
       if (!agentId) {
         console.warn("[MCP:TOOL] list_queries called without agentId");
         return {

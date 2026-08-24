@@ -1,4 +1,5 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { createMcpServer } from "./server";
 
 // Map of sessionId → { transport, createdAt } for stateful sessions
@@ -23,20 +24,40 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000); // Every 5 minutes
 
+// The SDK assembles a tool handler's `extra` by naming fields one at a time —
+// `authInfo`, `requestId`, `requestInfo` and a few more — rather than spreading
+// what the transport received. A property of our own set on the transport's
+// extra is therefore dropped before any handler sees it. `authInfo` is the one
+// channel that does cross, and `AuthInfo.extra` is documented as the place for
+// data of our own, so the agent travels there.
+//
+// It is built per request on purpose. Deriving it from the session instead
+// would make the session id decide who the caller is, and anyone holding
+// another agent's session id would act as that agent.
+function authInfoFor(req: Request, agentId: string): AuthInfo {
+  return {
+    token: (req.headers.get("Authorization") ?? "").slice(7),
+    clientId: agentId,
+    scopes: [],
+    extra: { agentId },
+  };
+}
+
 export async function handleMcpRequest(
   req: Request,
   agentId: string,
 ): Promise<Response> {
   const method = req.method;
+  const authInfo = authInfoFor(req, agentId);
 
   if (method === "POST") {
     // Check for existing session
     const sessionId = req.headers.get("mcp-session-id");
 
     if (sessionId && sessions.has(sessionId)) {
-      // Existing session — delegate
+      // Existing session — delegate, with this request's own caller
       const entry = sessions.get(sessionId)!;
-      return entry.transport.handleRequest(req);
+      return entry.transport.handleRequest(req, { authInfo });
     }
 
     // Reject if at capacity
@@ -60,17 +81,6 @@ export async function handleMcpRequest(
 
     const server = createMcpServer();
 
-    // Inject agentId into the server's request handler extra context
-    const originalOnMessage = transport.onmessage;
-    transport.onmessage = (message, extra) => {
-      if (extra) {
-        (extra as any).agentId = agentId;
-      }
-      if (originalOnMessage) {
-        originalOnMessage(message, extra);
-      }
-    };
-
     try {
       await server.connect(transport);
     } catch (err) {
@@ -78,27 +88,14 @@ export async function handleMcpRequest(
       return new Response("Internal server error", { status: 500 });
     }
 
-    // Now re-inject after connect overwrites onmessage
-    const serverOnMessage = transport.onmessage;
-    transport.onmessage = (message, extra) => {
-      if (extra) {
-        (extra as any).agentId = agentId;
-      } else {
-        extra = { agentId } as any;
-      }
-      if (serverOnMessage) {
-        serverOnMessage(message, extra);
-      }
-    };
-
-    return transport.handleRequest(req);
+    return transport.handleRequest(req, { authInfo });
   }
 
   if (method === "GET") {
     // SSE stream for server-initiated messages
     const sessionId = req.headers.get("mcp-session-id");
     if (sessionId && sessions.has(sessionId)) {
-      return sessions.get(sessionId)!.transport.handleRequest(req);
+      return sessions.get(sessionId)!.transport.handleRequest(req, { authInfo });
     }
     console.warn(`[MCP] GET session not found: ${sessionId}`);
     return new Response("Session not found", { status: 404 });
@@ -109,7 +106,7 @@ export async function handleMcpRequest(
     const sessionId = req.headers.get("mcp-session-id");
     if (sessionId && sessions.has(sessionId)) {
       const entry = sessions.get(sessionId)!;
-      const response = await entry.transport.handleRequest(req);
+      const response = await entry.transport.handleRequest(req, { authInfo });
       sessions.delete(sessionId);
       console.log(`[MCP] Session deleted via DELETE: ${sessionId} (active: ${sessions.size})`);
       return response;

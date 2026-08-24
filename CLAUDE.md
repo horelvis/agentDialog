@@ -58,6 +58,21 @@ does: `bunx tsc --noEmit` exits 0, and no recent commit touched
 environmental. Treat a failure now as real rather than waving it off as the
 old, known one. The publish workflow still deliberately typechecks only the SDK.
 
+**An MCP tool's caller arrives in `authInfo.extra`, nowhere else.** The SDK
+builds a handler's `extra` by naming fields one at a time — `authInfo`,
+`requestId`, `requestInfo` and a few more — instead of spreading what the
+transport received, so a property set on the transport's own extra is dropped
+before any handler sees it. `src/mcp/transport.ts` puts the agent in
+`authInfo.extra` and passes it **per request** to `handleRequest`; deriving it
+from the session would let anyone holding another agent's `mcp-session-id` act
+as that agent. This was broken in production from v0.7.0 until the fix that added this note: the older
+code mutated `extra.agentId`, which worked against the SDK current when it was
+written and silently stopped when the lockfile moved to 1.30.0. Every tool
+answered `Authentication required` while the whole suite stayed green, because
+the tests handed the handlers a bare `{ agentId }` — a shape no transport can
+produce. Test MCP over the real HTTP path, as
+`tests/integration/mcp-transport-identity.test.ts` does.
+
 **Integration tests are not hermetic.** Agent registration is rate-limited to 10
 per hour, and the counter lives in Redis, which survives between runs. Run the
 suite a few times in a row and you get spurious `429`s that look like real
