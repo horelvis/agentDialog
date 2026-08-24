@@ -73,6 +73,15 @@ the tests handed the handlers a bare `{ agentId }` — a shape no transport can
 produce. Test MCP over the real HTTP path, as
 `tests/integration/mcp-transport-identity.test.ts` does.
 
+**MCP sessions live in the process's memory, so a session id outlives its
+session routinely** — a deploy, an instance recycle, the 30-minute TTL sweep, or
+a request landing on one of the other instances (`max-instances=10`;
+`--session-affinity` is best effort). The protocol reserves **404** for an id the
+server does not know, and a client reads that as "open a new session". Returning
+400 instead leaves it stuck until somebody reconnects it by hand, which is what
+`src/mcp/transport.ts` used to do by handing the request to a fresh, uninitialised
+transport. Keep the 404 branch.
+
 **Integration tests are not hermetic.** Agent registration is rate-limited to 10
 per hour, and the counter lives in Redis, which survives between runs. Run the
 suite a few times in a row and you get spurious `429`s that look like real

@@ -54,10 +54,30 @@ export async function handleMcpRequest(
     // Check for existing session
     const sessionId = req.headers.get("mcp-session-id");
 
-    if (sessionId && sessions.has(sessionId)) {
+    if (sessionId) {
+      const entry = sessions.get(sessionId);
+
       // Existing session — delegate, with this request's own caller
-      const entry = sessions.get(sessionId)!;
-      return entry.transport.handleRequest(req, { authInfo });
+      if (entry) return entry.transport.handleRequest(req, { authInfo });
+
+      // A session id we do not know. Sessions live in this process's memory, so
+      // an id outlives its session routinely: a deploy, an instance recycle,
+      // the TTL sweep, or a request landing on one of the other instances.
+      //
+      // The protocol reserves 404 for exactly this, and a client reads it as
+      // "open a new session". Falling through to the branch below would hand a
+      // non-initialize request to a fresh transport, which answers 400 "Server
+      // not initialized" — a hard error the client does not recover from, and
+      // it stays stuck until somebody reconnects it by hand.
+      console.warn(`[MCP] Unknown session, asking client to re-initialize: ${sessionId}`);
+      return new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: { code: -32001, message: "Session not found" },
+          id: null,
+        }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     // Reject if at capacity
