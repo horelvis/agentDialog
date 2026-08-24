@@ -22,7 +22,7 @@ app.get("/conversations/:id/files/:attachmentId/download", async (c) => {
     throw new ForbiddenError("Not a participant in this conversation");
   }
 
-  const result = await getFileDownloadUrl(attachmentId);
+  const result = await getFileDownloadUrl(attachmentId, conversationId);
   if (!result) throw new NotFoundError("Attachment", attachmentId);
 
   // Proxy the download from MinIO to avoid exposing internal URLs
