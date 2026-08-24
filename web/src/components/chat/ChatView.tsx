@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useParams } from "react-router";
 import { useConversationStore } from "@/stores/conversationStore";
 import { useWsStore } from "@/stores/wsStore";
+import { useQueryStore } from "@/stores/queryStore";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
@@ -20,18 +21,26 @@ export function ChatView() {
   const setActiveId = useConversationStore((s) => s.setActiveId);
   const wsSubscribe = useWsStore((s) => s.subscribe);
   const wsUnsubscribe = useWsStore((s) => s.unsubscribe);
+  const fetchQueries = useQueryStore((s) => s.fetchQueries);
 
   useEffect(() => {
     if (id) {
       setActiveId(id);
       fetchMessages(id);
       wsSubscribe(id);
+      // A human_query message renders as the query itself, which the chat
+      // reads from the query store rather than from the message: the answer
+      // space lives on the query and is deliberately not copied into the
+      // message. Without this the card would fall back to plain question text
+      // for anyone who reached a conversation without passing through the
+      // queries page first.
+      fetchQueries();
     }
     return () => {
       if (id) wsUnsubscribe(id);
       setActiveId(null);
     };
-  }, [id, setActiveId, fetchMessages, wsSubscribe, wsUnsubscribe]);
+  }, [id, setActiveId, fetchMessages, wsSubscribe, wsUnsubscribe, fetchQueries]);
 
   if (!id) return <EmptyState />;
 

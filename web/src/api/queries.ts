@@ -44,6 +44,7 @@ type AnswerWire =
 interface QueryWire {
   query_id: string;
   conversation_id: string;
+  query_message_id: string;
   status: HumanQuery["status"];
   status_description: string;
   query_type: HumanQuery["queryType"];
@@ -98,6 +99,7 @@ function fromQueryWire(wire: QueryWire): HumanQuery {
   return {
     id: wire.query_id,
     conversationId: wire.conversation_id,
+    queryMessageId: wire.query_message_id,
     status: wire.status,
     statusDescription: wire.status_description,
     queryType: wire.query_type,

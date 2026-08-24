@@ -11,6 +11,7 @@ import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError, Va
 import { generateInvitationToken } from "../lib/crypto";
 import { canonicaliseEmail, sameEmail } from "../lib/email-identity";
 import { dispatchWebhooks } from "./webhook.service";
+import { getRedis } from "../lib/redis";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
 import { checkPayload, type Subject, type Risk } from "../admission/decidability";
@@ -214,7 +215,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       .returning();
 
     // Update the query message structuredData with queryId
-    await tx
+    const [withQueryId] = await tx
       .update(messages)
       .set({
         structuredData: {
@@ -222,12 +223,15 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
           queryId: query.id,
         },
       })
-      .where(eq(messages.id, queryMessage.id));
+      .where(eq(messages.id, queryMessage.id))
+      .returning();
 
-    return { conversation, query, token, status, humanId, expiresAt };
+    // The updated row, not the inserted one: publishing `queryMessage` would
+    // broadcast the version from before queryId was added to it.
+    return { conversation, query, token, status, humanId, expiresAt, queryMessage: withQueryId };
   });
 
-  const { conversation, query, token, status, expiresAt } = result;
+  const { conversation, query, token, status, expiresAt, queryMessage } = result;
 
   // Send query email outside the transaction (side effect)
   // Send for both "pending" and "assigned": the email is the only thing that
@@ -252,6 +256,10 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
   }
 
   console.log(`[QUERY] Created ${query.id} for ${targetEmail} (status: ${status}, type: ${input.query_type}, agent: ${agentId})`);
+
+  // The other half of the same omission: a human already looking at this
+  // conversation should see the question arrive, not find it on reload.
+  await publishMessage(conversation.id, queryMessage);
 
   return {
     query_id: query.id,
@@ -421,6 +429,8 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
   // match exactly what the guard above already verified.
   const fromStatuses: (typeof humanQueries.$inferSelect)["status"][] = isPending ? ["pending"] : ["assigned", "needs_context"];
 
+  let published: typeof messages.$inferSelect | undefined;
+
   const [updated] = await db.transaction(async (tx) => {
     if (isPending) await acceptPendingInvitation(tx);
 
@@ -442,6 +452,8 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
       })
       .returning();
 
+    published = responseMessage;
+
     // Update query with optimistic lock — only update if still awaiting an answer
     return tx
       .update(humanQueries)
@@ -462,6 +474,10 @@ export async function respondQuery(queryId: string, humanId: string, input: Resp
   if (!updated) {
     throw new ConflictError("Query was already answered or its status changed");
   }
+
+  // After the commit, never inside it: a subscriber that reacts by reading the
+  // row must find it there.
+  if (published) await publishMessage(query.conversationId, published);
 
   // Dispatch webhook to agent
   console.log(`[QUERY] Answered: ${queryId} by human ${humanId} (response_time: ${responseTimeMs}ms)`);
@@ -557,6 +573,13 @@ async function shapeHumanQuery(
     // out of scope now (see the design spec) and the renderer no longer takes
     // it, but the conversation is still the human's, so it stays.
     conversation_id: query.conversationId,
+    // Which message in that conversation IS this query. The chat is the only
+    // place a human answers, so its renderer has to find the query among the
+    // messages, and the link lived only in the database. Matching on
+    // conversation_id alone happens to work while createQuery opens one
+    // conversation per query — an invariant nobody promised, and one that
+    // multi-human queries would break without a sound.
+    query_message_id: query.queryMessageId,
     status,
     status_description: STATUS_HINTS[status] || `Unknown status: ${status}`,
     query_type: query.queryType,
@@ -771,6 +794,66 @@ export async function listAgentQueries(
     created_at: q.createdAt.toISOString(),
     expires_at: q.expiresAt.toISOString(),
   }));
+}
+
+/**
+ * Announce a message on its conversation's channel, the way every other
+ * message-writing path already does.
+ *
+ * The two messages this service writes — the question and the answer — were
+ * the only ones nobody published. That was survivable while a query lived on
+ * a page of its own; now the conversation is where a query is asked and
+ * answered, and a chat that never hears about them shows a question whose
+ * answer only appears on reload.
+ *
+ * Publishing is best effort and deliberately never rethrows: the answer is
+ * already committed, and failing to gossip about it must not fail the call
+ * that recorded it.
+ */
+async function publishMessage(conversationId: string, message: unknown) {
+  try {
+    await getRedis().publish(
+      `conversation:${conversationId}`,
+      JSON.stringify({ type: "message.new", data: message }),
+    );
+  } catch (err) {
+    console.error(`[QUERY] Failed to publish message on ${conversationId}:`, err);
+  }
+}
+
+/**
+ * Whether an open query on this conversation was addressed to this human.
+ *
+ * A query is answered in its own conversation now, so the chat has to be
+ * readable before anything has been accepted — and `pending` is exactly the
+ * state where nobody has. `listHumanQueries` already grants visibility of such
+ * a query by the address it was sent to rather than by a participant row, "by
+ * the same entitlement respondQuery uses"; this is that entitlement reaching
+ * the conversation that holds it. Without it the query is listed and then
+ * leads to a 403, and a first-time human cannot answer at all.
+ *
+ * It grants reading, not membership: sending messages and downloading files
+ * still require a participant row, which answering creates.
+ */
+export async function isOpenQueryTarget(conversationId: string, humanId: string): Promise<boolean> {
+  const db = getDb();
+
+  const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+  if (!human) return false;
+
+  const [row] = await db
+    .select({ id: humanQueries.id })
+    .from(humanQueries)
+    .where(
+      and(
+        eq(humanQueries.conversationId, conversationId),
+        eq(humanQueries.humanEmail, canonicaliseEmail(human.email)),
+        inArray(humanQueries.status, ["pending", "assigned", "needs_context"]),
+      ),
+    )
+    .limit(1);
+
+  return !!row;
 }
 
 export async function listHumanQueries(humanId: string) {
