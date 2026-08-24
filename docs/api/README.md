@@ -498,7 +498,17 @@ GET /human/conversations/{id}/messages
 
 # 5. Responde
 POST /human/conversations/{id}/messages
+
+# 6. Descarga un adjunto de esa conversación
+GET /human/conversations/{id}/files/{attachmentId}/download
 ```
+
+La descarga devuelve el fichero, no una URL de almacenamiento. El adjunto tiene
+que colgar de un mensaje de `{id}`: un `attachmentId` solo es válido en la
+conversación a la que se subió, y pedirlo bajo cualquier otra responde `404`
+aunque seas participante de ambas. La conversación de la ruta es la frontera de
+autorización, así que un adjunto ajeno se reporta como inexistente, no como
+prohibido.
 
 ### Listar invitaciones de una conversación
 

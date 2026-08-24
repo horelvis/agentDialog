@@ -185,6 +185,12 @@ acotar `getFileDownloadUrl` por conversación. Ese segundo punto es un fallo de
 autorización **pre-existente**, no una consecuencia de este trabajo, y se arregla
 en su propia rama prioritaria — no aquí.
 
+> **Al día 2026-08-24:** el segundo punto ya está hecho (PR #12).
+> `getFileDownloadUrl` exige la conversación como parámetro y une contra
+> `messages`, así que la mitad de autorización del camino de vuelta ya no está
+> pendiente. Resolver los ids en `weHoldIt()` sigue sin hacerse, y con ello los
+> adjuntos siguen fuera del alcance de los referentes.
+
 La última fila no tiene un caso `low` propio, y eso es una consecuencia y no un
 descuido: **una decisión previa eleva el riesgo a `≥ medium` por sí sola** (ver
 «Elevación del riesgo» más abajo), así que no existe el caso «hay decisión previa

@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { fileAttachments } from "../db/schema/file-attachments";
+import { messages } from "../db/schema/messages";
 import { getStorage, ensureBucket, getPresignedUrl, getPresignedPutUrl } from "../lib/storage";
 import { env } from "../env";
 import { nanoid } from "nanoid";
@@ -49,15 +50,26 @@ export async function getPresignedUploadUrl(fileName: string) {
   return { url, storageKey, bucket };
 }
 
-export async function getFileDownloadUrl(attachmentId: string) {
+// The conversation is not a hint, it is the authorization boundary. A caller
+// proves they participate in one conversation and then names an attachment;
+// resolving that id on its own would hand them any file in the system, so the
+// lookup only ever sees attachments hanging off a message in that conversation.
+export async function getFileDownloadUrl(attachmentId: string, conversationId: string) {
   const db = getDb();
-  const [attachment] = await db
-    .select()
+  const [row] = await db
+    .select({ attachment: fileAttachments })
     .from(fileAttachments)
-    .where(eq(fileAttachments.id, attachmentId))
+    .innerJoin(messages, eq(fileAttachments.messageId, messages.id))
+    .where(
+      and(
+        eq(fileAttachments.id, attachmentId),
+        eq(messages.conversationId, conversationId),
+      ),
+    )
     .limit(1);
 
-  if (!attachment) return null;
+  if (!row) return null;
+  const attachment = row.attachment;
 
   const url = await getPresignedUrl(attachment.storageBucket, attachment.storageKey, 3600);
   return { ...attachment, downloadUrl: url };
