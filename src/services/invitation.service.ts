@@ -3,6 +3,7 @@ import { getDb } from "../db";
 import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
 import { conversationParticipants } from "../db/schema/participants";
+import { humanQueries } from "../db/schema/human-queries";
 import { humans } from "../db/schema/humans";
 import { generateInvitationToken } from "../lib/crypto";
 import { NotFoundError, ConflictError, ForbiddenError } from "../lib/errors";
@@ -176,6 +177,35 @@ export async function acceptInvitation(token: string, humanId: string) {
       humanId,
       role: "participant",
     });
+  }
+
+  // A query owns its conversation, and `pending` is defined to the agent as
+  // "the human has been invited but hasn't accepted the invitation yet. They
+  // need to open the link in their email". The moment this call succeeds that
+  // sentence is false, and it is the only thing the agent has to go on: it
+  // will keep polling and reporting that nobody has looked.
+  //
+  // Until now nothing carried the acceptance across. `assigned` was reachable
+  // only by trusting the agent beforehand, by clarifying out of
+  // needs_context, or through the inbound email path that nothing calls — so
+  // a first-time human accepting in the web app left the query reading
+  // `pending` until they also answered.
+  //
+  // Scoped to this conversation and to rows still pending, so a query already
+  // answered or cancelled is untouched.
+  const assigned = await db
+    .update(humanQueries)
+    .set({ status: "assigned", humanId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(humanQueries.conversationId, invitation.conversationId),
+        eq(humanQueries.status, "pending"),
+      ),
+    )
+    .returning({ id: humanQueries.id });
+
+  for (const q of assigned) {
+    console.log(`[QUERY] Assigned ${q.id} to ${humanId} on invitation accept`);
   }
 
   return invitation;
