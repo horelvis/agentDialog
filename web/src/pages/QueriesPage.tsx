@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { Link } from "react-router";
 import { useQueryStore } from "@/stores/queryStore";
-import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
-import { AnswerSpaceInput, isAnswerComplete } from "@/components/answer/AnswerSpaceInput";
-import { QueryContextHeader } from "@/components/queries/QueryContextHeader";
-import { InsufficientContextControl } from "@/components/queries/InsufficientContextControl";
-import type { Answer, HumanQuery, InsufficientReason, QueryType } from "@/api/types";
-import type { RespondInput } from "@/api/queries";
+import type { HumanQuery, QueryType } from "@/api/types";
+
+/**
+ * An index, not a second place to answer.
+ *
+ * A query used to exist twice over: as a card here, and as a dead text bubble
+ * in the conversation it belongs to. Two channels for one question, and only
+ * one of them could actually answer it. Answering now happens in the chat,
+ * where the question was asked; this page exists because a human with queries
+ * across several conversations still needs somewhere to see them together.
+ */
 
 const queryTypeBadge: Record<QueryType, { label: string; color: string }> = {
   validation: { label: "Validation", color: "bg-blue-600" },
@@ -16,132 +22,43 @@ const queryTypeBadge: Record<QueryType, { label: string; color: string }> = {
   labeling: { label: "Labeling", color: "bg-green-600" },
 };
 
-function QueryCard({
-  query,
-  onRespond,
-}: {
-  query: HumanQuery;
-  onRespond: (id: string, input: RespondInput) => Promise<void>;
-}) {
-  const [answer, setAnswer] = useState<Answer | null>(null);
-  const [comment, setComment] = useState("");
-  const [confidence, setConfidence] = useState(0.8);
-  const [submitting, setSubmitting] = useState(false);
-  const [insufficientSubmitting, setInsufficientSubmitting] = useState(false);
-
+function QueryRow({ query }: { query: HumanQuery }) {
   const badge = queryTypeBadge[query.queryType];
-  const expiresIn = Math.max(0, Math.round((new Date(query.expiresAt).getTime() - Date.now()) / 60000));
-  const ready = isAnswerComplete(query.answerSpace, answer);
-
-  const handleSubmit = async () => {
-    if (!answer || !ready) return;
-    setSubmitting(true);
-    try {
-      await onRespond(query.id, {
-        outcome: "answer",
-        answer,
-        comment: comment.trim() || undefined,
-        confidence,
-      });
-    } catch (e) {
-      console.error("[respondQuery]", e);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleInsufficientContext = async (reason: InsufficientReason, note?: string) => {
-    setInsufficientSubmitting(true);
-    try {
-      await onRespond(query.id, { outcome: "insufficient_context", reason, note });
-    } catch (e) {
-      console.error("[respondQuery]", e);
-    } finally {
-      setInsufficientSubmitting(false);
-    }
-  };
+  const expiresIn = Math.max(
+    0,
+    Math.round((new Date(query.expiresAt).getTime() - Date.now()) / 60000),
+  );
 
   return (
-    <div className="rounded-lg border border-surface-border bg-surface-secondary p-5">
+    <Link
+      to={`/app/c/${query.conversationId}`}
+      className="block rounded-lg border border-surface-border bg-surface-secondary p-4 transition-colors hover:border-brand-500"
+    >
       <div className="flex items-start gap-3">
-        <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium text-white ${badge.color}`}>
+        <span
+          className={`inline-flex shrink-0 items-center rounded px-2 py-0.5 text-xs font-medium text-white ${badge.color}`}
+        >
           {badge.label}
         </span>
         <Badge variant="risk" risk={query.risk}>
           {query.risk}
         </Badge>
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-100">{query.question}</p>
-          {query.confidence != null && (
-            <p className="mt-1 text-xs text-gray-400">
-              Agent confidence: {Math.round(query.confidence * 100)}%
-            </p>
-          )}
-          <p className="mt-1 text-xs text-gray-500">Expires in {expiresIn} min</p>
+          <p className="truncate font-medium text-gray-100">{query.question}</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {query.status === "needs_context"
+              ? "Waiting on the agent to clarify"
+              : `Expires in ${expiresIn} min`}
+          </p>
         </div>
+        <span className="shrink-0 self-center text-xs text-brand-400">Answer →</span>
       </div>
-
-      <div className="mt-4">
-        <QueryContextHeader
-          subject={query.subject}
-          changes={query.changes}
-          priorDecisionAt={query.priorDecisionAt}
-        />
-      </div>
-
-      {query.context && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-brand-400 hover:text-brand-300">
-            Additional context
-          </summary>
-          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-primary p-3 text-xs text-gray-300">
-            {query.context}
-          </pre>
-        </details>
-      )}
-
-      <div className="mt-4 space-y-3">
-        <AnswerSpaceInput space={query.answerSpace} value={answer} onChange={setAnswer} />
-
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-400">Comment (optional)</label>
-          <input
-            type="text"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Additional notes..."
-            className="w-full rounded-lg border border-surface-border bg-surface-primary px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-400">
-            Your confidence: {Math.round(confidence * 100)}%
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={confidence}
-            onChange={(e) => setConfidence(parseFloat(e.target.value))}
-            className="w-full accent-brand-500"
-          />
-        </div>
-
-        <InsufficientContextControl onSubmit={handleInsufficientContext} submitting={insufficientSubmitting} />
-
-        <div className="flex justify-end">
-          <Button size="sm" loading={submitting} disabled={!ready} onClick={handleSubmit}>
-            Respond
-          </Button>
-        </div>
-      </div>
-    </div>
+    </Link>
   );
 }
 
 export function QueriesPage() {
-  const { queries, loading, fetchQueries, respond } = useQueryStore();
+  const { queries, loading, fetchQueries } = useQueryStore();
 
   useEffect(() => {
     fetchQueries();
@@ -152,7 +69,7 @@ export function QueriesPage() {
       <header className="border-b border-surface-border bg-surface-secondary px-6 py-4">
         <h1 className="text-lg font-semibold text-gray-100">Queries</h1>
         <p className="text-sm text-gray-400">
-          Questions from agents that need your response.
+          Questions from agents. Open one to answer it in its conversation.
         </p>
       </header>
       <div className="flex-1 p-6">
@@ -169,9 +86,9 @@ export function QueriesPage() {
             <p className="mt-1 text-sm">When agents send you questions, they'll appear here.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {queries.map((query) => (
-              <QueryCard key={query.id} query={query} onRespond={respond} />
+              <QueryRow key={query.id} query={query} />
             ))}
           </div>
         )}

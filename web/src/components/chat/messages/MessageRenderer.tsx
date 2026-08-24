@@ -11,6 +11,8 @@ import { NotificationMessage } from "./NotificationMessage";
 import { FileMessage } from "./FileMessage";
 import { VoiceNoteMessage } from "./VoiceNoteMessage";
 import { SystemMessage } from "./SystemMessage";
+import { HumanQueryMessage } from "./HumanQueryMessage";
+import { HumanQueryResponseMessage } from "./HumanQueryResponseMessage";
 
 interface MessageRendererProps {
   message: Message;
@@ -60,6 +62,17 @@ export function MessageRenderer({ message }: MessageRendererProps) {
     );
   }
 
+  // A query is answered here, in the conversation it was asked in. Before this
+  // case existed it fell through to the default below and rendered as a plain
+  // text bubble, so the human had to go to another page to do anything with it.
+  if (message.type === "human_query") {
+    return (
+      <div className="ml-11">
+        <HumanQueryMessage message={message} />
+      </div>
+    );
+  }
+
   // These are response types from human — use bubble
   const content = (() => {
     switch (message.type) {
@@ -69,6 +82,8 @@ export function MessageRenderer({ message }: MessageRendererProps) {
         return <FormResponseMessage message={message} />;
       case "approval_response":
         return <ApprovalResponseMessage message={message} />;
+      case "human_query_response":
+        return <HumanQueryResponseMessage message={message} />;
       case "file":
         return <FileMessage message={message} />;
       case "voice_note":

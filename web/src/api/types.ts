@@ -239,6 +239,8 @@ export type InsufficientReason = (typeof INSUFFICIENT_REASONS)[number];
 export interface HumanQuery {
   id: string;
   conversationId: string;
+  /** The message in that conversation that IS this query — how the chat finds it. */
+  queryMessageId: string;
   queryType: QueryType;
   status: QueryStatus;
   statusDescription: string;

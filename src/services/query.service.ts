@@ -557,6 +557,13 @@ async function shapeHumanQuery(
     // out of scope now (see the design spec) and the renderer no longer takes
     // it, but the conversation is still the human's, so it stays.
     conversation_id: query.conversationId,
+    // Which message in that conversation IS this query. The chat is the only
+    // place a human answers, so its renderer has to find the query among the
+    // messages, and the link lived only in the database. Matching on
+    // conversation_id alone happens to work while createQuery opens one
+    // conversation per query — an invariant nobody promised, and one that
+    // multi-human queries would break without a sound.
+    query_message_id: query.queryMessageId,
     status,
     status_description: STATUS_HINTS[status] || `Unknown status: ${status}`,
     query_type: query.queryType,
