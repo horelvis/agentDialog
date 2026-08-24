@@ -1,0 +1,70 @@
+---
+title: Roadmap
+description: "What AgentDialog does today, what is being built, and what it will not do"
+---
+
+Versions, not dates. A dated roadmap ages whether or not anything changes; a version says what a release will contain and nothing about when it ships.
+
+Anything listed under a version is being built. Anything under **Exploring** is not committed to a release, and **Not planned** means what it says — those entries exist so you do not build on something that will never arrive.
+
+## Available now — v0.8.5
+
+**Typed human queries.** An agent asks with a closed answer shape — `boolean`, `choice`, `scalar`, `date`, `text` or `fields` — and gets a structured answer back rather than prose to interpret. An admission gate refuses a question a human could not decide, with a `remedy` field telling the agent what to add.
+
+**MCP server.** `human_query`, `get_query`, `list_queries`, `clarify_query`, `cancel_query`, over OAuth. Works with Claude and any MCP client.
+
+**REST API for agents**, with WebSocket and webhooks for delivery.
+
+**TypeScript SDK** on npm as `@agentdialog/sdk`, with adapters for LangChain (`/langchain`) and the Vercel AI SDK (`/ai`).
+
+**A web chat for humans.** They answer there, signing in with a code — no account to create, no password. Email notifies them and carries that code.
+
+**File attachments** in conversations.
+
+## v0.9
+
+### A LangGraph-native integration
+
+The LangChain adapter already works inside a LangGraph graph, because it exposes ordinary tools: `ask_human` and `check_answer`. But that shape is polling. The agent asks, then calls back to see whether an answer has arrived, and burns a model call each time it does.
+
+LangGraph has a better primitive for this. `interrupt()` suspends a graph and a checkpointer resumes it with the human's value, so waiting costs nothing. Mapping a query onto interrupt and resume is what makes AgentDialog idiomatic there rather than merely usable.
+
+### The Python SDK, brought up to date and published
+
+`sdks/python` exists and is not published. It also predates typed queries: it covers conversations, messages, invitations and webhooks, and has no query support at all — the product's central primitive is missing from it.
+
+Publishing it is therefore not a packaging task. Parity first, then PyPI.
+
+### An abandoned `needs_context` query expires
+
+When a human replies that they lack the context to decide, the query returns to the agent as `needs_context` and its clock pauses. If the agent never clarifies, that pause has no ceiling and the query stays open with its deadline sliding into the past.
+
+No data is lost, and the rows are harmless. But an agent cannot currently distinguish *paused* from *abandoned*, and it should.
+
+## v1.0
+
+**Queries that need more than one human.** One question, several people, one settled answer. A direct extension of the typed-query model rather than a new one.
+
+**Delegation between agents.** Handing a conversation from one agent to another with its context intact, so the human sees a continuation instead of a fresh stranger.
+
+## Exploring
+
+Not committed to a release. Listed because they are real questions, not because they are scheduled.
+
+**An agent directory** — discovery by capability, with public profiles.
+
+**Reputation** — humans rating the agents that interrupt them.
+
+**A2H compatibility** — a translation layer for the Agent-to-Human protocol, which depends on a standard we do not control.
+
+## Not planned
+
+### Reading inbound email
+
+**A reply to a notification email is not read, and that is a decision.** Email tells a human there is a question and carries their sign-in code. They answer in the web chat.
+
+The alternative was built and measured before being rejected. Polling a shared mailbox makes the `\Seen` flag mean two incompatible things at once — *a person read this* and *the system processed this* — so any reply someone opened first was lost silently. And mail addressed to other people is never marked read, so the unread backlog was re-downloaded in full on every pass.
+
+Underneath both: a shared mailbox is not a queue, and treating it as one fails quietly rather than loudly.
+
+If a transactional provider is ever configured on our own domain, the webhook that would receive it already exists and verifies signatures. That is configuration, not construction — but it is not on this roadmap.

@@ -1527,11 +1527,8 @@ Todos los errores siguen el mismo formato:
 
 ---
 
-## Próximamente (Phase 2)
+## Roadmap
 
-- **Directorio de Agentes** — Búsqueda por capabilities, perfiles públicos
-- **Agent Delegation** — Transferir conversación entre agentes con contexto
-- **Sistema de Reputación** — Humanos califican agentes (1-5 estrellas)
-- **Compatibilidad A2H** — Capa de traducción para el protocolo Agent-to-Human
-- **SDKs oficiales** — npm `@agentdialog/sdk` y pip `agentdialog`
-- **Multi-respuesta** — Queries que requieren input de múltiples humanos
+El roadmap vive en **[docs.agentdialog.io/docs/roadmap](https://docs.agentdialog.io/docs/roadmap)**, anclado a versiones y con una sección de lo que **no** se va a hacer.
+
+Se mantiene en un solo sitio a propósito. Esta lista era una copia, y llegó a anunciar como venidero el SDK de npm que llevaba publicado desde v0.7.0.
