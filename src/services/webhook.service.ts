@@ -9,7 +9,7 @@ import {
   signatureHeader,
 } from "../lib/webhook-signature";
 import { deliverWebhook } from "../lib/webhook-delivery";
-import { NotFoundError, ForbiddenError } from "../lib/errors";
+import { NotFoundError, ForbiddenError, ValidationError } from "../lib/errors";
 import { getLimitsConfig } from "../config/limits";
 
 /**
@@ -59,6 +59,31 @@ export function liveSecrets(secrets: StoredSecret[], now: Date = new Date()): St
   return secrets.filter((s) => s.expiresAt === null || new Date(s.expiresAt) > now);
 }
 
+/**
+ * What a rotation keeps of the previous secrets: the current, non-expiring
+ * one earns the grace window — singular, per the spec. Anything already
+ * counting down from an earlier rotation is dropped rather than carried
+ * forward, so repeated rotations never accumulate more than the new secret
+ * plus the one it replaces.
+ */
+export function retireCurrentSecret(secrets: StoredSecret[], expiresAt: string): StoredSecret[] {
+  return secrets.filter((s) => s.expiresAt === null).map((s) => ({ ...s, expiresAt }));
+}
+
+/**
+ * True when a `PATCH { isActive: true }` must be refused. `rotate-secret` is
+ * the only sanctioned route back for a webhook the 0008 migration disabled;
+ * letting this through on a webhook with no live secret would open a second,
+ * silently broken one — dispatch would keep skipping it forever.
+ */
+export function refusesReactivation(
+  secrets: StoredSecret[],
+  isActive: boolean | undefined,
+  now: Date = new Date(),
+): boolean {
+  return isActive === true && liveSecrets(secrets, now).length === 0;
+}
+
 export async function createWebhook(
   agentId: string,
   input: { url: string; events: string[] },
@@ -96,6 +121,26 @@ export async function updateWebhook(
   input: { url?: string; events?: string[]; isActive?: boolean },
 ): Promise<PublicWebhook> {
   const db = getDb();
+
+  if (input.isActive === true) {
+    const [current] = await db
+      .select({ secrets: webhooks.secrets })
+      .from(webhooks)
+      .where(and(eq(webhooks.id, webhookId), eq(webhooks.agentId, agentId)))
+      .limit(1);
+
+    if (!current) throw new NotFoundError("Webhook", webhookId);
+
+    // rotate-secret is the only sanctioned way back for a webhook with no
+    // live secret (e.g. one the 0008 migration disabled). Letting this PATCH
+    // through would reactivate it while dispatch keeps silently skipping it.
+    if (refusesReactivation(current.secrets, input.isActive)) {
+      throw new ValidationError(
+        "Cannot activate a webhook with no live signing secret; rotate the secret first",
+      );
+    }
+  }
+
   const [webhook] = await db
     .update(webhooks)
     .set({ ...input, updatedAt: new Date() })
@@ -144,10 +189,7 @@ export async function rotateWebhookSecret(
   const { record, plaintext } = newSecret();
   const expiresAt = new Date(Date.now() + limits.webhookSecretGraceMs).toISOString();
 
-  const retired = liveSecrets(current.secrets).map((s) => ({
-    ...s,
-    expiresAt: s.expiresAt ?? expiresAt,
-  }));
+  const retired = retireCurrentSecret(current.secrets, expiresAt);
 
   const [webhook] = await db
     .update(webhooks)
@@ -178,10 +220,22 @@ export async function dispatchWebhooks(
       continue;
     }
 
-    const secrets = liveSecrets(webhook.secrets).map((s) => open(s));
+    let secrets: string[];
+    try {
+      secrets = liveSecrets(webhook.secrets).map((s) => open(s));
+    } catch (err) {
+      // A bad auth tag or a rotated/missing WEBHOOK_ENCRYPTION_KEY throws
+      // here. One poisoned row must not abort delivery for every other
+      // webhook of this agent, so skip just this one and keep going.
+      console.error(`Webhook ${webhook.id}: failed to open a stored secret, skipping delivery`, err);
+      continue;
+    }
+
     if (secrets.length === 0) {
-      // Every secret expired without a rotation. Signing with nothing would
-      // send an unverifiable delivery, which is the bug we are removing.
+      // Every secret expired without a rotation, or the webhook was
+      // reactivated with none live. Signing with nothing would send an
+      // unverifiable delivery, which is the bug we are removing.
+      console.warn(`Webhook ${webhook.id}: no live secret, skipping delivery`);
       continue;
     }
 
@@ -212,6 +266,10 @@ export async function dispatchWebhooks(
           .set({ failureCount: 0, lastDeliveryAt: new Date(), updatedAt: new Date() })
           .where(eq(webhooks.id, webhook.id));
       }
+    }).catch((err) => {
+      // dispatchWebhooks is always called bare (fire and forget), so an
+      // unhandled rejection here would surface as a process-level error.
+      console.error(`Webhook ${webhook.id}: delivery failed unexpectedly`, err);
     });
   }
 }
