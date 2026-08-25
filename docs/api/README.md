@@ -931,6 +931,64 @@ Si el humano ya aceptó una invitación previa del mismo agente, las queries fut
 
 ---
 
+### Responder desde el enlace del email
+
+Una query de riesgo `low` o `medium` genera además un **grant**: una capacidad
+acotada a resolver *esa* pregunta, entregada como un enlace en el email de
+notificación. No es una sesión — quien tiene el enlace puede responder esa
+pregunta y nada más: no lee el hilo, no ve otras queries y no obtiene acceso a
+la cuenta.
+
+Las queries `high` y `critical` **no generan grant**. Ahí el humano se
+identifica con su código, como siempre.
+
+#### Ver la pregunta
+
+```
+GET /api/v1/public/queries/:token
+```
+
+Sin autenticación. Devuelve la pregunta, su `subject`, su `answer_space`, su
+`risk` y **quién la hace** (`agent.display_name`) — nadie debería decidir por
+un desconocido.
+
+**Este `GET` no consume el enlace.** Los escáneres corporativos de correo abren
+los enlaces antes que el destinatario; si abrirlo lo gastara, la pregunta
+quedaría inutilizable antes de que nadie la leyera.
+
+#### Responder
+
+```
+POST /api/v1/public/queries/:token/respond
+```
+
+Mismo cuerpo que `POST /api/v1/human/queries/:id/respond`:
+
+```json
+{ "outcome": "answer", "answer": { "kind": "choice", "option_ids": ["publish"] } }
+```
+
+o, si la persona no puede decidir con lo que se le ha dado:
+
+```json
+{ "outcome": "insufficient_context", "reason": "unclear_consequences" }
+```
+
+**Solo `outcome: "answer"` consume el enlace.** `insufficient_context` devuelve
+el turno al agente, y esa persona tiene que poder volver por el mismo enlace
+cuando el agente aclare.
+
+#### Errores
+
+Un token desconocido, uno caducado y uno ya usado devuelven **el mismo `401`
+con el mismo mensaje**. Distinguirlos convertiría el endpoint en un oráculo que
+confirma a un desconocido qué enlaces existieron.
+
+El enlace caduca **con la query**: cuando la pregunta muere, el enlace muere. No
+hay endpoint para revocarlo — `cancel_query` mata la query y con ella el enlace.
+
+---
+
 ## 9. Notificaciones por Email
 
 La web app en `agentdialog.io` es la única forma en la que un humano responde
@@ -938,9 +996,17 @@ La web app en `agentdialog.io` es la única forma en la que un humano responde
 distintos y ninguno de los dos es "responder":
 
 1. **Notifica** que hay algo esperando (una invitación, una query, un mensaje nuevo).
-2. **Autentica**: lleva el código de inicio de sesión sin contraseña. No hay
-   formulario de registro — el código *es* el login — pero sí hay cuenta y
-   sesión una vez que el humano entra.
+2. **Lleva el enlace**. Qué enlace depende del riesgo de la query:
+
+   - `low` y `medium`: un enlace a `/q/<token>` que abre **esa** pregunta y
+     permite resolverla sin iniciar sesión. Ver «Responder desde el enlace del
+     email» en la sección 8.
+   - `high` y `critical`: un enlace a la conversación donde vive la pregunta,
+     con el email prerrellenado. Ahí sí hace falta el código.
+
+   En el segundo caso el email **autentica**: lleva el código de inicio de
+   sesión sin contraseña. No hay formulario de registro — el código *es* el
+   login — pero sí hay cuenta y sesión una vez que el humano entra.
 
 ### Qué pasa si el humano responde al email
 

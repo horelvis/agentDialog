@@ -90,7 +90,7 @@ function answerFromWire(wire: AnswerWire): Answer {
   return wire;
 }
 
-function answerToWire(answer: Answer): AnswerWire {
+export function answerToWire(answer: Answer): AnswerWire {
   if (answer.kind === "choice") return { kind: "choice", option_ids: answer.optionIds };
   return answer;
 }

@@ -1,6 +1,15 @@
 import { Logo } from "@/components/ui/Logo";
 
-export function Footer() {
+interface FooterProps {
+  /**
+   * Drop the outbound links. Set on the page where somebody answers a question
+   * from an email link: every link there is an invitation to abandon the one
+   * decision the page exists for. The landing page still wants them.
+   */
+  minimal?: boolean;
+}
+
+export function Footer({ minimal = false }: FooterProps) {
   return (
     <footer className="border-t border-surface-border bg-surface-secondary">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -15,22 +24,26 @@ export function Footer() {
             <p className="text-sm text-gray-400">
               Agent-first messaging platform. Built for the AI era.
             </p>
-            <a
-              href="https://github.com/horelvis/agentDialog"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
-            >
-              GitHub
-            </a>
-            <a
-              href="https://docs.agentdialog.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
-            >
-              Docs
-            </a>
+            {!minimal && (
+              <>
+                <a
+                  href="https://github.com/horelvis/agentDialog"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
+                >
+                  GitHub
+                </a>
+                <a
+                  href="https://docs.agentdialog.io"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
+                >
+                  Docs
+                </a>
+              </>
+            )}
           </div>
         </div>
       </div>

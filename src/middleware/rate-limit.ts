@@ -150,6 +150,18 @@ export const humanRateLimit = (rpm: number) =>
     keyFn: (c) => c.get("humanId") || "unknown",
   });
 
+/**
+ * Keyed by the token's prefix, so one link cannot be hammered from many IPs.
+ * Falls back to the client IP for a request with no token in the path.
+ */
+export const grantRateLimit = (rpm: number) =>
+  rateLimit({
+    windowMs: 60_000,
+    max: rpm,
+    keyPrefix: "grant",
+    keyFn: (c) => (c.req.param("token") ?? "").slice(0, 15) || getClientIp(c),
+  });
+
 export const registerRateLimit = (rph: number) =>
   rateLimit({
     windowMs: 3_600_000,

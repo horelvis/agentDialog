@@ -14,6 +14,8 @@ interface SendQueryEmailInput {
   targetEmail: string;
   expiresAt: Date;
   invitationToken: string;
+  conversationId: string;
+  grantToken?: string;
 }
 
 const CONTEXT_MAX_LENGTH = 2000;
@@ -92,7 +94,12 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
   // auto-responder pointing the sender back to the app. Unset means no Reply-To
   // at all, which is better than one nobody reads.
   const replyTo = e.REPLY_TO_ADDRESS;
-  const appUrl = `${e.APP_URL}/app/queries`;
+  // With a grant, the link resolves the question in one click. Without one —
+  // high and critical risk — it still carries context: it lands on the
+  // conversation the question lives in, rather than a generic list.
+  const appUrl = input.grantToken
+    ? `${e.APP_URL}/q/${input.grantToken}`
+    : `${e.APP_URL}/app/c/${input.conversationId}?email=${encodeURIComponent(input.targetEmail)}`;
   const typeLabel = QUERY_TYPE_LABELS[input.queryType] || input.queryType;
 
   let contextHtml = "";

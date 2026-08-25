@@ -5,6 +5,7 @@ import { conversations } from "../db/schema/conversations";
 import { conversationParticipants } from "../db/schema/participants";
 import { messages } from "../db/schema/messages";
 import { humans } from "../db/schema/humans";
+import { agents } from "../db/schema/agents";
 import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
 import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError, ValidationError } from "../lib/errors";
@@ -15,6 +16,8 @@ import { getRedis } from "../lib/redis";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
 import { checkPayload, type Subject, type Risk } from "../admission/decidability";
+import { mintQueryGrant } from "./query-grant.service";
+import { shouldMintGrant } from "../lib/query-grant-token";
 import { findPriorDecision, elevateRisk } from "../admission/history";
 import { validateAnswerAgainstSpace, type AnswerSpace, type Answer } from "../lib/answer-space";
 import type { CreateQueryInput, RespondQueryInput, PatchQueryInput, Change } from "../validators/query.validators";
@@ -228,10 +231,17 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
 
     // The updated row, not the inserted one: publishing `queryMessage` would
     // broadcast the version from before queryId was added to it.
-    return { conversation, query, token, status, humanId, expiresAt, queryMessage: withQueryId };
+    // The link that answers this question in one click. Minted inside the
+    // transaction so a rolled-back query never leaves a live grant behind.
+    // High and critical risk mint nothing: those still cost a sign-in.
+    const grantToken = shouldMintGrant(risk)
+      ? await mintQueryGrant(query.id, targetEmail, expiresAt, tx)
+      : undefined;
+
+    return { conversation, query, token, status, humanId, expiresAt, queryMessage: withQueryId, grantToken };
   });
 
-  const { conversation, query, token, status, expiresAt, queryMessage } = result;
+  const { conversation, query, token, status, expiresAt, queryMessage, grantToken } = result;
 
   // Send query email outside the transaction (side effect)
   // Send for both "pending" and "assigned": the email is the only thing that
@@ -249,6 +259,8 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       targetEmail,
       expiresAt,
       invitationToken: token,
+      conversationId: conversation.id,
+      grantToken,
     });
     console.log(`[QUERY] Query email sent to ${targetEmail}`);
   } catch (emailErr) {
@@ -925,6 +937,45 @@ export async function listHumanQueries(humanId: string) {
     (q) => now <= q.expiresAt && (q.status === "pending" || q.status === "assigned"),
   );
   return Promise.all(visible.map((q) => shapeHumanQuery(q, { includePriorDecision: true })));
+}
+
+/**
+ * The query as the holder of a grant may see it. There is no entitlement check
+ * here because the grant IS the entitlement — the middleware already proved the
+ * caller holds a token minted for this query. Deliberately without the prior
+ * decision: the link shows the question, not a history.
+ */
+export async function getQueryForGrant(queryId: string) {
+  const db = getDb();
+
+  const [query] = await db
+    .select()
+    .from(humanQueries)
+    .where(eq(humanQueries.id, queryId))
+    .limit(1);
+
+  if (!query) throw new NotFoundError("Query", queryId);
+
+  // Who is asking. Somebody reaching this page followed a link out of an email
+  // and has no other context: without a name, they are being asked to decide
+  // for a stranger. The agent's public identity only — nothing about its keys,
+  // its owner or its other conversations.
+  const [agent] = await db
+    .select({
+      slug: agents.slug,
+      displayName: agents.displayName,
+      avatarUrl: agents.avatarUrl,
+    })
+    .from(agents)
+    .where(eq(agents.id, query.agentId))
+    .limit(1);
+
+  return {
+    ...(await shapeHumanQuery(query, { includePriorDecision: false })),
+    agent: agent
+      ? { slug: agent.slug, display_name: agent.displayName, avatar_url: agent.avatarUrl }
+      : null,
+  };
 }
 
 export async function getQueryForHuman(queryId: string, humanId: string) {

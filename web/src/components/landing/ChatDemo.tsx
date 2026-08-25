@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 interface DemoMessage {
   id: number;
   sender: "agent" | "human" | "system";
-  type: "text" | "tool_call" | "tool_result" | "approval" | "approval_response" | "notification" | "form" | "form_response";
+  type: "text" | "tool_call" | "tool_result" | "query" | "query_response" | "notification";
   content?: string;
   meta?: Record<string, unknown>;
   delay: number;
@@ -38,7 +38,7 @@ const conversation: DemoMessage[] = [
     id: 4,
     sender: "agent",
     type: "tool_call",
-    content: "Asking sarah@company.com to validate release...",
+    content: "Asking sarah@company.com whether to release v3.1...",
     meta: { toolName: "human_query", status: "running" },
     delay: 2800,
   },
@@ -46,48 +46,41 @@ const conversation: DemoMessage[] = [
     id: 5,
     sender: "agent",
     type: "tool_result",
-    content: "Email sent. Waiting for an answer...",
+    content: "Query created. Email sent with a link to this decision.",
     meta: { toolName: "human_query", duration: "1.2s", status: "completed" },
     delay: 3600,
   },
   {
     id: 6,
     sender: "agent",
-    type: "notification",
-    content: "Waiting for Sarah to answer in the app",
-    meta: { severity: "info", title: "Human Input Requested" },
+    type: "query",
+    content: "Release v3.1 to production?",
+    meta: {
+      riskLevel: "high",
+      subject: "Release v3.1 — changelog and staging report",
+      options: [
+        { label: "Release now", consequence: "Rolls out to all instances immediately." },
+        { label: "Canary first", consequence: "5% of traffic for an hour, then I ask again." },
+        { label: "Hold", consequence: "Nothing ships. I close the release window." },
+      ],
+    },
     delay: 4400,
   },
   {
     id: 7,
     sender: "human",
-    type: "text",
-    content: "Looks good — go ahead with the release. Skip the canary, we already validated on staging.",
-    delay: 5800,
+    type: "query_response",
+    content: "Canary first",
+    meta: { comment: "Friday afternoon. Let's not." },
+    delay: 6400,
   },
   {
     id: 8,
     sender: "agent",
-    type: "approval",
-    content: "Release v3.1 to production? Skipping canary as instructed.",
-    meta: { riskLevel: "high", action: "release-to-production", details: "Direct deploy to 4 instances in us-east-1. Rolling update." },
-    delay: 7000,
-  },
-  {
-    id: 9,
-    sender: "human",
-    type: "approval_response",
-    content: "Approved",
-    meta: { decision: "approved" },
-    delay: 8400,
-  },
-  {
-    id: 10,
-    sender: "agent",
     type: "notification",
-    content: "v3.1 is live across all instances",
-    meta: { severity: "success", title: "Release Complete", details: "4 instances updated. Zero downtime. Total time: 6m 18s" },
-    delay: 9400,
+    content: "v3.1 at 5% of traffic. Asking again in an hour.",
+    meta: { severity: "success", title: "Decision applied" },
+    delay: 7600,
   },
 ];
 
@@ -149,39 +142,55 @@ function ToolResultBubble({ msg, animate }: { msg: DemoMessage; animate: boolean
   );
 }
 
-function ApprovalBubble({ msg, animate }: { msg: DemoMessage; animate: boolean }) {
+/**
+ * A query as the product actually poses one: a subject, a declared risk, and
+ * every option carrying the consequence of picking it. The consequence under
+ * each option is the piece the whole typed-query design rests on — without it,
+ * this is a tidy set of buttons over a decision nobody can actually make.
+ */
+function QueryBubble({ msg, animate }: { msg: DemoMessage; animate: boolean }) {
   const risk = (msg.meta?.riskLevel as string) ?? "medium";
+  const options = (msg.meta?.options as Array<{ label: string; consequence: string }>) ?? [];
+
   return (
     <div className={cn("rounded-lg border overflow-hidden transition-all duration-500", riskColors[risk], animate && "animate-fade-in")}>
       <div className="flex items-center gap-2 px-3 py-2">
         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", riskBadge[risk])}>
           {risk}
         </span>
-        <span className="text-xs font-medium text-gray-300">Approval Required</span>
+        <span className="text-xs font-medium text-gray-300">Decision required</span>
       </div>
       <div className="border-t border-white/5 px-3 py-3">
-        <p className="text-sm text-gray-200">{msg.content}</p>
-        {msg.meta?.details ? <p className="mt-1 text-xs text-gray-500">{String(msg.meta.details)}</p> : null}
-        <div className="mt-3 flex gap-2">
-          <button className="rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-500">
-            Approve
-          </button>
-          <button className="rounded-lg border border-surface-border bg-surface-elevated px-4 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-surface-hover">
-            Deny
-          </button>
+        {msg.meta?.subject ? (
+          <p className="text-[10px] uppercase tracking-wide text-gray-500">{String(msg.meta.subject)}</p>
+        ) : null}
+        <p className="mt-1 text-sm text-gray-200">{msg.content}</p>
+
+        <div className="mt-3 space-y-1.5">
+          {options.map((option) => (
+            <div
+              key={option.label}
+              className="rounded-lg border border-surface-border bg-surface-elevated px-3 py-2"
+            >
+              <p className="text-xs font-medium text-gray-200">{option.label}</p>
+              <p className="mt-0.5 text-[11px] leading-snug text-gray-500">{option.consequence}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-function ApprovalResponseBubble({ msg, animate }: { msg: DemoMessage; animate: boolean }) {
-  const approved = msg.meta?.decision === "approved";
+function QueryResponseBubble({ msg, animate }: { msg: DemoMessage; animate: boolean }) {
   return (
-    <div className={cn("flex items-center gap-2 transition-all duration-500", animate && "animate-fade-in")}>
-      <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", approved ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>
-        {approved ? "Approved" : "Denied"}
+    <div className={cn("max-w-[75%] transition-all duration-500", animate && "animate-fade-in")}>
+      <span className="inline-block rounded-full bg-green-500/20 px-2.5 py-0.5 text-xs font-medium text-green-400">
+        {msg.content}
       </span>
+      {msg.meta?.comment ? (
+        <p className="mt-1 text-right text-xs text-gray-500">{String(msg.meta.comment)}</p>
+      ) : null}
     </div>
   );
 }
@@ -256,21 +265,21 @@ function MessageRow({ msg, animate }: { msg: DemoMessage; animate: boolean }) {
       </div>
     );
   }
-  if (msg.type === "approval") {
+  if (msg.type === "query") {
     return (
       <div className="flex gap-2.5">
         <AgentAvatar />
         <div className="max-w-[85%] flex-1">
-          <ApprovalBubble msg={msg} animate={animate} />
+          <QueryBubble msg={msg} animate={animate} />
         </div>
       </div>
     );
   }
-  if (msg.type === "approval_response") {
+  if (msg.type === "query_response") {
     return (
       <div className={cn("flex gap-2.5", isHuman && "flex-row-reverse")}>
         <HumanAvatar />
-        <ApprovalResponseBubble msg={msg} animate={animate} />
+        <QueryResponseBubble msg={msg} animate={animate} />
       </div>
     );
   }
@@ -316,7 +325,9 @@ export function ChatDemo() {
             See the full loop in action
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Agent runs tools, asks a human, gets the answer, requests approval — all in one conversation.
+            The agent runs its tools, hits a decision that is not its to make, and asks — with
+            the options spelled out and what each one causes. The answer comes back structured,
+            and it carries on.
           </p>
         </div>
 
@@ -330,7 +341,7 @@ export function ChatDemo() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-100">Release v3.1 → Production</p>
-                <p className="text-xs text-gray-500">Release Agent &middot; Sarah (notified by email)</p>
+                <p className="text-xs text-gray-500">Release Agent &middot; Sarah (answered from her email link)</p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-green-500" />

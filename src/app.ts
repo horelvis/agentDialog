@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { AppEnv } from "./types/hono";
 import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "hono/bun";
 import { corsMiddleware } from "./middleware/cors";
@@ -12,6 +13,7 @@ import {
   agentRateLimit,
   humanRateLimit,
   authRateLimit,
+  grantRateLimit,
 } from "./middleware/rate-limit";
 import { getLimitsConfig } from "./config/limits";
 import { env } from "./env";
@@ -28,6 +30,7 @@ import agentInvitationRoutes from "./routes/agent/invitations";
 import agentWebhookRoutes from "./routes/agent/webhooks";
 import agentQueryRoutes from "./routes/agent/queries";
 import humanAuthRoutes from "./routes/human/auth";
+import publicQueryRoutes from "./routes/public/queries";
 import humanProfileRoutes from "./routes/human/profile";
 import humanInvitationRoutes from "./routes/human/invitations";
 import humanConversationRoutes from "./routes/human/conversations";
@@ -86,6 +89,13 @@ export function createApp() {
   agentApi.route("/webhooks", agentWebhookRoutes);
   agentApi.route("/queries", agentQueryRoutes);
   app.route("/api/v1/agent", agentApi);
+
+  // Public query links: no session at all, resolved by the token in the path.
+  // Mounted before the human routes so nothing here inherits humanAuth.
+  const publicQueryApp = new Hono<AppEnv>();
+  publicQueryApp.use("*", grantRateLimit(30));
+  publicQueryApp.route("/", publicQueryRoutes);
+  app.route("/api/v1/public/queries", publicQueryApp);
 
   // Human routes - auth (public, rate limited per IP)
   const humanAuthApp = new Hono();

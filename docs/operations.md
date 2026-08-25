@@ -263,6 +263,24 @@ identify the federation, they are not credentials.
 `docs-site/out/` and `docs-site/.next/` are build artifacts and gitignored.
 Cloudflare Pages builds them from source; do not commit them.
 
+### Enlaces de respuesta de un solo uso
+
+Una query de riesgo `low` o `medium` sale por email con un enlace a
+`/q/<token>` que resuelve esa pregunta sin sesión. La tabla es `query_grants`;
+el token se guarda como prefijo indexado más hash bcrypt, igual que los tokens
+de sesión.
+
+**El riesgo aceptado, por escrito:** un correo reenviado es una credencial
+reenviada. Está acotado — quien tenga el enlace responde esa pregunta y nada
+más: no lee el hilo, no ve otras queries, no obtiene sesión — y queda
+registrado qué grant se usó. `high` y `critical` no generan enlace.
+
+**No hay endpoint de revocación.** La caducidad y el consumo cubren el caso
+normal; un agente que se dé cuenta de haber preguntado a quien no debía usa
+`cancel_query`, que mata la query y con ella el enlace.
+
+No hace falta ningún secreto nuevo para esto.
+
 ### Configuration and secrets
 
 Configuration is a **hybrid**, which is worth knowing before you touch either half:

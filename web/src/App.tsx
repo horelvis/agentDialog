@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route } from "react-router";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import { BareLayout } from "@/components/layout/BareLayout";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { PublicQueryPage } from "@/pages/PublicQueryPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { InvitationsPage } from "@/pages/InvitationsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -20,6 +22,11 @@ export default function App() {
           <Route index element={<LandingPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="*" element={<NotFoundPage />} />
+        </Route>
+
+        {/* Answering from an email link: footer only, no navigation. */}
+        <Route element={<BareLayout />}>
+          <Route path="q/:token" element={<PublicQueryPage />} />
         </Route>
 
         {/* Protected routes */}

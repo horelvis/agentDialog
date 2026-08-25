@@ -69,6 +69,30 @@ remedy says exactly what to add. This is not a validation nicety: it is what
 makes it possible to check, mechanically, that a query is something a human
 could actually decide before it ever reaches one.
 
+## Risk also decides how they answer
+
+`risk` is not only an admission bar. It picks how much friction stands between
+the person and the answer, so it is worth choosing honestly rather than
+defensively.
+
+- **`low` and `medium`** — the notification email carries a link that opens
+  that one question and resolves it. No sign-in, no code, no account. The link
+  is scoped to a single query: whoever holds it can answer it and nothing else
+  — they cannot read the conversation, see other queries, or reach the account.
+  It dies with the query, and answering spends it.
+- **`high` and `critical`** — no such link exists. The email lands the person
+  on the conversation the question lives in, with their address prefilled, and
+  they sign in with a code as usual.
+
+The trade-off is deliberate: an email can be forwarded, and a forwarded link is
+a forwarded credential. Bounded to one answer, that is a risk worth taking to
+get a decision at all; on a payment or an irreversible action, it is not.
+
+**Declaring a lower risk to make answering easier is the one thing not to do.**
+AgentDialog raises risk on its own when it sees money or a prior decision, so
+the attempt is likely to be undone anyway — but where it isn't, you have traded
+somebody else's safety for your own convenience.
+
 ## `needs_context` and `cancelled`
 
 Passing the admission gate doesn't guarantee the human agrees they have
