@@ -157,7 +157,7 @@ space-separated, while a secret is being rotated). Verify with `verifyWebhook`
 against the **raw** request body:
 
 ```typescript
-import { verifyWebhook } from "@agentdialog/sdk";
+import { verifyWebhook } from "@agentdialog/sdk/webhooks";
 
 app.post("/hooks/agentdialog", async (req, res) => {
   const ok = verifyWebhook({

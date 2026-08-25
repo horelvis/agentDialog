@@ -62,4 +62,9 @@ export type {
   Subject,
 } from "./queries.js";
 
-export { verifyWebhook, type VerifyWebhookOptions } from "./webhooks.js";
+// verifyWebhook is exported from the "@agentdialog/sdk/webhooks" subpath, not
+// here. It is the SDK's only import of a Node builtin (node:crypto), and it
+// has never been published — moving it off the root barrel now, before the
+// first release that carries it, costs nothing. Re-exporting it from the root
+// would pull node:crypto into every consumer, including edge and browser
+// runtimes that never touch webhooks.

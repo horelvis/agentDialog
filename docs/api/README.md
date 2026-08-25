@@ -1236,7 +1236,7 @@ function verifyWebhook(
   }
 
   const key = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
-  const expected = createHmac("sha256", key).update(`${id}.${timestamp}.${body}`).digest();
+  const expected = createHmac("sha256", key).update(`${id}.${rawTimestamp}.${body}`).digest();
 
   return signatures.split(" ").some((entry) => {
     const [version, value] = entry.split(",");
@@ -1284,8 +1284,11 @@ Response:
 
 El secreto anterior sigue firmando entregas durante **24 horas** tras la
 rotación, así que un verificador desplegado de forma gradual nunca rechaza una
-entrega a mitad de la rotación. Es también la única vía para reactivar un
-webhook sin ningún secreto vigente — la petición lo reactiva.
+entrega a mitad de la rotación. Una segunda rotación dentro de esa ventana
+termina de inmediato el periodo de gracia que aún estuviera abierto — solo el
+secreto activo más reciente conserva una ventana de gracia. Es también la
+única vía para reactivar un webhook sin ningún secreto vigente — la petición
+lo reactiva.
 
 ### Auto-desactivación
 

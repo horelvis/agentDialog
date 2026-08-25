@@ -19,10 +19,10 @@ export async function deliverWebhook(
 ): Promise<{ success: boolean; statusCode?: number; error?: string }> {
   const e = env();
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), e.WEBHOOK_TIMEOUT_MS);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), e.WEBHOOK_TIMEOUT_MS);
 
+  try {
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -37,13 +37,13 @@ export async function deliverWebhook(
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
-
     return { success: response.ok, statusCode: response.status };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }

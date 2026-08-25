@@ -93,6 +93,22 @@ export const envSchema = z.object({
         "signing secrets cannot be stored recoverably and no delivery can be verified.",
     });
   }
+
+  // secret-box.ts checks this same thing, but only when a webhook is first
+  // sealed or opened — a malformed key otherwise boots green, serves traffic,
+  // and then fails silently on the first dispatch. Catch it at startup instead,
+  // the same way INBOUND_EMAIL_WEBHOOK_SECRET is validated above. The runtime
+  // guard in secret-box.ts stays too, as defence in depth.
+  if (env.WEBHOOK_ENCRYPTION_KEY) {
+    const decoded = Buffer.from(env.WEBHOOK_ENCRYPTION_KEY, "base64");
+    if (decoded.length !== 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["WEBHOOK_ENCRYPTION_KEY"],
+        message: `WEBHOOK_ENCRYPTION_KEY must decode to 32 bytes, got ${decoded.length}.`,
+      });
+    }
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

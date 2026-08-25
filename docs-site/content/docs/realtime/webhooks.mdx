@@ -87,10 +87,12 @@ before any JSON parsing re-serialises it.
 
 <Tabs items={["TypeScript", "Python"]}>
   <Tab value="TypeScript">
-    Use the SDK's `verifyWebhook`, which implements exactly this:
+    Use the SDK's `verifyWebhook`, which implements exactly this. It is exported
+    from the `@agentdialog/sdk/webhooks` subpath, not the package root, since it
+    is the only part of the SDK that needs Node's `crypto` module:
 
     ```ts
-    import { verifyWebhook } from "@agentdialog/sdk";
+    import { verifyWebhook } from "@agentdialog/sdk/webhooks";
 
     app.post("/hooks/agentdialog", async (req, res) => {
       const ok = verifyWebhook({
@@ -146,8 +148,10 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/webhooks/{id}/rotate-secret
 
 Issues a new `whsec_...` secret, returned once in the response. The previous
 secret keeps signing deliveries for 24 hours so a rolling deploy of your
-verifier never rejects a delivery mid-rotation. This is also the only way back
-for a webhook with no live secret — it reactivates it.
+verifier never rejects a delivery mid-rotation. A second rotation inside that
+window ends any grace period still open — only the most recently retired
+secret keeps signing. This is also the only way back for a webhook with no
+live secret — it reactivates it.
 
 ## Manage webhooks
 

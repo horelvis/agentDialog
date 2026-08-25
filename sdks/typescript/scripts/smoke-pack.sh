@@ -52,6 +52,7 @@ cat > consumer.mjs <<'JS'
 import { AgentDialog, QueryTimeoutError, UndecidableQueryError } from "@agentdialog/sdk";
 import { askHumanTool, checkAnswerTool } from "@agentdialog/sdk/ai";
 import { askHumanTool as lcAsk } from "@agentdialog/sdk/langchain";
+import { verifyWebhook } from "@agentdialog/sdk/webhooks";
 
 const client = new AgentDialog({ apiKey: "mge_ag_test" });
 
@@ -71,6 +72,11 @@ const checks = [
   ["ai askHumanTool builds", typeof askHumanTool(client, { defaultEmail: "a@b.test" }) === "object"],
   ["ai checkAnswerTool builds", typeof checkAnswerTool(client) === "object"],
   ["langchain askHumanTool builds", lcAsk(client, { defaultEmail: "a@b.test" }).name === "ask_human"],
+  ["webhooks verifyWebhook resolves and runs", typeof verifyWebhook({
+    secret: "whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    body: "{}",
+    headers: {},
+  }) === "boolean"],
 ];
 
 let failed = 0;
@@ -184,6 +190,7 @@ cat > consumer-adapters.ts <<'TS'
 import { AgentDialog } from "@agentdialog/sdk";
 import { askHumanTool, checkAnswerTool } from "@agentdialog/sdk/ai";
 import { askHumanTool as lcAsk, checkAnswerTool as lcCheck } from "@agentdialog/sdk/langchain";
+import { verifyWebhook, type VerifyWebhookOptions } from "@agentdialog/sdk/webhooks";
 
 const client = new AgentDialog({ apiKey: "mge_ag_test" });
 
@@ -196,10 +203,18 @@ export const langchainTools = [
   lcAsk(client, { defaultEmail: "oncall@example.com" }),
   lcCheck(client),
 ];
+
+const webhookOptions: VerifyWebhookOptions = {
+  secret: "whsec_test",
+  body: "{}",
+  headers: {},
+};
+export const webhookVerified: boolean = verifyWebhook(webhookOptions);
 TS
 
 npx --no-install tsc -p tsconfig.adapters.json
 echo "    ok    both adapter subpaths typecheck against their frameworks"
+echo "    ok    webhooks subpath typechecks, including the Node builtin it needs"
 echo ""
 
 echo "==> Package smoke test passed"
