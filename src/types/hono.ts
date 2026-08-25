@@ -9,6 +9,11 @@ export type AppVariables = {
   humanId: string;
   validatedBody: any;
   validatedQuery: any;
+  // Set by query-grant-auth. A grant is a capability, not an identity: it never
+  // sets `human`, and holding one is not being signed in.
+  grantId: string;
+  grantQueryId: string;
+  grantEmail: string;
 };
 
 export type AppEnv = {

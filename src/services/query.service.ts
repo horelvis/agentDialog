@@ -938,6 +938,26 @@ export async function listHumanQueries(humanId: string) {
   return Promise.all(visible.map((q) => shapeHumanQuery(q, { includePriorDecision: true })));
 }
 
+/**
+ * The query as the holder of a grant may see it. There is no entitlement check
+ * here because the grant IS the entitlement — the middleware already proved the
+ * caller holds a token minted for this query. Deliberately without the prior
+ * decision: the link shows the question, not a history.
+ */
+export async function getQueryForGrant(queryId: string) {
+  const db = getDb();
+
+  const [query] = await db
+    .select()
+    .from(humanQueries)
+    .where(eq(humanQueries.id, queryId))
+    .limit(1);
+
+  if (!query) throw new NotFoundError("Query", queryId);
+
+  return shapeHumanQuery(query, { includePriorDecision: false });
+}
+
 export async function getQueryForHuman(queryId: string, humanId: string) {
   const db = getDb();
 
