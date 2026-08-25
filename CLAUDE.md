@@ -36,11 +36,14 @@ block a merge on its own; that needs branch protection enabling on the repo.
 Setup from scratch:
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d postgres redis
+docker compose -f docker-compose.dev.yml up -d postgres redis minio
 cp .env.example .env
 bun install
 bun run db:migrate
 ```
+
+`minio` (port 9000) is not optional: `tests/integration/file-download-idor.test.ts`
+fails without it.
 
 The integration tests need a separate database:
 
@@ -128,6 +131,18 @@ override, and do not pin zod below 3.25 — the MCP SDK imports `zod/v3` and
 **Docker lockfile globs are `bun.lock*`, not `bun.lockb*`.** Bun 1.4 writes a
 text lockfile. The old glob matched nothing, so every `--frozen-lockfile`
 silently ran with no lockfile at all.
+
+**`bun run db:migrate` reads `migrations/meta/_journal.json`, not the
+filesystem.** `scripts/migrate.ts` calls Drizzle's `migrate()`, which applies
+exactly what the journal lists — a hand-written `.sql` file dropped into
+`migrations/` with no matching journal entry is silently skipped. The command
+still prints `[MIGRATE] Migrations complete` and exits 0; nothing tells you the
+schema didn't change. Task 3 of the webhook-signing work hit this with
+`0008_webhook_signing.sql`: the first `db:migrate` "succeeded" and `\d
+webhooks` still showed the old column. Every hand-written migration since 0003
+has needed the same fix (`git log --oneline -- migrations/meta/_journal.json`).
+Add the journal entry — idx, tag matching the filename, a timestamp after the
+previous entry's — in the same commit as the migration itself.
 
 ## Conventions
 

@@ -5,6 +5,7 @@ import {
   listWebhooks,
   updateWebhook,
   deleteWebhook,
+  rotateWebhookSecret,
 } from "../../services/webhook.service";
 import { validateBody } from "../../middleware/validate";
 import { z } from "zod";
@@ -51,6 +52,19 @@ app.patch("/:id", validateBody(updateWebhookSchema), async (c) => {
   const webhook = await updateWebhook(webhookId, agentId, input);
 
   return c.json({ data: webhook });
+});
+
+app.post("/:id/rotate-secret", async (c) => {
+  const webhookId = c.req.param("id");
+  const agentId = c.get("agentId");
+  const { webhook, secret } = await rotateWebhookSecret(webhookId, agentId);
+
+  return c.json({
+    data: {
+      ...webhook,
+      secret, // Only returned once!
+    },
+  });
 });
 
 app.delete("/:id", async (c) => {

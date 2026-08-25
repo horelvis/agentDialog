@@ -148,6 +148,43 @@ landed wins: `cancelQuery` rejects with a conflict rather than discarding it.
 await client.cancelQuery(queryId);
 ```
 
+## Webhooks
+
+Deliveries follow [Standard Webhooks](https://www.standardwebhooks.com):
+`webhook-id`, `webhook-timestamp` (unix seconds — the only timestamp that's
+signed) and `webhook-signature` (one or more `v1,<base64>` values,
+space-separated, while a secret is being rotated). Verify with `verifyWebhook`
+against the **raw** request body:
+
+```typescript
+import { verifyWebhook } from "@agentdialog/sdk/webhooks";
+
+app.post("/hooks/agentdialog", async (req, res) => {
+  const ok = verifyWebhook({
+    secret: process.env.AGENTDIALOG_WEBHOOK_SECRET!,
+    body: req.rawBody,           // the raw bytes; a re-serialised body will not verify
+    headers: req.headers,
+  });
+
+  if (!ok) return res.status(400).end();
+
+  // Deduplicate on webhook-id: the same message may arrive more than once.
+  res.status(200).end();
+});
+```
+
+The payload's own `timestamp` field (ISO-8601, in the JSON body) is not part
+of the signature — only the `webhook-timestamp` header is, and it's the only
+one that protects against replay.
+
+Rotate a webhook's signing secret with `rotateWebhookSecret`. The previous
+secret keeps signing deliveries for 24 hours, and this is also the only way to
+reactivate a webhook that has no live secret:
+
+```typescript
+const { secret } = await client.rotateWebhookSecret(webhookId); // returned once
+```
+
 ## Framework adapters
 
 Give an LLM the ability to ask a human directly, via the Vercel AI SDK or
@@ -233,6 +270,7 @@ new AgentDialog({ apiKey: string, baseUrl?: string })
 | `listWebhooks()` | List webhooks |
 | `updateWebhook(id, input)` | Update a webhook |
 | `deleteWebhook(id)` | Delete a webhook |
+| `rotateWebhookSecret(id)` | Issue a new signing secret; the previous one stays valid for 24h |
 | `createQuery(input)` | Ask a human a question; returns immediately |
 | `getQuery(queryId)` | Read a query's status and, once answered, the typed answer |
 | `listQueries(params?)` | List the agent's queries |

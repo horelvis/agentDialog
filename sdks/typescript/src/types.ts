@@ -127,6 +127,8 @@ export interface Webhook {
   url: string;
   events: string[];
   isActive: boolean;
+  failureCount: number;
+  lastDeliveryAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

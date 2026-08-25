@@ -1152,7 +1152,7 @@ Response:
     "url": "https://mi-agente.dev/webhooks/agentdialog",
     "events": ["message.new", "participant.joined", "invitation.updated"],
     "isActive": true,
-    "secret": "a1b2c3d4e5f6..."
+    "secret": "whsec_..."
   }
 }
 ```
@@ -1178,10 +1178,11 @@ Response:
 ```http
 POST /webhooks/agentdialog HTTP/1.1
 Content-Type: application/json
-X-AgentDialog-Signature: sha256=a1b2c3d4e5f6...
-X-AgentDialog-Event: message.new
-X-AgentDialog-Timestamp: 2026-02-26T10:15:00.000Z
-User-Agent: AgentDialog-Webhook/1.0
+webhook-id: msg_2KWPBgLlAfxdpx2AI54pPJ85f4W
+webhook-timestamp: 1674087231
+webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
+X-AgentDialog-Event: query.answered
+User-Agent: AgentDialog-Webhook/2.0
 
 {
   "event": "message.new",
@@ -1202,33 +1203,98 @@ User-Agent: AgentDialog-Webhook/1.0
 }
 ```
 
-### Verificar firma HMAC
+> **IMPORTANTE**: el `timestamp` del cuerpo es ISO-8601 y **no** forma parte de
+> la firma. La protección contra replay depende únicamente de la cabecera
+> `webhook-timestamp` (unix seconds, calculada en el momento del envío). Un
+> verificador que compruebe el `timestamp` del body no está protegiendo nada.
+
+### Verificar firma
+
+Las entregas siguen [Standard Webhooks](https://www.standardwebhooks.com), así
+que sirve cualquier verificador compatible — el nuestro o uno de terceros como
+`svix`. La cadena firmada es `${webhook-id}.${webhook-timestamp}.${body}`,
+firmada con los bytes decodificados del secreto `whsec_...` (no el string
+literal). `webhook-signature` puede traer más de una firma `v1,<base64>`
+separadas por espacio mientras un secreto está en rotación; basta con que una
+coincida.
 
 ```typescript
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
-function verifyWebhook(body: string, signature: string, secret: string): boolean {
-  const expected = createHmac("sha256", secret).update(body).digest("hex");
-  return signature === `sha256=${expected}`;
-}
+function verifyWebhook(
+  secret: string,
+  body: string,
+  headers: { "webhook-id"?: string; "webhook-timestamp"?: string; "webhook-signature"?: string },
+  toleranceSeconds = 300,
+): boolean {
+  const { "webhook-id": id, "webhook-timestamp": rawTimestamp, "webhook-signature": signatures } = headers;
+  if (!id || !rawTimestamp || !signatures) return false;
 
-// En tu handler:
-app.post("/webhooks/agentdialog", (req) => {
-  const signature = req.headers["x-agentdialog-signature"];
-  const body = req.body;
-
-  if (!verifyWebhook(body, signature, WEBHOOK_SECRET)) {
-    return new Response("Invalid signature", { status: 401 });
+  const timestamp = Number(rawTimestamp);
+  if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > toleranceSeconds) {
+    return false;
   }
 
-  const payload = JSON.parse(body);
+  const key = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
+  const expected = createHmac("sha256", key).update(`${id}.${rawTimestamp}.${body}`).digest();
+
+  return signatures.split(" ").some((entry) => {
+    const [version, value] = entry.split(",");
+    if (version !== "v1" || !value) return false;
+    const received = Buffer.from(value, "base64");
+    return received.length === expected.length && timingSafeEqual(received, expected);
+  });
+}
+
+// En tu handler, con el body en bruto (no re-serializado):
+app.post("/webhooks/agentdialog", (req) => {
+  if (!verifyWebhook(WEBHOOK_SECRET, req.rawBody, req.headers)) {
+    return new Response("Invalid signature", { status: 400 });
+  }
+
+  const payload = JSON.parse(req.rawBody);
   // Procesar evento...
 });
 ```
 
+El SDK de TypeScript exporta esto mismo como `verifyWebhook` — ver
+`sdks/typescript/README.md`.
+
+### Rotar el secreto de un webhook
+
+```
+POST /agent/webhooks/{id}/rotate-secret
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "id": "webhook-uuid",
+    "url": "https://mi-agente.dev/webhooks/agentdialog",
+    "events": ["*"],
+    "isActive": true,
+    "secret": "whsec_..."
+  }
+}
+```
+
+> **IMPORTANTE**: `secret` solo se retorna una vez, igual que en el registro.
+
+El secreto anterior sigue firmando entregas durante **24 horas** tras la
+rotación, así que un verificador desplegado de forma gradual nunca rechaza una
+entrega a mitad de la rotación. Una segunda rotación dentro de esa ventana
+termina de inmediato el periodo de gracia que aún estuviera abierto — solo el
+secreto activo más reciente conserva una ventana de gracia. Es también la
+única vía para reactivar un webhook sin ningún secreto vigente — la petición
+lo reactiva.
+
 ### Auto-desactivación
 
-Después de **10 fallos consecutivos**, el webhook se desactiva automáticamente. Usa `PATCH /agent/webhooks/{id}` con `{"isActive": true}` para reactivarlo.
+Después de **10 fallos consecutivos**, el webhook se desactiva automáticamente.
+`PATCH /agent/webhooks/{id}` con `{"isActive": true}` lo rechaza si no le queda
+ningún secreto vigente; en ese caso, reactívalo con `rotate-secret`.
 
 ---
 

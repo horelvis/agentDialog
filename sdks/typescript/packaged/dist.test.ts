@@ -42,6 +42,8 @@ describe("built artifact", () => {
       "ai/index.d.ts",
       "langchain/index.js",
       "langchain/index.d.ts",
+      "webhooks.js",
+      "webhooks.d.ts",
     ]) {
       expect(existsSync(join(DIST, file))).toBe(true);
     }
@@ -102,6 +104,25 @@ describe("root entry point, from dist", () => {
       expect(source.includes(framework)).toBe(false);
       expect(client.includes(framework)).toBe(false);
     }
+  });
+
+  it("does not re-export verifyWebhook, so a root import never needs node:crypto", async () => {
+    // It lives behind the "@agentdialog/sdk/webhooks" subpath so an edge or
+    // browser consumer of the root import never drags in a Node builtin.
+    const mod = await import(join(DIST, "index.js"));
+    expect("verifyWebhook" in mod).toBe(false);
+
+    const specifiers = [
+      ...(await Bun.file(join(DIST, "index.js")).text()).matchAll(/from\s+"([^"]+)"/g),
+    ].map((m) => m[1]);
+    expect(specifiers.some((s) => s.includes("crypto"))).toBe(false);
+  });
+});
+
+describe("webhooks subpath, from dist", () => {
+  it("exports verifyWebhook", async () => {
+    const mod = await import(join(DIST, "webhooks.js"));
+    expect(typeof mod.verifyWebhook).toBe("function");
   });
 });
 
