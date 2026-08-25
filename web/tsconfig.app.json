@@ -28,5 +28,8 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Bun runs the *.test.ts files (`bun test web/src/lib`); they import
+  // "bun:test", which the app's DOM-typed build has no types for.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }
