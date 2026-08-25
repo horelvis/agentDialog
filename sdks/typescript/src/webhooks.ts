@@ -39,7 +39,7 @@ export function verifyWebhook(options: VerifyWebhookOptions): boolean {
     "base64",
   );
   const expected = createHmac("sha256", key)
-    .update(`${id}.${timestamp}.${body}`)
+    .update(`${id}.${rawTimestamp}.${body}`)
     .digest();
 
   return signatures.split(" ").some((entry) => {

@@ -61,6 +61,21 @@ describe("verifyWebhook", () => {
     ).toBe(false);
   });
 
+  it("rejects a delivery timestamped in the future beyond the tolerance", () => {
+    const timestamp = nowSeconds() + 6 * 60;
+    expect(
+      verifyWebhook({
+        secret: SECRET,
+        body: BODY,
+        headers: {
+          "webhook-id": MSG_ID,
+          "webhook-timestamp": String(timestamp),
+          "webhook-signature": sign(SECRET, MSG_ID, timestamp, BODY),
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("accepts when one of several signatures matches, which is how rotation works", () => {
     const timestamp = nowSeconds();
     const other = "whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
