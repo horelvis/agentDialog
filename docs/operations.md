@@ -296,36 +296,94 @@ No hace falta ningún secreto nuevo para esto.
 
 ### Configuration and secrets
 
-Configuration is a **hybrid**, which is worth knowing before you touch either half:
+**Every credential is a Secret Manager reference** (`valueFrom`). Nothing
+sensitive is a plain environment variable on the service any more:
 
-- `SMTP_PASS` is a **Secret Manager reference** (`valueFrom`), backed by the
-  secret `smtp-password`.
-- `WEBHOOK_ENCRYPTION_KEY` is the same kind of reference, backed by its own
-  Secret Manager secret. It is the AES-256-GCM key `src/lib/secret-box.ts`
-  uses to encrypt webhook signing secrets at rest — never the signing secrets
-  themselves. Generate it with `openssl rand -base64 32`. Losing it loses
-  every stored signing secret for every agent's webhooks; there is no recovery
-  path other than each affected agent calling
-  `POST /agent/webhooks/:id/rotate-secret` to get a new one.
-- Every other variable is a **plain environment variable** on the service.
+| Variable | Secret | What it is |
+|---|---|---|
+| `SESSION_SECRET` | `session-secret` | Signs human sessions. Rotating it logs everyone out. |
+| `MINIO_ACCESS_KEY` | `minio-access-key` | HMAC access id for the file bucket. |
+| `MINIO_SECRET_KEY` | `minio-secret-key` | Its secret half. |
+| `WEBHOOK_ENCRYPTION_KEY` | `webhook-encryption-key` | AES-256-GCM key that encrypts webhook signing secrets at rest. |
+| `SMTP_PASS` | `smtp-password` | Outbound mail. |
+| `INBOUND_EMAIL_WEBHOOK_SECRET` | `inbound-email-webhook-secret` | Verifies the dormant inbound webhook. |
 
-Four further secrets exist in Secret Manager — `SMTP_FROM`, `SMTP_HOST`,
-`SMTP_PORT`, `SMTP_USER` — that nothing references. They are leftovers from the
-original setup and none of them is sensitive.
+`WEBHOOK_ENCRYPTION_KEY` encrypts the signing secrets, never *is* one. Generate
+it with `openssl rand -base64 32` — it must decode to exactly 32 bytes, and
+`src/env.ts` refuses to start otherwise. Losing it loses every stored signing
+secret for every agent's webhook, with no recovery but each affected agent
+calling `POST /agent/webhooks/:id/rotate-secret`.
 
-The trade-off of plain environment variables is worth knowing rather than
-rediscovering: they are simpler and cost nothing, but they are visible to anyone
-with `run.services.get` on the project, they are not versioned, and rotating one
-requires a service update. For the current scale that is acceptable; for a team
-it would not be.
+`SMTP_USER` is still a plain value on the service. It is a username, not a
+credential, so it is left alone; a Secret Manager entry of that name exists and
+is unreferenced, along with `SMTP_FROM`, `SMTP_HOST` and `SMTP_PORT`.
+
+### Why none of these is a plain variable any more
+
+`SESSION_SECRET` and `MINIO_SECRET_KEY` were plain values until 2026-08-25, and
+that is exactly how they leaked: a routine
+`gcloud run services describe ... --format="value(...env)"`, run to check how a
+*different* secret was wired, printed both in full into a session transcript.
+No unusual command, no mistake in the flags — describing the service is what
+prints them.
+
+That is the argument, and it is stronger than the usual one: a plain variable is
+not merely "visible to anyone with `run.services.get`", it is visible to anyone
+who looks at the service for any reason at all. Both were rotated and migrated
+the same day, and the old GCS HMAC key was deactivated, verified, and deleted.
+
+### Rotating one
+
+```bash
+# New value straight into Secret Manager — never through a shell that echoes it
+openssl rand -hex 32 | tr -d '\n' | \
+  gcloud secrets versions add session-secret --project=agentdialog --data-file=-
+
+gcloud run services update agentdialog-api --region=us-central1 \
+  --project=agentdialog --update-secrets=SESSION_SECRET=session-secret:latest
+```
+
+`MINIO_*` is not a value you choose — it is a GCS HMAC key pair. Create a new one
+for the runtime service account, wire **both** halves, verify a real upload, and
+only then deactivate and delete the old key:
+
+```bash
+gcloud storage hmac create 477560692826-compute@developer.gserviceaccount.com \
+  --project=agentdialog --format=json   # capture; do not print
+gcloud storage hmac update <OLD_ACCESS_ID> --deactivate --project=agentdialog
+gcloud storage hmac delete <OLD_ACCESS_ID> --project=agentdialog
+```
+
+Deactivate, verify, then delete: deactivating is reversible and deleting is not.
+
+**Turning a plain variable into a reference takes one command, not two.**
+`gcloud` refuses to change a variable's type in place — *"Cannot update
+environment variable [X] to the given type"* — and removing it in a separate
+deploy leaves a revision that will not boot, because `src/env.ts` requires it.
+Remove and set together:
+
+```bash
+gcloud run services update agentdialog-api --region=us-central1 --project=agentdialog \
+  --remove-env-vars=SESSION_SECRET \
+  --update-secrets=SESSION_SECRET=session-secret:latest
+```
 
 <!-- DANGER -->
-**`scripts/cleanup-secrets.sh` will break outbound email if you run it today.**
-It calls `gcloud run services update --clear-secrets`, which removes *every*
-secret reference from the service — including the live `SMTP_PASS`. Its hardcoded
-list of secrets to delete (`database-url`, `redis-url`, `session-secret`) does not
-match what actually exists, and omits the four that do. The script was written for
-a configuration this project no longer has. Do not run it without rewriting it.
+**`scripts/cleanup-secrets.sh` will take the service down if you run it today,
+and it got worse on 2026-08-25.** It calls
+`gcloud run services update --clear-secrets`, which strips *every* secret
+reference from the service — now all six, not just `SMTP_PASS`. The service then
+fails to boot at all: `src/env.ts` requires `SESSION_SECRET` and
+`WEBHOOK_ENCRYPTION_KEY` in production.
+
+Worse, its hardcoded delete list includes **`session-secret`**. That name used to
+match nothing, which is what made the script merely wrong. It now names the
+secret that signs every live session. Deleting a Secret Manager secret is not
+instant-fatal — the service keeps the mounted value until it restarts — which
+means the damage would surface later, at the next revision, far from the command
+that caused it.
+
+Do not run it. Rewrite or delete it.
 
 `src/env.ts` validates everything at startup with zod and exits if a variable is
 missing or malformed, so a misconfigured deploy fails immediately and loudly
@@ -334,8 +392,13 @@ rather than at the first request that needs the value.
 ### Inbound email: tried, measured, rejected
 
 **Nothing reads inbound email.** A human answers a query in the web app. Email
-notifies them that a question is waiting and carries their sign-in code, and
-that is all it does.
+notifies them that a question is waiting and carries the link that gets them
+there, and that is all it does.
+
+Which link depends on the query's risk: `low` and `medium` get a one-click link
+that resolves that question without signing in at all, and `high` and `critical`
+get a link to the conversation plus the sign-in code. See «Enlaces de respuesta
+de un solo uso» above.
 
 This is worth recording because the obvious cheap fix was built, reviewed and
 thrown away, and the next person to reach for it should know why.
