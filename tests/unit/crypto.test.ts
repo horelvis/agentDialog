@@ -6,8 +6,6 @@ import {
   generateSessionToken,
   generateVerificationCode,
   generateInvitationToken,
-  generateWebhookSecret,
-  signWebhookPayload,
 } from "../../src/lib/crypto";
 
 describe("crypto", () => {
@@ -39,22 +37,5 @@ describe("crypto", () => {
   it("generates invitation tokens", () => {
     const token = generateInvitationToken();
     expect(token.length).toBe(32);
-  });
-
-  it("generates webhook secrets", () => {
-    const secret = generateWebhookSecret();
-    expect(secret.length).toBe(64); // 32 bytes hex
-  });
-
-  it("signs webhook payloads consistently", () => {
-    const payload = '{"test": true}';
-    const secret = "test-secret";
-    const sig1 = signWebhookPayload(payload, secret);
-    const sig2 = signWebhookPayload(payload, secret);
-    expect(sig1).toBe(sig2);
-
-    // Different payload = different signature
-    const sig3 = signWebhookPayload('{"test": false}', secret);
-    expect(sig1).not.toBe(sig3);
   });
 });

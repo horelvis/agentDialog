@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { nanoid } from "nanoid";
-import { createHmac, randomBytes, randomInt } from "crypto";
+import { randomInt } from "crypto";
 import { getAuthConfig } from "../config/auth";
 
 export function generateApiKey(): { key: string; prefix: string } {
@@ -41,12 +41,4 @@ export function generateVerificationCode(): string {
 
 export function generateInvitationToken(): string {
   return nanoid(32);
-}
-
-export function generateWebhookSecret(): string {
-  return randomBytes(32).toString("hex");
-}
-
-export function signWebhookPayload(payload: string, secret: string): string {
-  return createHmac("sha256", secret).update(payload).digest("hex");
 }

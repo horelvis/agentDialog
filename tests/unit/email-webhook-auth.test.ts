@@ -15,6 +15,7 @@ import { envSchema } from "../../src/env";
 const base = {
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
   SESSION_SECRET: "a-session-secret-of-at-least-32-chars",
+  WEBHOOK_ENCRYPTION_KEY: "dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdA==",
 };
 
 describe("signatureRequirement", () => {
