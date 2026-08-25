@@ -14,6 +14,7 @@ export function getLimitsConfig() {
     maxMessageLength: 32_000,
     maxConversationParticipants: 20,
     maxWebhooksPerAgent: 10,
+    webhookSecretGraceMs: 24 * 60 * 60 * 1000, // a rotated secret stays live 24h
     paginationDefault: 50,
     paginationMax: 100,
     penaltyMaxSeconds: 300, // 5 minutes max penalty
