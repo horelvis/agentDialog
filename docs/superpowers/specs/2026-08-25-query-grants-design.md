@@ -31,10 +31,17 @@ que el enlace conceda nada más que responder esa pregunta.
 
 Se diseñan juntos y se pueden construir por separado.
 
-**(a) El enlace lleva contexto.** No toca la autenticación. El correo enlaza a la
-pregunta concreta; si no hay sesión, el formulario de acceso sale en esa misma
-página con el email ya relleno, y al verificar se aterriza en la pregunta. De
-ocho pasos a tres. Sirve para **todos** los niveles de riesgo.
+**(a) El enlace lleva contexto.** No toca la autenticación. El correo enlaza a
+`/app/c/:conversationId` —la conversación donde vive la pregunta, porque una
+query se responde en el chat y no en una página propia— en vez de a la lista
+genérica. Si no hay sesión, el formulario de acceso sale en esa misma página con
+el email ya relleno, y al verificar se aterriza en la conversación. De ocho pasos
+a tres. Sirve para **todos** los niveles de riesgo.
+
+Es más barato de lo que parece: `sendQueryEmail` **ya recibe** `invitationToken`
+(`src/services/query.service.ts:250`) y no lo usa — hoy construye el enlace como
+`${APP_URL}/app/queries` (`src/services/query-email.service.ts:95`). El dato ya
+llega al sitio correcto; solo hay que aprovecharlo.
 
 **(b) El enlace concede responder.** Sí toca la autenticación, y es el grueso de
 este documento.
@@ -99,7 +106,10 @@ un problema conocido y aparte; heredarlo en código nuevo sería importarlo.
 
 ## 2. Ciclo de vida
 
-**Se acuña** al invitar al humano de una query cuyo riesgo sea `low` o `medium`.
+**Se acuña** dentro de `createQuery`, cuando el riesgo de la query es `low` o
+`medium`, y se pasa a `sendQueryEmail` junto al `invitationToken` que ya viaja
+ahí. El correo lleva entonces un enlace u otro según el riesgo, y esa es la única
+rama del envío.
 
 **Caduca con la query**: `expires_at` se copia de `human_queries.expires_at`, no
 es un TTL inventado. Cuando la pregunta muere, el enlace muere.
@@ -132,8 +142,9 @@ respuesta consume el grant; `insufficient_context` no.
 
 Con límite de peticiones propio, por prefijo de token y por IP.
 
-La página pública que abre el humano vive en `/q/:token` y es la única del web
-que funciona sin sesión. El enlace del correo apunta ahí.
+La página pública que abre el humano vive en `/q/:token`, dentro del grupo
+`PublicLayout` que el web ya tiene (`web/src/App.tsx:19`), al lado de `login`. Es
+la única página de la aplicación que muestra una query sin sesión.
 
 ## 4. Cómo encaja sin tocar la seguridad existente
 
