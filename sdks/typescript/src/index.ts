@@ -61,3 +61,5 @@ export type {
   Slot,
   Subject,
 } from "./queries.js";
+
+export { verifyWebhook, type VerifyWebhookOptions } from "./webhooks.js";

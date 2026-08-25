@@ -191,6 +191,10 @@ export class AgentDialog {
     return this.request<WebhookWithSecret>("POST", "/agent/webhooks", input);
   }
 
+  async rotateWebhookSecret(id: string): Promise<WebhookWithSecret> {
+    return this.request<WebhookWithSecret>("POST", `/agent/webhooks/${id}/rotate-secret`);
+  }
+
   async listWebhooks(): Promise<Webhook[]> {
     return this.request<Webhook[]>("GET", "/agent/webhooks");
   }
