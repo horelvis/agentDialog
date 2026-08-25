@@ -39,6 +39,10 @@ RUN bun run build
 FROM base AS production
 ENV NODE_ENV=production
 
+# Stamped by the deploy from the release tag. An unstamped build reports "dev".
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 # Backend
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build-backend /app/src ./src

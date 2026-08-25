@@ -45,6 +45,19 @@ gh release create v0.8.0 --target main --title "v0.8.0 - what changed" --notes "
 Migrations run from the image being deployed, so the schema can never be migrated
 by a different build than the one that ends up serving traffic.
 
+**La etiqueta es la única fuente de la versión.** El build la inyecta como
+`APP_VERSION` (`--build-arg` en `deploy.yml`, `ARG`/`ENV` en
+`Dockerfile.cloudrun`) y la raíz de la API la lee de ahí. Un build sin etiquetar
+responde `dev`, a propósito: antes había un `"0.1.0"` a fuego en
+`src/routes/health.ts` que siguió diciéndolo durante toda la vida del producto,
+en un sitio donde nadie mira. Si alguna vez vuelves a ver un número de versión
+escrito en el código, es esa regresión.
+
+**Antes de cortar la release, actualiza el roadmap.** `docs-site/content/docs/roadmap.mdx`
+lleva la versión en el titular de «Available now» y describe en prosa lo que ya
+existe; eso no se puede inyectar. Es el único punto del proceso que depende de
+que alguien se acuerde, y ya se quedó dos versiones atrás una vez.
+
 ### Secrets it needs
 
 | Secret | Used for |
