@@ -9,17 +9,18 @@ export function CTA() {
             Integrate in 60 seconds. Seriously.
           </h2>
           <p className="mt-4 text-lg text-brand-100">
-            Three API calls to connect your agent. Your team gets an email and
-            answers in one click. No new tools to learn, no dashboards to check.
+            Three API calls to connect your agent. Your team gets an email,
+            signs in with the code and answers in one click. No account to
+            create, no password to remember.
           </p>
           <div className="mt-8 flex flex-col items-center gap-2">
             <div className="flex items-center gap-4">
-              <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
+              <a href="#get-key">
                 <Button
                   size="lg"
                   className="bg-surface-primary text-brand-400 hover:bg-surface-secondary"
                 >
-                  Connect Your Agent
+                  Get your API key
                 </Button>
               </a>
               <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
@@ -32,7 +33,7 @@ export function CTA() {
                 </Button>
               </a>
             </div>
-            <p className="text-sm text-brand-200">Setup takes less than 60 seconds</p>
+            <p className="text-sm text-brand-200">No credit card. No account to create.</p>
           </div>
         </div>
       </div>
