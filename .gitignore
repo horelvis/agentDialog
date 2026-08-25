@@ -12,8 +12,15 @@ coverage/
 # Build artifacts
 .next/
 *.tsbuildinfo
-MARKETING-AUDIT.md
 docs-site/out/
+
+# Marketing drafts and their images. Not product, and the images are large.
+MARKETING-AUDIT.md
+docs/linkedin-*
+
+# A copy of CLAUDE.md that some agent tooling writes. It is generated, and two
+# copies of the same instructions drift the moment one of them is edited.
+AGENTS.md
 
 # Scratch: git worktrees and subagent-driven-development workspaces
 .worktrees/
