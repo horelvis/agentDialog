@@ -42,6 +42,9 @@ export const envSchema = z.object({
 
   WEBHOOK_TIMEOUT_MS: z.coerce.number().default(10000),
   WEBHOOK_MAX_RETRIES: z.coerce.number().default(3),
+  // The key that encrypts webhook signing secrets at rest. 32 bytes, base64.
+  // Losing it loses every signing secret; recovery is rotation.
+  WEBHOOK_ENCRYPTION_KEY: z.string().optional(),
 
   // The amount above which a money question is treated as high risk regardless
   // of what the agent declared. Deliberately crude: no currency conversion, the
@@ -75,6 +78,19 @@ export const envSchema = z.object({
         "INBOUND_EMAIL_WEBHOOK_SECRET is required in production: without it the " +
         "inbound email webhook accepts unsigned requests and a human's answer " +
         "can be forged.",
+    });
+  }
+
+  // Without this key a webhook secret cannot be stored recoverably, and a
+  // secret we cannot recover cannot sign anything the consumer can verify —
+  // which is the bug this exists to prevent recurring.
+  if (env.NODE_ENV === "production" && !env.WEBHOOK_ENCRYPTION_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["WEBHOOK_ENCRYPTION_KEY"],
+      message:
+        "WEBHOOK_ENCRYPTION_KEY is required in production: without it webhook " +
+        "signing secrets cannot be stored recoverably and no delivery can be verified.",
     });
   }
 });
