@@ -269,6 +269,13 @@ Configuration is a **hybrid**, which is worth knowing before you touch either ha
 
 - `SMTP_PASS` is a **Secret Manager reference** (`valueFrom`), backed by the
   secret `smtp-password`.
+- `WEBHOOK_ENCRYPTION_KEY` is the same kind of reference, backed by its own
+  Secret Manager secret. It is the AES-256-GCM key `src/lib/secret-box.ts`
+  uses to encrypt webhook signing secrets at rest — never the signing secrets
+  themselves. Generate it with `openssl rand -base64 32`. Losing it loses
+  every stored signing secret for every agent's webhooks; there is no recovery
+  path other than each affected agent calling
+  `POST /agent/webhooks/:id/rotate-secret` to get a new one.
 - Every other variable is a **plain environment variable** on the service.
 
 Four further secrets exist in Secret Manager — `SMTP_FROM`, `SMTP_HOST`,

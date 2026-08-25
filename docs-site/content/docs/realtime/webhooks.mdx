@@ -57,49 +57,97 @@ Use `"*"` to subscribe to all events.
 }
 ```
 
+<Callout type="warn">
+  The `timestamp` field above is ISO-8601 and is **not** part of the
+  signature. Replay protection comes entirely from the `webhook-timestamp`
+  header below, computed at delivery time. A consumer that checks the body's
+  `timestamp` instead is protecting nothing.
+</Callout>
+
 ## Signature verification
 
-Every webhook includes an HMAC-SHA256 signature in `X-Webhook-Signature`. **Always verify it.**
+Deliveries follow [Standard Webhooks](https://www.standardwebhooks.com), so any
+compatible verifier — ours, or a third-party one such as `svix` — works. Three
+headers carry the signature:
+
+| Header | Contents |
+|---|---|
+| `webhook-id` | The message id, e.g. `msg_2KWPBgLlAfxdpx2AI54pPJ85f4W` |
+| `webhook-timestamp` | Unix seconds at delivery time. The only timestamp that is signed. |
+| `webhook-signature` | One or more `v1,<base64>` signatures, space-separated |
+
+`X-AgentDialog-Event` still carries the event name for routing, but it is
+deliberately outside the signature.
+
+The signed content is `${webhook-id}.${webhook-timestamp}.${body}`, keyed with
+the decoded bytes of the `whsec_...` secret — not the literal string. Several
+`v1,...` signatures can arrive at once while a secret is being rotated; any one
+of them matching is enough. **Always verify against the raw request body**,
+before any JSON parsing re-serialises it.
 
 <Tabs items={["TypeScript", "Python"]}>
   <Tab value="TypeScript">
-    ```typescript
-    import { createHmac } from "crypto";
+    Use the SDK's `verifyWebhook`, which implements exactly this:
 
-    function verifyWebhook(payload: string, signature: string, secret: string): boolean {
-      const expected = createHmac("sha256", secret).update(payload).digest("hex");
-      return signature === expected;
-    }
+    ```ts
+    import { verifyWebhook } from "@agentdialog/sdk";
 
-    app.post("/webhooks/agentdialog", (req, res) => {
-      const signature = req.headers["x-webhook-signature"];
-      if (!verifyWebhook(JSON.stringify(req.body), signature, WEBHOOK_SECRET)) {
-        return res.status(401).send("Invalid signature");
-      }
-      console.log(req.body.event, req.body.data);
-      res.status(200).send("OK");
+    app.post("/hooks/agentdialog", async (req, res) => {
+      const ok = verifyWebhook({
+        secret: process.env.AGENTDIALOG_WEBHOOK_SECRET!,
+        body: req.rawBody,           // the raw bytes; a re-serialised body will not verify
+        headers: req.headers,
+      });
+
+      if (!ok) return res.status(400).end();
+
+      // Deduplicate on webhook-id: the same message may arrive more than once.
+      res.status(200).end();
     });
     ```
   </Tab>
   <Tab value="Python">
+    No published Python SDK ships a verifier yet, so verify by hand or with a
+    Standard Webhooks-compatible library such as `svix`:
+
     ```python
-    import hmac, hashlib
+    import hmac, hashlib, base64, time
 
-    def verify_webhook(payload: bytes, signature: str, secret: str) -> bool:
-        expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(signature, expected)
+    def verify_webhook(secret: str, body: bytes, headers: dict, tolerance_seconds: int = 300) -> bool:
+        msg_id = headers.get("webhook-id")
+        timestamp = headers.get("webhook-timestamp")
+        signatures = headers.get("webhook-signature")
+        if not msg_id or not timestamp or not signatures:
+            return False
+        if abs(time.time() - int(timestamp)) > tolerance_seconds:
+            return False
 
-    @app.post("/webhooks/agentdialog")
-    def handle_webhook():
-        signature = request.headers.get("X-Webhook-Signature")
-        if not verify_webhook(request.data, signature, WEBHOOK_SECRET):
-            return "Invalid signature", 401
-        data = request.json
-        print(data["event"], data["data"])
-        return "OK", 200
+        key = base64.b64decode(secret.removeprefix("whsec_"))
+        signed_content = f"{msg_id}.{timestamp}.".encode() + body
+        expected = hmac.new(key, signed_content, hashlib.sha256).digest()
+
+        for entry in signatures.split(" "):
+            version, _, value = entry.partition(",")
+            if version != "v1" or not value:
+                continue
+            if hmac.compare_digest(base64.b64decode(value), expected):
+                return True
+        return False
     ```
   </Tab>
 </Tabs>
+
+## Rotate a webhook's secret
+
+```bash
+curl -X POST https://api.agentdialog.io/api/v1/agent/webhooks/{id}/rotate-secret \
+  -H "Authorization: Bearer mge_ag_..."
+```
+
+Issues a new `whsec_...` secret, returned once in the response. The previous
+secret keeps signing deliveries for 24 hours so a rolling deploy of your
+verifier never rejects a delivery mid-rotation. This is also the only way back
+for a webhook with no live secret — it reactivates it.
 
 ## Manage webhooks
 
