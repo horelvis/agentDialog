@@ -311,6 +311,7 @@ import { getDb } from "../../src/db";
 import { agents } from "../../src/db/schema/agents";
 import { conversations } from "../../src/db/schema/conversations";
 import { humanQueries } from "../../src/db/schema/human-queries";
+import { messages } from "../../src/db/schema/messages";
 import {
   mintQueryGrant,
   resolveQueryGrant,
@@ -338,6 +339,16 @@ async function makeQuery(email: string) {
     title: "Grant lifecycle",
   }).returning();
 
+  // A query points at the message that carries it — query_message_id is NOT
+  // NULL — so the message has to exist first.
+  const [message] = await db.insert(messages).values({
+    conversationId: conversation.id,
+    senderType: "agent",
+    senderAgentId: agent.id,
+    type: "human_query",
+    content: "Is this correct?",
+  }).returning();
+
   const [query] = await db.insert(humanQueries).values({
     conversationId: conversation.id,
     agentId: agent.id,
@@ -346,6 +357,7 @@ async function makeQuery(email: string) {
     question: "Is this correct?",
     answerSpace: { kind: "boolean", labels: { t: "Yes", f: "No" } },
     subject: { id: "s1", label: "Subject", body: "Body" },
+    queryMessageId: message.id,
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   }).returning();
 

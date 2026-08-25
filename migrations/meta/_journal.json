@@ -64,6 +64,13 @@
       "when": 1787740800000,
       "tag": "0008_webhook_signing",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787827200000,
+      "tag": "0009_query_grants",
+      "breakpoints": true
     }
   ]
 }
