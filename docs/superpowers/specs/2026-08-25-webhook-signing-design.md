@@ -159,14 +159,19 @@ una cabecera `X-Webhook-Signature` que no existe— y `docs/api/README.md:1181`.
 
 `secret_hash` se elimina sin pérdida: esos hashes no sirven para nada.
 
-Los webhooks existentes tienen su secreto original **perdido de forma
-irrecuperable**. La migración los deja `isActive = false`. Revivir uno exige
-llamar a `rotate-secret` y adoptar el secreto que devuelve.
+**En producción no hay ningún webhook** — cero filas, comprobado el 2026-08-25.
+Así que este cambio no rompe a nadie y no hay nada que comunicar. Conviene
+saberlo al leer lo que sigue: no es una migración delicada, es una tabla vacía.
 
-Es deliberado y es la parte incómoda del arreglo: convierte un fallo silencioso
-—entregas que llegan y no se pueden validar— en un fallo visible con una acción
-clara. Dejarlos activos con un secreto que el consumidor no tiene prolongaría el
-estado roto sin obligar a nadie a salir de él.
+Aun así la migración deja los webhooks existentes en `isActive = false`, y la
+cláusula se escribe igualmente. Cuesta nada, y cubre el caso de que alguien cree
+uno entre hoy y el despliegue: su secreto original sería igual de irrecuperable
+que los de antes, porque hasta que este trabajo esté desplegado se sigue
+guardando un hash bcrypt. Revivirlo exige llamar a `rotate-secret` y adoptar el
+secreto que devuelve.
+
+Que la tabla esté vacía no vuelve opcional el endpoint de rotación: su razón de
+ser es responder a un secreto comprometido, no migrar estas filas.
 
 ## 6. Verificación
 
@@ -196,4 +201,5 @@ estado roto sin obligar a nadie a salir de él.
   `docs/operations.md`.
 - Perder `WEBHOOK_ENCRYPTION_KEY` equivale a perder todos los secretos de firma;
   la recuperación es rotar. Debe decirlo la documentación de operaciones.
-- Los webhooks existentes dejan de entregar hasta que su dueño rote.
+- Ningún consumidor se ve afectado: no hay webhooks en producción. La única
+  ruptura teórica es la de un webhook creado entre hoy y el despliegue.
