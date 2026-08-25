@@ -369,21 +369,30 @@ gcloud run services update agentdialog-api --region=us-central1 --project=agentd
 ```
 
 <!-- DANGER -->
-**`scripts/cleanup-secrets.sh` will take the service down if you run it today,
-and it got worse on 2026-08-25.** It calls
-`gcloud run services update --clear-secrets`, which strips *every* secret
-reference from the service — now all six, not just `SMTP_PASS`. The service then
-fails to boot at all: `src/env.ts` requires `SESSION_SECRET` and
-`WEBHOOK_ENCRYPTION_KEY` in production.
+**There is no cleanup script, and there should not be one.**
+`scripts/cleanup-secrets.sh` was deleted on 2026-08-25. It is recorded here so
+nobody writes it again from the same reasoning.
 
-Worse, its hardcoded delete list includes **`session-secret`**. That name used to
-match nothing, which is what made the script merely wrong. It now names the
-secret that signs every live session. Deleting a Secret Manager secret is not
-instant-fatal — the service keeps the mounted value until it restarts — which
-means the damage would surface later, at the next revision, far from the command
-that caused it.
+It called `gcloud run services update --clear-secrets`, which strips *every*
+secret reference from the service — six of them by the end, not the one it was
+written for. The service would then not boot at all: `src/env.ts` requires
+`SESSION_SECRET` and `WEBHOOK_ENCRYPTION_KEY` in production.
 
-Do not run it. Rewrite or delete it.
+Its hardcoded delete list — `smtp-password`, `database-url`, `redis-url`,
+`session-secret` — is the part worth remembering. Two of those names were live
+by the end: `smtp-password`, and `session-secret`, created that same day. The
+list was written against a configuration this project had years ago, and grew
+*more* dangerous with time rather than less, because names that once matched
+nothing came back into use.
+
+And the failure mode was quiet. Deleting a Secret Manager secret does not break
+a running service: it keeps the mounted value until it restarts. The damage
+would surface at the next revision, far from the command that caused it, looking
+like a deploy problem.
+
+A destructive script with a hardcoded list of production resources cannot be
+kept correct — it is only ever as right as the day it was written. If teardown
+is ever needed, read what exists first and delete by what you found.
 
 `src/env.ts` validates everything at startup with zod and exits if a variable is
 missing or malformed, so a misconfigured deploy fails immediately and loudly
