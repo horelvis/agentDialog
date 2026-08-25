@@ -1,19 +1,22 @@
-import { signWebhookPayload } from "./crypto";
 import { env } from "../env";
 
-interface WebhookPayload {
+export interface WebhookDelivery {
+  body: string;
   event: string;
-  data: Record<string, unknown>;
-  timestamp: string;
+  msgId: string;
+  timestamp: number; // unix seconds, and part of the signed content
+  signature: string; // one "v1,<base64>" per live secret, space delimited
 }
 
+/**
+ * Headers follow Standard Webhooks, so a consumer verifies with an existing
+ * library instead of a snippet of ours. X-AgentDialog-Event is a convenience
+ * for routing and is deliberately outside the signature.
+ */
 export async function deliverWebhook(
   url: string,
-  secret: string,
-  payload: WebhookPayload,
+  delivery: WebhookDelivery,
 ): Promise<{ success: boolean; statusCode?: number; error?: string }> {
-  const body = JSON.stringify(payload);
-  const signature = signWebhookPayload(body, secret);
   const e = env();
 
   try {
@@ -24,21 +27,19 @@ export async function deliverWebhook(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-AgentDialog-Signature": `sha256=${signature}`,
-        "X-AgentDialog-Event": payload.event,
-        "X-AgentDialog-Timestamp": payload.timestamp,
-        "User-Agent": "AgentDialog-Webhook/1.0",
+        "webhook-id": delivery.msgId,
+        "webhook-timestamp": String(delivery.timestamp),
+        "webhook-signature": delivery.signature,
+        "X-AgentDialog-Event": delivery.event,
+        "User-Agent": "AgentDialog-Webhook/2.0",
       },
-      body,
+      body: delivery.body,
       signal: controller.signal,
     });
 
     clearTimeout(timeout);
 
-    return {
-      success: response.ok,
-      statusCode: response.status,
-    };
+    return { success: response.ok, statusCode: response.status };
   } catch (error) {
     return {
       success: false,
