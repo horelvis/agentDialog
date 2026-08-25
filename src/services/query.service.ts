@@ -15,6 +15,8 @@ import { getRedis } from "../lib/redis";
 import { getAgentById } from "./agent.service";
 import { sendQueryEmail } from "./query-email.service";
 import { checkPayload, type Subject, type Risk } from "../admission/decidability";
+import { mintQueryGrant } from "./query-grant.service";
+import { shouldMintGrant } from "../lib/query-grant-token";
 import { findPriorDecision, elevateRisk } from "../admission/history";
 import { validateAnswerAgainstSpace, type AnswerSpace, type Answer } from "../lib/answer-space";
 import type { CreateQueryInput, RespondQueryInput, PatchQueryInput, Change } from "../validators/query.validators";
@@ -228,10 +230,17 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
 
     // The updated row, not the inserted one: publishing `queryMessage` would
     // broadcast the version from before queryId was added to it.
-    return { conversation, query, token, status, humanId, expiresAt, queryMessage: withQueryId };
+    // The link that answers this question in one click. Minted inside the
+    // transaction so a rolled-back query never leaves a live grant behind.
+    // High and critical risk mint nothing: those still cost a sign-in.
+    const grantToken = shouldMintGrant(risk)
+      ? await mintQueryGrant(query.id, targetEmail, expiresAt, tx)
+      : undefined;
+
+    return { conversation, query, token, status, humanId, expiresAt, queryMessage: withQueryId, grantToken };
   });
 
-  const { conversation, query, token, status, expiresAt, queryMessage } = result;
+  const { conversation, query, token, status, expiresAt, queryMessage, grantToken } = result;
 
   // Send query email outside the transaction (side effect)
   // Send for both "pending" and "assigned": the email is the only thing that
@@ -249,6 +258,8 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       targetEmail,
       expiresAt,
       invitationToken: token,
+      conversationId: conversation.id,
+      grantToken,
     });
     console.log(`[QUERY] Query email sent to ${targetEmail}`);
   } catch (emailErr) {

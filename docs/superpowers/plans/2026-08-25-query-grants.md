@@ -449,7 +449,7 @@ git commit -m "Give a query a link that resolves it and nothing else"
 Crear `tests/integration/query-grant-minting.test.ts`:
 
 ```ts
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createTestApp } from "../helpers";
 import { getDb } from "../../src/db";
@@ -487,8 +487,15 @@ async function createQuery(app: ReturnType<typeof createTestApp>, apiKey: string
       answer_space: { kind: "boolean", labels: { t: "Yes", f: "No" } },
     }),
   });
-  expect(res.status).toBe(201);
-  return (await res.json()).data;
+  const body = await res.json();
+  // Say why, not just that: an admission refusal carries the reason and the
+  // remedy, and a bare status code hides both.
+  if (res.status !== 201) {
+    throw new Error(`create query (${risk}) failed ${res.status}: ${JSON.stringify(body)}`);
+  }
+  // The created query is snake_case on the wire and its id is `query_id`, not
+  // `id`. Mixing the two conventions is a documented trap in this repo.
+  return body.data;
 }
 
 async function grantsFor(queryId: string) {
@@ -501,31 +508,31 @@ describe("grant minting is gated by risk", () => {
   it("mints for a low-risk query", async () => {
     const apiKey = await registerAgent(app);
     const query = await createQuery(app, apiKey, "low");
-    expect(await grantsFor(query.id)).toHaveLength(1);
+    expect(await grantsFor(query.query_id)).toHaveLength(1);
   });
 
   it("mints for a medium-risk query", async () => {
     const apiKey = await registerAgent(app);
     const query = await createQuery(app, apiKey, "medium");
-    expect(await grantsFor(query.id)).toHaveLength(1);
+    expect(await grantsFor(query.query_id)).toHaveLength(1);
   });
 
   it("mints nothing for a high-risk query", async () => {
     const apiKey = await registerAgent(app);
     const query = await createQuery(app, apiKey, "high");
-    expect(await grantsFor(query.id)).toHaveLength(0);
+    expect(await grantsFor(query.query_id)).toHaveLength(0);
   });
 
   it("mints nothing for a critical-risk query", async () => {
     const apiKey = await registerAgent(app);
     const query = await createQuery(app, apiKey, "critical");
-    expect(await grantsFor(query.id)).toHaveLength(0);
+    expect(await grantsFor(query.query_id)).toHaveLength(0);
   });
 
   it("gives the grant the same expiry as the query it belongs to", async () => {
     const apiKey = await registerAgent(app);
     const query = await createQuery(app, apiKey, "low");
-    const [grant] = await grantsFor(query.id);
+    const [grant] = await grantsFor(query.query_id);
 
     // Read the expiry from the row rather than the wire: the queries resource
     // is snake_case on the wire and camelCase in the schema, and the schema is
@@ -533,7 +540,7 @@ describe("grant minting is gated by risk", () => {
     const [row] = await getDb()
       .select()
       .from(humanQueries)
-      .where(eq(humanQueries.id, query.id))
+      .where(eq(humanQueries.id, query.query_id))
       .limit(1);
 
     expect(new Date(grant.expiresAt).getTime()).toBe(new Date(row.expiresAt).getTime());
@@ -708,7 +715,7 @@ async function makeQueryWithToken() {
   const [row] = await getDb()
     .select()
     .from(humanQueries)
-    .where(eq(humanQueries.id, created.id))
+    .where(eq(humanQueries.id, created.query_id))
     .limit(1);
 
   const token = await mintQueryGrant(row.id, row.humanEmail, row.expiresAt);
@@ -797,8 +804,8 @@ describe("the public query link", () => {
     // point is that it cannot be pointed at b by swapping the path.
     const res = await get(a.token);
     const body = await res.json();
-    expect(body.data.id).toBe(a.queryId);
-    expect(body.data.id).not.toBe(b.queryId);
+    expect(body.data.query_id).toBe(a.queryId);
+    expect(body.data.query_id).not.toBe(b.queryId);
   });
 
   it("refuses an unknown token", async () => {

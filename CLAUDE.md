@@ -109,6 +109,13 @@ per hour, and the counter lives in Redis, which survives between runs. Run the
 suite a few times in a row and you get spurious `429`s that look like real
 failures. Clear it with `redis-cli -n 1 FLUSHDB` against the test database.
 
+That budget is **shared by the whole suite**, so a new test file that registers
+an agent per case silently breaks a *different* file. Adding five registrations
+to `query-grant-minting.test.ts` pushed the run over ten and made
+`webhook-signature.test.ts` fail in its `beforeAll` — a failure that pointed at
+webhooks, reproduced every run, and vanished when that file ran alone. Register
+once per file in a `beforeAll` and reuse the key.
+
 **Two release paths that must not be confused.** A GitHub Release deploys the API
 and **runs migrations against production**. A `sdk-v*` tag publishes the SDK.
 `.github/workflows/deploy.yml` carries a guard against `sdk-v*` tags, but never cut a GitHub
