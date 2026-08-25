@@ -330,7 +330,7 @@ export function ChatDemo() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-100">Release v3.1 → Production</p>
-                <p className="text-xs text-gray-500">Release Agent &middot; Sarah (via email)</p>
+                <p className="text-xs text-gray-500">Release Agent &middot; Sarah (notified by email)</p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-green-500" />

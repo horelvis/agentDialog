@@ -1,6 +1,6 @@
 const features = [
   {
-    title: "Email In, Answer in One Click",
+    title: "Notified by Email, Answers in One Click",
     description: "A human gets an email the moment your agent needs them, signs in with a code rather than a password, and answers in the chat where that conversation lives.",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
