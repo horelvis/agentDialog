@@ -104,6 +104,13 @@ describe("the public query link", () => {
     expect(body.data.subject.label).toBe("Subject");
   });
 
+  it("says who is asking, because nobody should decide for a stranger", async () => {
+    const { token } = await makeQueryWithToken();
+
+    const body = await (await get(token)).json();
+    expect(body.data.agent.display_name).toBe("Grant Routes Agent");
+  });
+
   it("does not spend the token on GET, so a mail scanner costs nothing", async () => {
     const { token } = await makeQueryWithToken();
 

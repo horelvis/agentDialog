@@ -5,6 +5,7 @@ import { conversations } from "../db/schema/conversations";
 import { conversationParticipants } from "../db/schema/participants";
 import { messages } from "../db/schema/messages";
 import { humans } from "../db/schema/humans";
+import { agents } from "../db/schema/agents";
 import { invitations } from "../db/schema/invitations";
 import { agentTrustRevocations } from "../db/schema/trust-revocations";
 import { NotFoundError, ForbiddenError, ConflictError, UndecidableQueryError, ValidationError } from "../lib/errors";
@@ -955,7 +956,26 @@ export async function getQueryForGrant(queryId: string) {
 
   if (!query) throw new NotFoundError("Query", queryId);
 
-  return shapeHumanQuery(query, { includePriorDecision: false });
+  // Who is asking. Somebody reaching this page followed a link out of an email
+  // and has no other context: without a name, they are being asked to decide
+  // for a stranger. The agent's public identity only — nothing about its keys,
+  // its owner or its other conversations.
+  const [agent] = await db
+    .select({
+      slug: agents.slug,
+      displayName: agents.displayName,
+      avatarUrl: agents.avatarUrl,
+    })
+    .from(agents)
+    .where(eq(agents.id, query.agentId))
+    .limit(1);
+
+  return {
+    ...(await shapeHumanQuery(query, { includePriorDecision: false })),
+    agent: agent
+      ? { slug: agent.slug, display_name: agent.displayName, avatar_url: agent.avatarUrl }
+      : null,
+  };
 }
 
 export async function getQueryForHuman(queryId: string, humanId: string) {

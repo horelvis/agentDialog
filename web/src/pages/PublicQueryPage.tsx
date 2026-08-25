@@ -3,6 +3,7 @@ import { useParams } from "react-router";
 import { AnswerSpaceInput, isAnswerComplete } from "@/components/answer/AnswerSpaceInput";
 import { Button } from "@/components/ui/Button";
 import { API_BASE } from "@/lib/constants";
+import { answerToWire } from "@/api/queries";
 import type { Answer, AnswerSpace } from "@/api/types";
 
 /**
@@ -13,6 +14,7 @@ import type { Answer, AnswerSpace } from "@/api/types";
 
 interface PublicQuery {
   query_id: string;
+  agent: { slug: string; display_name: string; avatar_url?: string | null } | null;
   question: string;
   context?: string | null;
   risk: string;
@@ -30,7 +32,7 @@ const REASONS = [
 
 type State =
   | { status: "loading" }
-  | { status: "ready"; query: PublicQuery }
+  | { status: "ready"; query: PublicQuery; error?: string }
   | { status: "sending"; query: PublicQuery }
   | { status: "answered" }
   | { status: "returned" }
@@ -65,7 +67,8 @@ export function PublicQueryPage() {
 
   async function send(payload: unknown, done: State) {
     if (state.status !== "ready") return;
-    setState({ status: "sending", query: state.query });
+    const { query } = state;
+    setState({ status: "sending", query });
 
     try {
       const res = await fetch(`${API_BASE}/public/queries/${token}/respond`, {
@@ -74,9 +77,21 @@ export function PublicQueryPage() {
         body: JSON.stringify(payload),
       });
 
-      setState(res.ok ? done : { status: "gone" });
+      if (res.ok) return setState(done);
+
+      // Only a dead link is a dead link. Collapsing every failure into that
+      // screen tells someone their link expired when in truth the send was
+      // rejected — and throws away an answer they can still send.
+      if (res.status === 401) return setState({ status: "gone" });
+
+      const body = await res.json().catch(() => null);
+      setState({
+        status: "ready",
+        query,
+        error: body?.error?.message ?? "That didn't send. Try again.",
+      });
     } catch {
-      setState({ status: "gone" });
+      setState({ status: "ready", query, error: "Could not reach the server. Try again." });
     }
   }
 
@@ -127,6 +142,22 @@ export function PublicQueryPage() {
 
   return (
     <Shell>
+      {query.agent && (
+        <div className="mb-5 flex items-center gap-3 border-b border-surface-border pb-4">
+          {query.agent.avatar_url ? (
+            <img src={query.agent.avatar_url} alt="" className="h-9 w-9 rounded-lg object-cover" />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-sm font-semibold text-white">
+              {query.agent.display_name.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <p className="text-sm font-medium text-gray-100">{query.agent.display_name}</p>
+            <p className="text-xs text-gray-500">is asking you a question</p>
+          </div>
+        </div>
+      )}
+
       <p className="text-xs uppercase tracking-wide text-gray-500">{query.subject.label}</p>
       <h1 className="mt-1 text-xl font-semibold text-gray-100">{query.question}</h1>
 
@@ -142,12 +173,18 @@ export function PublicQueryPage() {
         <AnswerSpaceInput space={query.answer_space} value={answer} onChange={setAnswer} />
       </div>
 
+      {state.status === "ready" && state.error && (
+        <p role="alert" className="mt-4 text-sm text-red-400">
+          {state.error}
+        </p>
+      )}
+
       <Button
         className="mt-6 w-full"
         size="lg"
         loading={busy}
         disabled={!isAnswerComplete(query.answer_space, answer)}
-        onClick={() => send({ outcome: "answer", answer }, { status: "answered" })}
+        onClick={() => answer && send({ outcome: "answer", answer: answerToWire(answer) }, { status: "answered" })}
       >
         Send answer
       </Button>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -7,8 +7,29 @@ import { Input } from "@/components/ui/Input";
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
 
+/**
+ * Where to go after signing in. Only a path inside our own app: an absolute URL
+ * here would turn the sign-in into an open redirect, where an attacker mails
+ * `?next=https://evil.example` and the victim lands there having just proved
+ * they control their inbox.
+ *
+ * The `//` check is not paranoia — `//evil.example` is a URL with a host per
+ * the spec and slips past a naive `startsWith("/")`.
+ */
+function safeNext(next: string | null): string {
+  if (!next) return "/app";
+  if (next.startsWith("//")) return "/app";
+  if (!next.startsWith("/app")) return "/app";
+  return next;
+}
+
 export function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
+
+  // Prefilled from the link in the notification email, which was addressed to
+  // this person: putting it in that URL tells them nothing they did not know.
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [step, setStep] = useState<"email" | "code">("email");
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(""));
   const [error, setError] = useState("");
@@ -46,7 +67,7 @@ export function LoginForm() {
     setLoading(true);
     try {
       await verifyCode(email, fullCode);
-      navigate("/app", { replace: true });
+      navigate(safeNext(nextParam), { replace: true });
     } catch (err: unknown) {
       const apiErr = err as { error?: { message?: string } } | undefined;
       setError(apiErr?.error?.message || "Invalid or expired code. Please try again.");
