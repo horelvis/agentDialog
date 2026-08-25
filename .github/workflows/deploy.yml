@@ -41,7 +41,9 @@ jobs:
       - name: Build Docker image
         run: |
           IMAGE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.SERVICE_NAME }}"
-          docker build -f Dockerfile.cloudrun -t "${IMAGE}:${{ github.event.release.tag_name }}" -t "${IMAGE}:latest" .
+          docker build -f Dockerfile.cloudrun \
+            --build-arg APP_VERSION="${{ github.event.release.tag_name }}" \
+            -t "${IMAGE}:${{ github.event.release.tag_name }}" -t "${IMAGE}:latest" .
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
 
       - name: Push to Artifact Registry

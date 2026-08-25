@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { appVersion } from "../lib/app-version";
 import type { AppEnv } from "../types/hono";
 import { getDb } from "../db";
 import { getRedis } from "../lib/redis";
@@ -46,7 +47,7 @@ app.get("/health", async (c) => {
 app.get("/", (c) => {
   return c.json({
     name: "AgentDialog",
-    version: "0.1.0",
+    version: appVersion(),
     description: "Agent-first messaging platform",
     docs: "/api/v1",
     health: "/health",
