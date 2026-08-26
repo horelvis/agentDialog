@@ -412,12 +412,23 @@ function HorizontalFlow({ view }: { view: FlowView }) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // A stage of fixed height. Every piece inside is positioned, so a frame can
-  // never grow the section and shove the page around.
+  // The stage shows as much of its own coordinate space as the frame needs: the
+  // rail alone while the graph is running, all of it once the question is up.
+  // The inner box keeps its 380px whatever happens, because every node is placed
+  // as a percentage of it — tying those percentages to a height that moves would
+  // slide the rail up and down as the panel comes and goes.
+  const stageHeight = frame.query === "hidden" ? "h-[150px]" : "h-[380px]";
+
   return (
     <div className="relative">
           <div ref={scrollerRef} className="overflow-x-auto pb-2">
-            <div className="relative h-[380px] min-w-[700px]">
+            <div
+              className={cn(
+                "relative min-w-[700px] overflow-hidden transition-[height] duration-500 ease-out",
+                stageHeight,
+              )}
+            >
+            <div className="absolute inset-x-0 top-0 h-[380px]">
             <svg
               className="absolute inset-0 h-full w-full"
               viewBox="0 0 100 100"
@@ -479,6 +490,7 @@ function HorizontalFlow({ view }: { view: FlowView }) {
                   onChoose={onChoose}
                 />
               ) : null}
+            </div>
             </div>
             </div>
           </div>
