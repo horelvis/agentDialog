@@ -50,7 +50,8 @@ const NODE_DETAIL: Partial<Record<NodeId, string>> = {
 /**
  * The script. Written out frame by frame rather than derived from a clock,
  * because the interesting states are not evenly spaced: the wait is long on
- * purpose and everything after the answer is quick.
+ * purpose and everything after the answer is quick. It plays once; the last
+ * frame is where the section stays.
  */
 const FRAMES: Frame[] = [
   { ms: 700, states: { start: "running" }, query: "hidden" },
@@ -384,6 +385,8 @@ interface FlowView {
   waitSeconds: number;
   choice: number;
   onChoose: (index: number) => void;
+  /** True before the section is on screen: drawn, but not running yet. */
+  idle: boolean;
 }
 
 const edgeFor = (target: NodeState): EdgeState =>
@@ -391,7 +394,7 @@ const edgeFor = (target: NodeState): EdgeState =>
 
 /** The wide layout: the agent's rail across the top, the person underneath it. */
 function HorizontalFlow({ view }: { view: FlowView }) {
-  const { frame, states, takesApply, answered, waitSeconds, choice, onChoose } = view;
+  const { frame, states, takesApply, answered, waitSeconds, choice, onChoose, idle } = view;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [scrollable, setScrollable] = useState(false);
 
@@ -426,6 +429,10 @@ function HorizontalFlow({ view }: { view: FlowView }) {
               className={cn(
                 "relative min-w-[700px] overflow-hidden transition-[height] duration-500 ease-out",
                 stageHeight,
+                // Drawn and breathing until the section is on screen. Swapping in
+                // a separate skeleton would flash when the real one replaced it;
+                // this is the real one, at rest.
+                idle && "animate-pulse",
               )}
             >
             <div className="absolute inset-x-0 top-0 h-[380px]">
@@ -546,10 +553,10 @@ function VerticalRail({ state }: { state: NodeState }) {
  * one shape that keeps every label full size.
  */
 function VerticalFlow({ view }: { view: FlowView }) {
-  const { frame, states, takesApply, waitSeconds, choice, onChoose } = view;
+  const { frame, states, takesApply, waitSeconds, choice, onChoose, idle } = view;
 
   return (
-    <div className="mx-auto max-w-sm">
+    <div className={cn("mx-auto max-w-sm", idle && "animate-pulse")}>
       <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-600">agent</p>
 
       <VerticalNode id="start" state={states.start} />
@@ -642,18 +649,18 @@ export function FlowDemo() {
 
   useEffect(() => {
     if (reduced || !active) return;
-    // Option B holds the operation for review, so the run genuinely stops here.
-    // Letting it play on to __end__ would show the graph closing something the
-    // person just declined to close.
+
+    // It runs once and then stays closed. A loop would replay the same decision
+    // at whoever is reading the section by then, and the finished graph is the
+    // more useful thing to leave on screen — the buttons still work on it.
+    if (frameIndex >= FRAMES.length - 1) return;
+
+    // Option B holds the operation for review, so the run genuinely stops there.
+    // Playing on to __end__ would show the graph closing something the person
+    // just declined to close.
     if (!takesApply && frameIndex >= ANSWERED_FRAME) return;
 
-    const timer = setTimeout(() => {
-      setFrameIndex((i) => {
-        const next = (i + 1) % FRAMES.length;
-        if (next === 0) setChoice(0);
-        return next;
-      });
-    }, FRAMES[frameIndex].ms);
+    const timer = setTimeout(() => setFrameIndex((i) => i + 1), FRAMES[frameIndex].ms);
     return () => clearTimeout(timer);
   }, [reduced, active, frameIndex, takesApply]);
 
@@ -671,6 +678,8 @@ export function FlowDemo() {
   const waitSeconds = frame.query === "asking" ? tick : 0;
 
   const answered = frame.query === "answered";
+  // Drawn but not running: the section has not been scrolled to yet.
+  const idle = !active && !reduced;
 
   const states: Record<NodeId, NodeState> = {
     start: stateOf(frame, "start"),
@@ -696,6 +705,7 @@ export function FlowDemo() {
       setChoice(index);
       setFrameIndex(ANSWERED_FRAME);
     },
+    idle,
   };
 
   const askState = states.ask_human;
@@ -722,17 +732,23 @@ export function FlowDemo() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full transition-colors duration-500",
-                  askState === "waiting" || (!takesApply && answered)
-                    ? "bg-risk-medium"
-                    : "bg-brand-500",
+                  idle || states.end === "done"
+                    ? "bg-gray-600"
+                    : askState === "waiting" || (!takesApply && answered)
+                      ? "bg-risk-medium"
+                      : "bg-brand-500",
                 )}
               />
               <span className="text-[10px] uppercase tracking-wide text-gray-500">
-                {askState === "waiting"
-                  ? "paused on a human"
-                  : !takesApply && answered
-                    ? "held for review"
-                    : "running"}
+                {idle
+                  ? "ready"
+                  : askState === "waiting"
+                    ? "paused on a human"
+                    : !takesApply && answered
+                      ? "held for review"
+                      : states.end === "done"
+                        ? "closed"
+                        : "running"}
               </span>
             </span>
           </div>
