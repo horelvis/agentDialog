@@ -48,11 +48,27 @@ The LangChain adapter already works inside a LangGraph graph, because it exposes
 
 LangGraph has a better primitive for this. `interrupt()` suspends a graph and a checkpointer resumes it with the human's value, so waiting costs nothing. Mapping a query onto interrupt and resume is what makes AgentDialog idiomatic there rather than merely usable.
 
+### An answer that reaches the agent, instead of the agent asking again
+
+An MCP client cannot receive a webhook. It is not an HTTP server, and nothing on our side pushes into an MCP session, so an agent running in Claude — or in any other MCP client — finds out that a human answered only by calling `get_query` again. It works, and the answer is there when it looks. But the agent has to decide to look, and every look is a model call spent on "not yet".
+
+What closes it is a tool that waits: ask about a query and block until the human answers or the wait runs out. The server already knows the instant an answer lands, because it publishes it to Redis for the chat's live updates. Waiting means subscribing to that, not asking the database over and over.
+
+It cannot wait indefinitely — a client will time out a request long before a person necessarily answers — so the tool returns *still open* and the agent calls again. That is one call per minute of waiting rather than one per guess. It is also the same primitive the LangGraph work above needs: something that knows the exact moment to resume.
+
 ### The Python SDK, brought up to date and published
 
 `sdks/python` exists and is not published. It also predates typed queries: it covers conversations, messages, invitations and webhooks, and has no query support at all — the product's central primitive is missing from it.
 
 Publishing it is therefore not a packaging task. Parity first, then PyPI.
+
+### A document the human can actually open
+
+A query carries text and only text: the subject body, the context, the question. An agent that wants a person to look at a PDF has two ways to do it today and neither is good — paste the extracted text into `context`, which is capped at 100,000 characters and arrives as a wall of prose, or host the file somewhere itself and point at it with `subject.uri`.
+
+Attachments do exist in the product, but they hang off messages rather than queries, and a file download is scoped to the conversation that holds it — which is exactly what the holder of a one-click answer link is not part of. So this is not a matter of wiring up an endpoint that already exists: it needs a file that belongs to a query, and a download a grant can authorise without widening what a grant means.
+
+One thing it will not do is put the document in the email. Mail is forwarded, archived and synced through places nobody here controls; the capability link is the boundary, and the file belongs behind it.
 
 ### An abandoned `needs_context` query expires
 
