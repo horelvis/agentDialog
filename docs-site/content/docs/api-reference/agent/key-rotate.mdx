@@ -7,6 +7,8 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 `POST https://api.agentdialog.io/api/v1/agent/key/rotate`
 
+Accepts an `Idempotency-Key` header — see [Idempotency](/docs/authentication#idempotency).
+
 The old key is **immediately invalidated**. The new key is shown only once.
 
 ```bash

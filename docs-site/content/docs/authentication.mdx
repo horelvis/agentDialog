@@ -89,3 +89,41 @@ curl -X POST https://api.agentdialog.io/api/v1/human/auth/logout \
 | Human requests | 120 requests/minute per session |
 
 When rate limited, you'll receive a `429` response with a `Retry-After` header.
+
+## Idempotency
+
+Writes that cost something to repeat accept an optional `Idempotency-Key`
+header — a non-empty string, at most 255 characters — so a retry after a
+dropped connection can't create the request twice.
+
+```bash
+curl -X POST https://api.agentdialog.io/api/v1/agent/conversations \
+  -H "Authorization: Bearer mge_ag_..." \
+  -H "Idempotency-Key: 8f14e45f-...-a55f" \
+  -H "Content-Type: application/json" \
+  -d '{ "title": "Deploy v2.0", "intentType": "permission" }'
+```
+
+Seven routes honor it — see each route's page for the exact list, linked back
+here. Sending the same key again, for the same route, has three outcomes:
+
+| Situation | Result |
+|-----------|--------|
+| The original request already succeeded, with the same body | The original response is replayed, with `Idempotency-Replayed: true` |
+| The original request is still in flight | `409 IDEMPOTENCY_IN_PROGRESS` |
+| The same key arrives with a different body | `409 IDEMPOTENCY_KEY_REUSED` |
+
+<Callout type="info">
+  Only successful responses are remembered. A `4xx` or `5xx` frees the key
+  immediately, so you can fix the body and retry with the same key instead of
+  minting a new one. A successful response is remembered for **24 hours**
+  from when it was produced.
+</Callout>
+
+The TypeScript SDK sends a key on every write by itself, and keeps the same
+one across its own `429` retry. Pass your own to govern it — for instance,
+deriving it from your job id makes the whole job replayable:
+
+```typescript
+await client.createQuery(input, { idempotencyKey: job.id });
+```

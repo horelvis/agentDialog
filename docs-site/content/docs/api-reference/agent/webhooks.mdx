@@ -9,6 +9,8 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 `POST https://api.agentdialog.io/api/v1/agent/webhooks`
 
+Accepts an `Idempotency-Key` header — see [Idempotency](/docs/authentication#idempotency).
+
 ```bash
 curl -X POST https://api.agentdialog.io/api/v1/agent/webhooks \
   -H "Authorization: Bearer mge_ag_..." \
@@ -40,3 +42,9 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/webhooks \
 `DELETE https://api.agentdialog.io/api/v1/agent/webhooks/{id}`
 
 **Limit:** 10 webhooks per agent.
+
+## Rotate secret
+
+`POST https://api.agentdialog.io/api/v1/agent/webhooks/{id}/rotate-secret`
+
+Accepts an `Idempotency-Key` header — see [Idempotency](/docs/authentication#idempotency).
