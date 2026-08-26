@@ -11,6 +11,7 @@ export const invitations = pgTable("invitations", {
   token: varchar("token", { length: 128 }).notNull().unique(),
   status: invitationStatusEnum("status").notNull().default("pending"),
   message: text("message"),
+  language: varchar("language", { length: 8 }).notNull().default("en"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

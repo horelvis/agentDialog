@@ -30,6 +30,7 @@ export const humanQueries = pgTable("human_queries", {
   pausedAt: timestamp("paused_at", { withTimezone: true }),
   insufficientReason: varchar("insufficient_reason", { length: 64 }),
   confidence: real("confidence"),
+  language: varchar("language", { length: 8 }).notNull().default("en"),
   timeoutMinutes: integer("timeout_minutes").notNull().default(60),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   answer: jsonb("answer").$type<Record<string, unknown>>(),

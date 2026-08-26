@@ -104,6 +104,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         invitedHumanEmail: targetEmail,
         token,
         message: input.question,
+        language: input.language ?? "en",
         expiresAt: invitationExpiresAt,
       })
       .returning();
@@ -211,6 +212,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
         changes: input.changes,
         answerSpace: input.answer_space,
         confidence: input.confidence,
+        language: input.language ?? "en",
         timeoutMinutes: input.timeout_minutes,
         expiresAt,
         metadata: input.metadata || {},
@@ -538,6 +540,7 @@ function shapeQuery(query: typeof humanQueries.$inferSelect, status: string = qu
     question: query.question,
     context: query.context,
     confidence: query.confidence,
+    language: query.language,
     answer: status === "answered" ? query.answer : null,
     comment: status === "answered" ? query.answerComment : null,
     human_confidence: status === "answered" ? query.answerConfidence : null,
@@ -603,6 +606,7 @@ async function shapeHumanQuery(
     changes: query.changes as unknown as Change[] | null,
     risk: query.risk as Risk,
     answer_space: query.answerSpace as unknown as AnswerSpace,
+    language: query.language,
     insufficient_reason: status === "needs_context" ? query.insufficientReason : null,
     answer: status === "answered" ? (query.answer as unknown as Answer | null) : null,
     comment: status === "answered" ? query.answerComment : null,

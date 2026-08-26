@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { answerSpaceSchema, answerSchema } from "../lib/answer-space";
 import { isHttpUrl } from "../lib/url";
+import { SUPPORTED_LANGUAGES } from "../i18n";
 
 export const subjectSchema = z.object({
   id: z.string().min(1).max(128),
@@ -35,6 +36,7 @@ export const createQuerySchema = z.object({
   answer_space: answerSpaceSchema,
   target_human_email: z.string().email(),
   confidence: z.number().min(0).max(1).optional(),
+  language: z.enum(SUPPORTED_LANGUAGES).optional(),
   timeout_minutes: z.number().int().min(1).max(10080).default(60),
   metadata: z.record(z.unknown()).optional(),
 });
@@ -93,6 +95,7 @@ export const patchQueryFields = {
   answer_space: answerSpaceSchema.optional(),
   question: z.string().min(1).max(10_000).optional(),
   context: z.string().max(100_000).optional(),
+  language: z.enum(SUPPORTED_LANGUAGES).optional(),
 };
 
 export const patchQuerySchema = z.object(patchQueryFields)
