@@ -4,6 +4,7 @@ import type { AppEnv } from "../../src/types/hono";
 import { idempotency } from "../../src/middleware/idempotency";
 import { errorHandler } from "../../src/middleware/error-handler";
 import { getRedis } from "../../src/lib/redis";
+import { idempotencyStorageKey } from "../../src/lib/idempotency";
 
 function appWithCounter() {
   let calls = 0;
@@ -96,5 +97,29 @@ describe("idempotency middleware", () => {
     const { app } = appWithCounter();
     const res = await post(app, "   ", { ship: true });
     expect(res.status).toBe(422);
+  });
+
+  it("stores successful responses with a long TTL", async () => {
+    const { app } = appWithCounter();
+    const key = KEY();
+    const redis = getRedis();
+
+    await post(app, key, { ship: true });
+
+    const storageKey = idempotencyStorageKey("agent-under-test", "POST", "/thing", key);
+    const ttl = await redis.ttl(storageKey);
+    expect(ttl).toBeGreaterThan(80000);
+  });
+
+  it("removes the key after a failed request", async () => {
+    const { app } = appWithCounter();
+    const key = KEY();
+    const redis = getRedis();
+
+    await post(app, key, { fail: true });
+
+    const storageKey = idempotencyStorageKey("agent-under-test", "POST", "/thing", key);
+    const exists = await redis.exists(storageKey);
+    expect(exists).toBe(0);
   });
 });

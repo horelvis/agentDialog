@@ -5,6 +5,14 @@ import { ValidationError } from "./errors";
  *  sane retry window. */
 export const IDEMPOTENCY_TTL_SECONDS = 86_400;
 
+/**
+ * How long a reservation may sit unfinished. A process that dies between
+ * reserving and completing would otherwise lock the key for the full window,
+ * and every retry would meet 409 until it expired. Two minutes is far above any
+ * request this API serves and far below anything a caller would wait out.
+ */
+export const IDEMPOTENCY_RESERVATION_TTL_SECONDS = 120;
+
 const MAX_KEY_LENGTH = 255;
 
 export type IdempotencyRecord =

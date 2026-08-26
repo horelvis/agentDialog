@@ -4,6 +4,7 @@ import { getRedis } from "../lib/redis";
 import { IdempotencyConflictError } from "../lib/errors";
 import {
   IDEMPOTENCY_TTL_SECONDS,
+  IDEMPOTENCY_RESERVATION_TTL_SECONDS,
   assertValidIdempotencyKey,
   decideFromRecord,
   hashBody,
@@ -40,7 +41,7 @@ export function idempotency(): MiddlewareHandler<AppEnv> {
       storageKey,
       JSON.stringify({ state: "in_progress", bodyHash } satisfies IdempotencyRecord),
       "EX",
-      IDEMPOTENCY_TTL_SECONDS,
+      IDEMPOTENCY_RESERVATION_TTL_SECONDS,
       "NX",
     );
 
@@ -79,12 +80,14 @@ export function idempotency(): MiddlewareHandler<AppEnv> {
     const status = c.res.status;
     if (status >= 200 && status < 300) {
       const body = await c.res.clone().text();
-      // KEEPTTL is not a detail: a plain SET restarts the clock, and then the
-      // window is measured from the last write instead of the first request.
+      // The window is measured from when the response was produced, not from the
+      // initial request, because the reservation before it is deliberately short-lived.
+      // If the process dies before completing, the lock times out in 120 seconds.
       await redis.set(
         storageKey,
         JSON.stringify({ state: "completed", bodyHash, status, body } satisfies IdempotencyRecord),
-        "KEEPTTL",
+        "EX",
+        IDEMPOTENCY_TTL_SECONDS,
       );
     } else {
       // Only successful responses are remembered. A rejected request must leave
