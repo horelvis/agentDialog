@@ -49,6 +49,16 @@ export class RateLimitError extends AppError {
 }
 
 /**
+ * Two different conflicts share 409 and are told apart by `code`, which is what
+ * an agent can branch on without reading prose.
+ */
+export class IdempotencyConflictError extends AppError {
+  constructor(message: string, code: "IDEMPOTENCY_IN_PROGRESS" | "IDEMPOTENCY_KEY_REUSED") {
+    super(409, message, code);
+  }
+}
+
+/**
  * The receiver of this error is an agent, not a person reading documentation.
  * It can only correct itself and retry if the error says what is missing, so
  * `remedy` is part of the contract rather than a courtesy.
