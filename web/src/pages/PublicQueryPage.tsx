@@ -4,7 +4,8 @@ import { AnswerSpaceInput, isAnswerComplete } from "@/components/answer/AnswerSp
 import { Button } from "@/components/ui/Button";
 import { API_BASE } from "@/lib/constants";
 import { answerToWire } from "@/api/queries";
-import type { Answer, AnswerSpace } from "@/api/types";
+import { QueryContextHeader } from "@/components/queries/QueryContextHeader";
+import type { Answer, AnswerSpace, QueryChange, QuerySubject } from "@/api/types";
 
 /**
  * The one page that shows a question without a session. What the holder of a
@@ -18,7 +19,10 @@ interface PublicQuery {
   question: string;
   context?: string | null;
   risk: string;
-  subject: { id: string; label: string; body?: string | null; uri?: string | null };
+  subject: QuerySubject;
+  // The route already sends both. The page used to declare neither, so a
+  // renewed decision arrived here with its delta and showed none of it.
+  changes?: QueryChange[] | null;
   answer_space: AnswerSpace;
 }
 
@@ -158,16 +162,30 @@ export function PublicQueryPage() {
         </div>
       )}
 
-      <p className="text-xs uppercase tracking-wide text-gray-500">{query.subject.label}</p>
-      <h1 className="mt-1 text-xl font-semibold text-gray-100">{query.question}</h1>
+      <h1 className="text-xl font-semibold text-gray-100">{query.question}</h1>
 
-      {query.subject.body && (
-        <div className="mt-4 whitespace-pre-wrap rounded-lg bg-surface-secondary p-4 text-sm text-gray-300">
-          {query.subject.body}
+      {/* The same component the chat uses, rather than a second rendering of the
+          same fields. It brings what this page was missing: the referenced link,
+          checked again with isHttpUrl before it becomes an href, and the delta of
+          a renewed decision. It also keeps the referent behind a toggle and in a
+          box that scrolls — a subject body may be 100,000 characters, and pouring
+          those onto the page pushes the answer out of reach. */}
+      <div className="mt-4">
+        <QueryContextHeader
+          subject={query.subject}
+          changes={query.changes ?? null}
+          priorDecisionAt={null}
+        />
+      </div>
+
+      {query.context && (
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Context</p>
+          <p className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap text-sm text-gray-400">
+            {query.context}
+          </p>
         </div>
       )}
-
-      {query.context && <p className="mt-4 text-sm text-gray-400">{query.context}</p>}
 
       <div className="mt-6">
         <AnswerSpaceInput space={query.answer_space} value={answer} onChange={setAnswer} />
