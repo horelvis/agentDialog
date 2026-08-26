@@ -215,4 +215,26 @@ describe("query methods", () => {
     expect(query.status).toBe("needs_context");
     expect(query.insufficientReason).toBe("unknown_subject");
   });
+
+  it("passes language through clarifyQuery as a wire field", async () => {
+    const calls = mockFetch({
+      data: {
+        query_id: "q1", status: "assigned", status_description: "The human has accepted the invitation.",
+        query_type: "validation",
+        question: "Ship it?", context: null, confidence: null,
+        answer: null, comment: null, human_confidence: null,
+        response_time_ms: null, insufficient_reason: null,
+        created_at: "2026-08-20T10:00:00.000Z", expires_at: "2026-08-20T12:00:00.000Z",
+      },
+    });
+    const client = new AgentDialog({ apiKey: "mge_ag_test", baseUrl: "https://example.test" });
+    await client.clarifyQuery("q1", {
+      context: "Here's more information in Spanish.",
+      language: "es",
+    });
+    const body = JSON.parse(String(calls[0].init.body));
+    // Verify that language survives the conversion to wire format unchanged
+    expect(body.language).toBe("es");
+    expect(body.context).toBe("Here's more information in Spanish.");
+  });
 });
