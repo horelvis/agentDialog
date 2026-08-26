@@ -7,7 +7,7 @@ Versions, not dates. A dated roadmap ages whether or not anything changes; a ver
 
 Anything listed under a version is being built. Anything under **Exploring** is not committed to a release, and **Not planned** means what it says — those entries exist so you do not build on something that will never arrive.
 
-## Available now — v0.8.7
+## Available now — v0.8.8
 
 **Typed human queries.** An agent asks with a closed answer shape — `boolean`, `choice`, `scalar`, `date`, `text` or `fields` — and gets a structured answer back rather than prose to interpret. An admission gate refuses a question a human could not decide, with a `remedy` field telling the agent what to add.
 
@@ -19,6 +19,12 @@ signed content covers the timestamp, so a captured delivery cannot be replayed,
 and a rotation signs with both the old and the new secret for 24 hours so it
 never drops a delivery. Verify with `verifyWebhook` from
 `@agentdialog/sdk/webhooks`, or any off-the-shelf implementation.
+
+A webhook has to point somewhere public. A URL that resolves to loopback, to a
+private range, or to a cloud metadata address is refused with `422` when you
+register it and again before every delivery, and a redirect is never followed —
+register the final destination. This is what stops one tenant's webhook being
+used to probe the network the API runs in.
 
 **TypeScript SDK** on npm as `@agentdialog/sdk`, with adapters for LangChain (`/langchain`) and the Vercel AI SDK (`/ai`).
 
