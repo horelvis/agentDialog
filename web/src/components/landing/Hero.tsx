@@ -82,7 +82,7 @@ export function Hero() {
 
   return (
     <section id="get-key" className="relative overflow-hidden bg-surface-primary">
-      <div className="mx-auto max-w-7xl px-4 pb-20 pt-24 sm:px-6 sm:pb-24 sm:pt-32 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 pb-12 pt-24 sm:px-6 sm:pb-16 sm:pt-32 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-800 bg-brand-950 px-4 py-1.5 text-sm text-brand-300">
             <span className="flex h-2 w-2 rounded-full bg-brand-500" />
