@@ -1,3 +1,5 @@
+import type { Language } from "./queries.js";
+
 // ── Enums ──
 
 export type ActorType = "agent" | "human";
@@ -205,6 +207,13 @@ export interface SendMessageInput {
 export interface InviteHumanInput {
   email: string;
   message?: string;
+  /**
+   * The language the invitation email's wrapper is written in — subject
+   * line, labels, dates. Absent means `en`. It does NOT translate `message`:
+   * that travels exactly as written, so write it in the language you
+   * declare here.
+   */
+  language?: Language;
   expiresInHours?: number;
 }
 

@@ -42,7 +42,7 @@ await client.sendMessage(conv.id, {
 });
 
 // Invite a human
-await client.inviteHuman(conv.id, { email: "user@example.com" });
+await client.inviteHuman(conv.id, { email: "user@example.com", language: "es" });
 
 // Auto-paginate through messages
 for await (const msg of client.listAllMessages(conv.id)) {
@@ -147,6 +147,29 @@ landed wins: `cancelQuery` rejects with a conflict rather than discarding it.
 ```typescript
 await client.cancelQuery(queryId);
 ```
+
+### Language
+
+`createQuery`, `clarifyQuery`, and `inviteHuman` all accept an optional
+`language: "en" | "es" | "ca"`. Basque is not in the catalogue — a language is
+added once someone who speaks it has validated the translation — and anything
+else is rejected with a `422`. Leaving it out means `en`.
+
+```typescript
+await client.createQuery({
+  // ...
+  question: "¿Los datos de revenue de Q4 son correctos?",
+  language: "es",
+});
+```
+
+**This does not translate what you write.** `language` only changes the
+wrapper the product puts around your words — the email's subject line, its
+labels, its dates. `question`, `subject`, the options and their consequences,
+`context`, and `changes` are sent exactly as you wrote them, so write them in
+the language you declare here. The one email this does not apply to is the
+passwordless sign-in code: it takes its language from the browser of whoever
+is requesting the code, since there's a person in front of one at that moment.
 
 ## Idempotency
 

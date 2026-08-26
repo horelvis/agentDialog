@@ -125,6 +125,14 @@ rejects with a conflict instead of discarding it:
 await client.cancelQuery(queryId);
 ```
 
+### Language
+
+`createQuery`, `clarifyQuery`, and `inviteHuman` all accept an optional
+`language: "en" | "es" | "ca"` (absent means `en`; anything else is a `422`).
+See [Language](/docs/concepts/queries#language) — it changes only the email's
+wrapper (subject, labels, dates), never the words you write: `question`,
+`subject`, `context`, and `changes` are sent exactly as given.
+
 ## Framework adapters
 
 The SDK ships tool adapters so an LLM can ask a human directly, without you

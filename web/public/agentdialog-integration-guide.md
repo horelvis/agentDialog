@@ -471,9 +471,17 @@ POST /agent/conversations/{id}/invitations
 {
   "email": "carlos@empresa.com",
   "message": "Necesito tu aprobación para el deploy a producción",
+  "language": "es",
   "expiresInHours": 48
 }
 ```
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `email` | string | Sí | Email del humano |
+| `message` | string | No | Mensaje personalizado dentro del email |
+| `language` | enum | No | `en`, `es` o `ca`. Ausente equivale a `en`. Ver [idioma del email](#idioma-del-email) — no traduce `message` |
+| `expiresInHours` | number | No | Horas hasta que expira la invitación (default 48) |
 
 El humano recibe un email con un código de verificación:
 1. Se autentica vía código de verificación (sin contraseña)
@@ -556,6 +564,7 @@ POST /agent/queries
   "context": "Datos extraídos de BigQuery, tabla finance.quarterly_revenue...",
   "target_human_email": "sarah@example.com",
   "confidence": 0.7,
+  "language": "es",
   "timeout_minutes": 30
 }
 ```
@@ -598,6 +607,7 @@ El `subject` de arriba lleva el referente en `body`. **Sin referente y sin `self
 | `changes` | array | No | Deltas antes/después que cubre esta decisión — obligatorio por encima de `low` si este humano ya decidió sobre este `subject` |
 | `context` | string | No | Contexto adicional: código, datos, etc. (max 100,000 chars) |
 | `confidence` | number | No | Confianza del agente en su propia evaluación (0-1) |
+| `language` | enum | No | `en`, `es` o `ca`. Ausente equivale a `en`. Ver [idioma del email](#idioma-del-email) — **no traduce** `question`, `context` ni `changes` |
 | `timeout_minutes` | number | No | Minutos antes de expirar (default: 60, max: 10080) |
 | `metadata` | object | No | Metadata arbitraria asociada a la query |
 
@@ -715,6 +725,7 @@ Solo válido cuando `status` es `needs_context`. Envía lo que resuelva lo que e
 | `changes` | array | No | Delta antes/después |
 | `question` | string | No | Pregunta reformulada |
 | `context` | string | No | Contexto adicional |
+| `language` | enum | No | `en`, `es` o `ca` — reemplaza el idioma declarado en la creación. Ver [idioma del email](#idioma-del-email) |
 
 Al menos un campo es obligatorio — un `PATCH` vacío se rechaza. Los campos que no se envían conservan su valor anterior. La petición pasa por la misma puerta de admisión que la creación y puede volver `422` igual. Si tiene éxito, la query vuelve a `status: "assigned"` con la misma forma que [consultar una query](#consultar-una-query), y su reloj de expiración retoma desde donde se pausó.
 
@@ -782,6 +793,7 @@ Crea una query para que un humano responda una pregunta que de verdad pueda deci
   "context": "Datos extraídos de BigQuery, tabla finance.quarterly_revenue...",
   "target_human_email": "sarah@example.com",
   "confidence": 0.7,
+  "language": "es",
   "timeout_minutes": 30
 }
 ```
@@ -824,6 +836,7 @@ El `subject` de arriba lleva el referente en `body`. **Sin referente y sin `self
 | `changes` | array | No | Deltas antes/después que cubre esta decisión |
 | `target_human_email` | string | Sí | Email del humano a quien preguntar |
 | `confidence` | number | No | Confianza del agente en su propia evaluación (0-1) |
+| `language` | enum | No | `en`, `es` o `ca`. Cambia el envoltorio del email — asunto, etiquetas, fechas — pero **no traduce** `question`, `subject`, `answer_space` ni `changes`: eso viaja tal cual lo escribas, así que escríbelo en el idioma que declares aquí |
 | `timeout_minutes` | number | No | Minutos antes de expirar (default: 60, max: 10080) |
 
 **Response:**
@@ -1008,6 +1021,36 @@ distintos y ninguno de los dos es "responder":
    En el segundo caso el email **autentica**: lleva el código de inicio de
    sesión sin contraseña. No hay formulario de registro — el código *es* el
    login — pero sí hay cuenta y sesión una vez que el humano entra.
+
+### Idioma del email
+
+El catálogo es cerrado: **`en`, `es`, `ca`**. Cualquier otro valor de
+`language` se rechaza con `422`. El euskera está fuera a propósito — un
+idioma entra en el catálogo cuando hay quien lo valide, no antes.
+
+Qué decide el idioma depende de si hay un navegador delante o no:
+
+- **Si hay un navegador delante, manda el navegador.** El email del código de
+  inicio de sesión (`POST /human/auth/send-code`) toma el idioma del header
+  `Accept-Language` de quien lo pide — hay una persona con un navegador en ese
+  momento, y es mejor fuente que cualquier cosa que pudiéramos inferir de su
+  historial. Este email **no** usa el `language` que un agente haya declarado.
+- **Si no hay navegador, manda lo que el agente declaró.** El email de una
+  query (`POST /agent/queries`, y su PATCH de aclaración) y el de una
+  invitación (`POST /agent/conversations/{id}/invitations`) usan el `language`
+  que el agente mandó en la petición.
+- **Sin ninguno de los dos, inglés.** `language` ausente, o un valor que ya no
+  esté soportado (una fila escrita antes de que la columna existiera), cae en
+  `en` sin fallar.
+
+**Declarar un idioma no traduce lo que escribe el agente.** Cambia el
+envoltorio que el producto pone alrededor de la pregunta — el asunto, las
+etiquetas, las fechas — y es una pista para el agente sobre en qué idioma
+escribir. La pregunta, el asunto y cuerpo del subject, las opciones y sus
+consecuencias, el contexto y los `changes` viajan exactamente como se
+escribieron. Un integrador que asuma que traducimos por él lo descubre el día
+que un humano recibe un envoltorio en catalán alrededor de una pregunta en
+inglés.
 
 ### Qué pasa si el humano responde al email
 

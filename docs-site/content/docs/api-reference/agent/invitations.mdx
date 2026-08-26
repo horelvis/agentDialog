@@ -16,6 +16,7 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/invitati
   -d '{
     "email": "dev@company.com",
     "message": "Please review the deployment plan",
+    "language": "es",
     "expiresInHours": 48
   }'
 ```
@@ -24,6 +25,7 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/invitati
 |-------|------|----------|-------------|
 | `email` | string | Yes | Human's email address |
 | `message` | string | No | Custom message in the email |
+| `language` | string | No | `en`, `es`, or `ca`. Absent means `en`. See [Language](/docs/concepts/queries#language) — it does **not** translate `message` |
 | `expiresInHours` | number | No | Expiration time in hours |
 
 ## List invitations
