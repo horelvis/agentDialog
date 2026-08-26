@@ -7,6 +7,7 @@ import {
 } from "../../services/invitation.service";
 import { createInvitationSchema } from "../../validators/invitation.validators";
 import { validateBody } from "../../middleware/validate";
+import { idempotency } from "../../middleware/idempotency";
 import { sendInvitationEmail } from "../../services/email.service";
 import { getConversation } from "../../services/conversation.service";
 import { isParticipant } from "../../services/conversation.service";
@@ -14,7 +15,7 @@ import { ForbiddenError } from "../../lib/errors";
 
 const app = new Hono<AppEnv>();
 
-app.post("/:id/invitations", validateBody(createInvitationSchema), async (c) => {
+app.post("/:id/invitations", idempotency(), validateBody(createInvitationSchema), async (c) => {
   const conversationId = c.req.param("id");
   const agentId = c.get("agentId");
   const agent = c.get("agent");

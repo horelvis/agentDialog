@@ -5,6 +5,7 @@ import { isParticipant } from "../../services/conversation.service";
 import { ForbiddenError } from "../../lib/errors";
 import { createMessageSchema } from "../../validators/message.validators";
 import { validateBody, validateQuery } from "../../middleware/validate";
+import { idempotency } from "../../middleware/idempotency";
 import { paginationQuery } from "../../validators/common.validators";
 import { getLimit } from "../../lib/pagination";
 import { getRedis } from "../../lib/redis";
@@ -12,7 +13,7 @@ import { dispatchWebhooks } from "../../services/webhook.service";
 
 const app = new Hono<AppEnv>();
 
-app.post("/:id/messages", validateBody(createMessageSchema), async (c) => {
+app.post("/:id/messages", idempotency(), validateBody(createMessageSchema), async (c) => {
   const conversationId = c.req.param("id");
   const agentId = c.get("agentId");
 

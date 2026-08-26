@@ -7,6 +7,8 @@ description: "Send and list messages in a conversation"
 
 `POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages`
 
+Accepts an `Idempotency-Key` header — see [Idempotency](/docs/authentication#idempotency).
+
 ```bash
 curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages \
   -H "Authorization: Bearer mge_ag_..." \

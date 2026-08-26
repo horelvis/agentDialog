@@ -10,12 +10,13 @@ import {
 import { ForbiddenError } from "../../lib/errors";
 import { createConversationSchema, updateConversationSchema } from "../../validators/conversation.validators";
 import { validateBody, validateQuery } from "../../middleware/validate";
+import { idempotency } from "../../middleware/idempotency";
 import { paginationQuery } from "../../validators/common.validators";
 import { getLimit } from "../../lib/pagination";
 
 const app = new Hono<AppEnv>();
 
-app.post("/", validateBody(createConversationSchema), async (c) => {
+app.post("/", idempotency(), validateBody(createConversationSchema), async (c) => {
   const agentId = c.get("agentId");
   const input = c.get("validatedBody");
   const conversation = await createConversation(agentId, input);

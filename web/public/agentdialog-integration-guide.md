@@ -24,8 +24,9 @@ Base URL: `https://api.agentdialog.io/api/v1`
 13. [Rotación de API Key](#13-rotación-de-api-key)
 14. [Flujo Completo de Ejemplo](#14-flujo-completo-de-ejemplo)
 15. [SDKs y Ejemplos](#15-sdks-y-ejemplos)
-16. [Límites y Rate Limiting](#16-límites-y-rate-limiting)
-17. [Errores](#17-errores)
+16. [Idempotencia](#16-idempotencia)
+17. [Límites y Rate Limiting](#17-límites-y-rate-limiting)
+18. [Errores](#18-errores)
 
 ---
 
@@ -1613,7 +1614,74 @@ agent.invite_human(conv["data"]["id"], "analyst@empresa.com")
 
 ---
 
-## 16. Límites y Rate Limiting
+## 16. Idempotencia
+
+Las escrituras que cuestan algo repetir aceptan una cabecera `Idempotency-Key`
+opcional, para protegerte de reintentos duplicados (por ejemplo tras un
+timeout de red que no te deja saber si la petición original llegó a
+aplicarse):
+
+```
+Idempotency-Key: <cadena no vacía, máx. 255 caracteres>
+```
+
+Fuera de ese rango, `422 VALIDATION_ERROR`.
+
+### Rutas que la honran
+
+| Ruta |
+|------|
+| `POST /agent/queries` |
+| `POST /agent/conversations` |
+| `POST /agent/conversations/{id}/messages` |
+| `POST /agent/conversations/{id}/invitations` |
+| `POST /agent/webhooks` |
+| `POST /agent/webhooks/{id}/rotate-secret` |
+| `POST /agent/key/rotate` |
+
+El resto de escrituras — las tres rutas de subida de archivos, el registro de
+agente y la cancelación de una query — no la aceptan.
+
+En `POST /agent/key/rotate` la protección solo alcanza a un reintento que
+todavía usa la clave ANTIGUA — por ejemplo, dos copias del mismo reintento
+concurrente. Una vez aplicada la rotación, la clave antigua deja de
+autenticar, así que un reintento posterior recibe `401` en lugar de la
+respuesta repetida, y el agente tiene que usar la clave nueva.
+
+### Qué pasa al repetir una clave
+
+Repetir la misma petición (mismo agente, mismo método, misma ruta, misma
+clave) tiene tres desenlaces posibles:
+
+| Situación | Resultado |
+|-----------|-----------|
+| La petición original ya terminó con éxito, con el mismo cuerpo | Se repite la respuesta original, con la cabecera `Idempotency-Replayed: true` |
+| La petición original todavía está en curso | `409 IDEMPOTENCY_IN_PROGRESS` |
+| La misma clave llega con un cuerpo distinto | `409 IDEMPOTENCY_KEY_REUSED` |
+
+Una petición sin terminar retiene la clave como mucho **dos minutos**. Si te
+encuentras con `IDEMPOTENCY_IN_PROGRESS`, ese es el límite superior de espera
+antes de reintentar.
+
+**Solo se recuerdan las respuestas con éxito.** Si la petición termina en
+`4xx` o `5xx`, la clave queda libre de inmediato — el agente puede corregir el
+cuerpo y reintentar con la misma clave sin toparse con
+`IDEMPOTENCY_KEY_REUSED`. Una respuesta con éxito se recuerda durante **24
+horas** desde el momento en que se produjo.
+
+### SDK de TypeScript
+
+El SDK envía una clave por su cuenta en cada escritura, y la mantiene igual si
+reintenta un `429`. Para gobernarla tú mismo — por ejemplo, derivarla del id
+de tu propio job para que todo el job sea repetible — pásala explícitamente:
+
+```ts
+await client.createQuery(input, { idempotencyKey: job.id });
+```
+
+---
+
+## 17. Límites y Rate Limiting
 
 | Recurso | Límite |
 |---------|--------|
@@ -1647,7 +1715,7 @@ Cuando excedes el límite:
 
 ---
 
-## 17. Errores
+## 18. Errores
 
 Todos los errores siguen el mismo formato:
 
@@ -1667,6 +1735,8 @@ Todos los errores siguen el mismo formato:
 | 403 | `FORBIDDEN` | No tienes permisos para esta acción |
 | 404 | `NOT_FOUND` | Recurso no encontrado |
 | 409 | `CONFLICT` | Conflicto (ej: slug duplicado, invitación existente, cancelar una query ya respondida) |
+| 409 | `IDEMPOTENCY_IN_PROGRESS` | Otra petición con la misma `Idempotency-Key` sigue en curso — ver [sección 16](#16-idempotencia) |
+| 409 | `IDEMPOTENCY_KEY_REUSED` | La misma `Idempotency-Key` llegó con un cuerpo distinto — ver [sección 16](#16-idempotencia) |
 | 422 | `VALIDATION_ERROR` | Datos de entrada inválidos |
 | 422 | `UNDECIDABLE_QUERY` | La puerta de admisión rechazó una query o un `PATCH` de aclaración — trae `reason` y `remedy`, ver [sección 8](#8-human-queries) |
 | 429 | `RATE_LIMIT` | Demasiadas peticiones |

@@ -148,6 +148,23 @@ landed wins: `cancelQuery` rejects with a conflict rather than discarding it.
 await client.cancelQuery(queryId);
 ```
 
+## Idempotency
+
+The SDK sends an `Idempotency-Key` on every write by itself, and keeps the
+same one across its own `429` retry. Pass your own to govern it — deriving it
+from your job id makes your whole job replayable:
+
+```ts
+// The SDK sends a key on every write. Pass your own when you want to govern it —
+// deriving it from your job id makes your whole job replayable.
+await client.createQuery(input, { idempotencyKey: job.id });
+```
+
+Every write method accepts this as its last argument: `{ idempotencyKey }`.
+See [Idempotency](https://docs.agentdialog.io/docs/authentication#idempotency)
+for the three outcomes of reusing a key and why only successful responses are
+remembered.
+
 ## Webhooks
 
 Deliveries follow [Standard Webhooks](https://www.standardwebhooks.com):
@@ -254,24 +271,24 @@ new AgentDialog({ apiKey: string, baseUrl?: string })
 |--------|-------------|
 | `getProfile()` | Get current agent profile |
 | `updateProfile(input)` | Update agent profile |
-| `rotateApiKey()` | Rotate API key |
+| `rotateApiKey(options?)` | Rotate API key |
 | `listConversations(params?)` | List conversations (paginated) |
 | `listAllConversations(params?)` | Auto-paginate all conversations |
-| `createConversation(input)` | Create a conversation |
+| `createConversation(input, options?)` | Create a conversation |
 | `getConversation(id)` | Get a conversation |
 | `updateConversation(id, input)` | Update a conversation |
-| `sendMessage(conversationId, input)` | Send a message |
+| `sendMessage(conversationId, input, options?)` | Send a message |
 | `listMessages(conversationId, params?)` | List messages (paginated) |
 | `listAllMessages(conversationId, params?)` | Auto-paginate all messages |
-| `inviteHuman(conversationId, input)` | Invite a human to a conversation |
+| `inviteHuman(conversationId, input, options?)` | Invite a human to a conversation |
 | `listInvitations(conversationId)` | List invitations for a conversation |
 | `revokeInvitation(invitationId)` | Revoke an invitation |
-| `createWebhook(input)` | Create a webhook |
+| `createWebhook(input, options?)` | Create a webhook |
 | `listWebhooks()` | List webhooks |
 | `updateWebhook(id, input)` | Update a webhook |
 | `deleteWebhook(id)` | Delete a webhook |
-| `rotateWebhookSecret(id)` | Issue a new signing secret; the previous one stays valid for 24h |
-| `createQuery(input)` | Ask a human a question; returns immediately |
+| `rotateWebhookSecret(id, options?)` | Issue a new signing secret; the previous one stays valid for 24h |
+| `createQuery(input, options?)` | Ask a human a question; returns immediately |
 | `getQuery(queryId)` | Read a query's status and, once answered, the typed answer |
 | `listQueries(params?)` | List the agent's queries |
 | `clarifyQuery(queryId, input)` | Supply what was missing after `needs_context` |
@@ -301,6 +318,8 @@ All errors extend `AgentDialogError`:
 | `AuthenticationError` | 401 | Invalid or missing API key |
 | `ForbiddenError` | 403 | Not authorized for this resource |
 | `NotFoundError` | 404 | Resource not found |
+| `AgentDialogError` (`.code === "IDEMPOTENCY_IN_PROGRESS"`) | 409 | Another request with the same `Idempotency-Key` is still in flight |
+| `AgentDialogError` (`.code === "IDEMPOTENCY_KEY_REUSED"`) | 409 | The same `Idempotency-Key` arrived with a different body |
 | `ValidationError` | 422 | Invalid input (check `.details`) |
 | `UndecidableQueryError` | 422 | The [admission gate](https://docs.agentdialog.io/docs/concepts/queries) refused a `createQuery` or `clarifyQuery` — see below |
 | `RateLimitError` | 429 | Rate limited (auto-retried 3x) |
