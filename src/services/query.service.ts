@@ -263,6 +263,7 @@ export async function createQuery(agentId: string, input: CreateQueryInput) {
       invitationToken: token,
       conversationId: conversation.id,
       grantToken,
+      language: query.language,
     });
     console.log(`[QUERY] Query email sent to ${targetEmail}`);
   } catch (emailErr) {
