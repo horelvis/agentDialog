@@ -8,6 +8,7 @@ import {
   rotateWebhookSecret,
 } from "../../services/webhook.service";
 import { validateBody } from "../../middleware/validate";
+import { idempotency } from "../../middleware/idempotency";
 import { z } from "zod";
 
 const createWebhookSchema = z.object({
@@ -23,7 +24,7 @@ const updateWebhookSchema = z.object({
 
 const app = new Hono<AppEnv>();
 
-app.post("/", validateBody(createWebhookSchema), async (c) => {
+app.post("/", idempotency(), validateBody(createWebhookSchema), async (c) => {
   const agentId = c.get("agentId");
   const input = c.get("validatedBody");
   const { webhook, secret } = await createWebhook(agentId, input);
@@ -54,7 +55,7 @@ app.patch("/:id", validateBody(updateWebhookSchema), async (c) => {
   return c.json({ data: webhook });
 });
 
-app.post("/:id/rotate-secret", async (c) => {
+app.post("/:id/rotate-secret", idempotency(), async (c) => {
   const webhookId = c.req.param("id");
   const agentId = c.get("agentId");
   const { webhook, secret } = await rotateWebhookSecret(webhookId, agentId);

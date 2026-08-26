@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/hono";
+import { idempotency } from "../../middleware/idempotency";
 import { rotateApiKey } from "../../services/agent.service";
 
 const app = new Hono<AppEnv>();
 
-app.post("/key/rotate", async (c) => {
+app.post("/key/rotate", idempotency(), async (c) => {
   const agentId = c.get("agentId");
   const { agent, apiKey } = await rotateApiKey(agentId);
 

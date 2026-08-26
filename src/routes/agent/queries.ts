@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import type { AppEnv } from "../../types/hono";
 import { createQuery, getQuery, listAgentQueries, updateQuery, cancelQuery } from "../../services/query.service";
 import { validateBody, validateQuery } from "../../middleware/validate";
+import { idempotency } from "../../middleware/idempotency";
 import { createQuerySchema, listQueriesQuerySchema, patchQuerySchema } from "../../validators/query.validators";
 
 const app = new Hono<AppEnv>();
 
-app.post("/", validateBody(createQuerySchema), async (c) => {
+app.post("/", idempotency(), validateBody(createQuerySchema), async (c) => {
   const agentId = c.get("agentId");
   const input = c.get("validatedBody");
   const result = await createQuery(agentId, input);
