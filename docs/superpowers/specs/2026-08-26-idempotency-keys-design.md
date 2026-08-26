@@ -108,14 +108,24 @@ agente quedaría atrapado sin entender por qué.
 Redis, con la forma que ya usa `src/middleware/rate-limit.ts`.
 
 - Clave: `idem:<agentId>:<sha256(method + path + idempotencyKey)>`
-- Reserva: `SET … NX EX 86400` con `{ state: "in_progress", bodyHash }`
-- Al terminar con éxito: `SET … KEEPTTL` con `{ state: "completed", status, body, bodyHash }`.
-  `KEEPTTL` no es un detalle: un `SET` normal reinicia la cuenta, y entonces la
-  ventana de memoria no la marca la primera petición sino la última escritura
+- Reserva: `SET … NX EX 120` (`IDEMPOTENCY_RESERVATION_TTL_SECONDS`) con
+  `{ state: "in_progress", bodyHash }`
+- Al terminar con éxito: `SET … EX 86400` (`IDEMPOTENCY_TTL_SECONDS`), explícito
+  y no `KEEPTTL`, con `{ state: "completed", status, body, bodyHash }`. La
+  ventana de memoria de veinticuatro horas arranca cuando la respuesta se
+  produjo, no cuando llegó la petición original
 - Al terminar con error: `DEL`
 
-Veinticuatro horas de memoria, que es lo que hace la industria y bastante más que
-cualquier ventana de reintento razonable.
+Esto difiere de lo planteado al principio: la reserva iba a llevar la misma TTL
+de veinticuatro horas que la respuesta completada, con `KEEPTTL` para no
+reiniciarla. Una ronda de implementación lo cambió: una reserva que sobrevive
+un proceso caído bloquearía la clave un día entero en vez de dos minutos, así
+que la reserva usa su propia TTL corta (`IDEMPOTENCY_RESERVATION_TTL_SECONDS`,
+120 segundos) y la respuesta completada fija la suya de manera explícita en vez
+de heredar la de la reserva.
+
+Veinticuatro horas de memoria para la respuesta completada, que es lo que hace
+la industria y bastante más que cualquier ventana de reintento razonable.
 
 La reserva y la lectura ocurren en una sola operación atómica (`SET NX` devuelve
 si escribió), así que dos peticiones simultáneas no pueden entrar ambas: la
@@ -133,6 +143,15 @@ segunda ve la reserva y responde `IDEMPOTENCY_IN_PROGRESS`.
   conviene decirlo porque alguien preguntará.
 - **Las subidas siguen sin protección**, y con ellas el mensaje de tipo `file` que
   crean.
+- **La respuesta completada se recuerda entera, secretos incluidos, durante 24
+  horas en Redis.** `POST /agent/webhooks`, `POST /agent/webhooks/:id/rotate-secret`
+  y `POST /agent/key/rotate` devuelven un valor que el sistema enseña
+  deliberadamente una sola vez, y ese valor queda legible en el registro de
+  reserva mientras dure la ventana de repetición. Es una decisión consciente —la
+  misma que toma Stripe— y es el precio de poder repetir la respuesta que el
+  cliente perdió, pero hasta ahora no estaba escrita en ninguna parte, y esto lo
+  hace en un producto que por lo demás cifra esos mismos secretos en reposo en
+  Postgres.
 
 ## El SDK
 

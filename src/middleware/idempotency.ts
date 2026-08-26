@@ -83,16 +83,31 @@ export function idempotency(): MiddlewareHandler<AppEnv> {
       // The window is measured from when the response was produced, not from the
       // initial request, because the reservation before it is deliberately short-lived.
       // If the process dies before completing, the lock times out in 120 seconds.
-      await redis.set(
-        storageKey,
-        JSON.stringify({ state: "completed", bodyHash, status, body } satisfies IdempotencyRecord),
-        "EX",
-        IDEMPOTENCY_TTL_SECONDS,
-      );
+      try {
+        await redis.set(
+          storageKey,
+          JSON.stringify({ state: "completed", bodyHash, status, body } satisfies IdempotencyRecord),
+          "EX",
+          IDEMPOTENCY_TTL_SECONDS,
+        );
+      } catch (err) {
+        // The handler already did its work and c.res is already set to that
+        // success response. Losing the ability to remember it must not turn
+        // into a failure for a caller whose request actually succeeded — a
+        // retry will simply run again instead of replaying.
+        console.error(`Idempotency-Key ${storageKey}: failed to store completed response, skipping replay`, err);
+      }
     } else {
       // Only successful responses are remembered. A rejected request must leave
       // the key free for the corrected retry.
-      await redis.del(storageKey);
+      try {
+        await redis.del(storageKey);
+      } catch (err) {
+        // Same reasoning as above: the handler's own (non-2xx) response still
+        // stands. Leaving the reservation in place just means the key stays
+        // locked until its TTL expires instead of being freed immediately.
+        console.error(`Idempotency-Key ${storageKey}: failed to release reservation after a failed request`, err);
+      }
     }
   };
 }

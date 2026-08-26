@@ -113,6 +113,16 @@ here. Sending the same key again, for the same route, has three outcomes:
 | The original request is still in flight | `409 IDEMPOTENCY_IN_PROGRESS` |
 | The same key arrives with a different body | `409 IDEMPOTENCY_KEY_REUSED` |
 
+An in-flight request holds its key for at most **two minutes**. That's the
+upper bound on how long to wait out before retrying past an
+`IDEMPOTENCY_IN_PROGRESS`.
+
+On `POST /agent/key/rotate`, replay only helps a retry that's still using the
+OLD key — for instance, two copies of the same concurrent retry landing
+before either has read the response. Once the rotation has been applied, the
+old key no longer authenticates, so a later retry gets `401` instead of the
+replayed response, and you'll need to switch to the new key.
+
 <Callout type="info">
   Only successful responses are remembered. A `4xx` or `5xx` frees the key
   immediately, so you can fix the body and retry with the same key instead of

@@ -122,4 +122,33 @@ describe("idempotency middleware", () => {
     const exists = await redis.exists(storageKey);
     expect(exists).toBe(0);
   });
+
+  it("still returns the handler's success response when remembering it fails", async () => {
+    // Redis blipping after the handler already did its work (query created, email
+    // sent, key rotated) must not turn a successful request into a 500. It may
+    // only cost us the ability to replay it later.
+    const { app, calls } = appWithCounter();
+    const key = KEY();
+    const redis = getRedis();
+    const originalSet = redis.set.bind(redis);
+    // The reservation SET carries "NX"; the completion SET does not. Only fail
+    // the completion write, so the reservation still succeeds and the handler runs.
+    // @ts-expect-error -- monkey-patching the ioredis instance for this test only
+    redis.set = (...args: unknown[]) => {
+      if (!args.includes("NX")) {
+        return Promise.reject(new Error("simulated Redis outage"));
+      }
+      // @ts-expect-error -- forwarding to the real, bound implementation
+      return originalSet(...args);
+    };
+
+    try {
+      const res = await post(app, key, { ship: true });
+      expect(res.status).toBe(201);
+      expect((await res.json()).data.calls).toBe(1);
+      expect(calls()).toBe(1);
+    } finally {
+      redis.set = originalSet;
+    }
+  });
 });

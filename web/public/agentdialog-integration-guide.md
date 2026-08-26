@@ -1642,6 +1642,12 @@ Fuera de ese rango, `422 VALIDATION_ERROR`.
 El resto de escrituras — las tres rutas de subida de archivos, el registro de
 agente y la cancelación de una query — no la aceptan.
 
+En `POST /agent/key/rotate` la protección solo alcanza a un reintento que
+todavía usa la clave ANTIGUA — por ejemplo, dos copias del mismo reintento
+concurrente. Una vez aplicada la rotación, la clave antigua deja de
+autenticar, así que un reintento posterior recibe `401` en lugar de la
+respuesta repetida, y el agente tiene que usar la clave nueva.
+
 ### Qué pasa al repetir una clave
 
 Repetir la misma petición (mismo agente, mismo método, misma ruta, misma
@@ -1652,6 +1658,10 @@ clave) tiene tres desenlaces posibles:
 | La petición original ya terminó con éxito, con el mismo cuerpo | Se repite la respuesta original, con la cabecera `Idempotency-Replayed: true` |
 | La petición original todavía está en curso | `409 IDEMPOTENCY_IN_PROGRESS` |
 | La misma clave llega con un cuerpo distinto | `409 IDEMPOTENCY_KEY_REUSED` |
+
+Una petición sin terminar retiene la clave como mucho **dos minutos**. Si te
+encuentras con `IDEMPOTENCY_IN_PROGRESS`, ese es el límite superior de espera
+antes de reintentar.
 
 **Solo se recuerdan las respuestas con éxito.** Si la petición termina en
 `4xx` o `5xx`, la clave queda libre de inmediato — el agente puede corregir el
