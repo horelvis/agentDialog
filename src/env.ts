@@ -42,6 +42,13 @@ export const envSchema = z.object({
 
   WEBHOOK_TIMEOUT_MS: z.coerce.number().default(10000),
   WEBHOOK_MAX_RETRIES: z.coerce.number().default(3),
+  // Whether a webhook may point at a loopback or private address. Left unset it
+  // resolves to `NODE_ENV !== "production"` (see privateTargetsAllowed), so the
+  // test suite's localhost receiver and `bun run dev` need no configuration.
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
   // The key that encrypts webhook signing secrets at rest. 32 bytes, base64.
   // Losing it loses every signing secret; recovery is rotation.
   WEBHOOK_ENCRYPTION_KEY: z.string().optional(),
@@ -91,6 +98,21 @@ export const envSchema = z.object({
       message:
         "WEBHOOK_ENCRYPTION_KEY is required in production: without it webhook " +
         "signing secrets cannot be stored recoverably and no delivery can be verified.",
+    });
+  }
+
+  // On a public API the webhook URL is attacker-chosen, so allowing a private
+  // target in production hands any agent a probe into the VPC and the cloud
+  // metadata service. There is no legitimate production use, and an operator
+  // setting it deserves to find out at startup rather than in an incident.
+  if (env.NODE_ENV === "production" && env.WEBHOOK_ALLOW_PRIVATE_TARGETS === true) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["WEBHOOK_ALLOW_PRIVATE_TARGETS"],
+      message:
+        "WEBHOOK_ALLOW_PRIVATE_TARGETS must not be true in production: it disables " +
+        "the guard that stops a webhook reaching loopback, the private ranges and " +
+        "the cloud metadata service.",
     });
   }
 

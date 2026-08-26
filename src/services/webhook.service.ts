@@ -9,6 +9,7 @@ import {
   signatureHeader,
 } from "../lib/webhook-signature";
 import { deliverWebhook } from "../lib/webhook-delivery";
+import { inspectWebhookTarget } from "../lib/webhook-url-guard";
 import { NotFoundError, ForbiddenError, ValidationError } from "../lib/errors";
 import { getLimitsConfig } from "../config/limits";
 
@@ -84,6 +85,18 @@ export function refusesReactivation(
   return isActive === true && liveSecrets(secrets, now).length === 0;
 }
 
+/**
+ * Refuses a destination the delivery path would refuse anyway. Doing it here is
+ * ergonomics rather than security: the agent gets a 422 naming the problem
+ * instead of a webhook that is registered and silently never delivers.
+ */
+async function assertTargetAllowed(url: string): Promise<void> {
+  const verdict = await inspectWebhookTarget(url);
+  if (!verdict.allowed) {
+    throw new ValidationError(verdict.reason!);
+  }
+}
+
 export async function createWebhook(
   agentId: string,
   input: { url: string; events: string[] },
@@ -99,6 +112,8 @@ export async function createWebhook(
   if (existing.length >= limits.maxWebhooksPerAgent) {
     throw new ForbiddenError(`Maximum ${limits.maxWebhooksPerAgent} webhooks per agent`);
   }
+
+  await assertTargetAllowed(input.url);
 
   const { record, plaintext } = newSecret();
 
@@ -121,6 +136,10 @@ export async function updateWebhook(
   input: { url?: string; events?: string[]; isActive?: boolean },
 ): Promise<PublicWebhook> {
   const db = getDb();
+
+  if (input.url !== undefined) {
+    await assertTargetAllowed(input.url);
+  }
 
   if (input.isActive === true) {
     const [current] = await db

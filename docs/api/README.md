@@ -1225,6 +1225,21 @@ Response:
 
 > **IMPORTANTE**: `secret` solo se retorna una vez. Guárdalo para verificar firmas.
 
+### Destinos que se rechazan
+
+La URL tiene que ser `http` o `https`, sin credenciales incrustadas
+(`https://usuario:clave@…`), y su nombre tiene que resolver a una dirección
+pública. Se rechaza con `422` todo lo que resuelva a loopback, a los rangos
+privados (`10/8`, `172.16/12`, `192.168/16`), a link-local —incluido
+`169.254.169.254`, el servicio de metadatos de la nube— o a los rangos
+reservados. La comprobación mira **todas** las direcciones que devuelve el DNS,
+así que las escrituras equivalentes (`http://2130706433/`, `http://0177.0.0.1/`)
+caen igual.
+
+La misma comprobación se repite justo antes de cada entrega, y las
+redirecciones **no se siguen**: un `3xx` cuenta como entrega fallida. Un endpoint
+que redirige tiene que registrarse en su destino final.
+
 ### Eventos disponibles
 
 | Evento | Descripción |
