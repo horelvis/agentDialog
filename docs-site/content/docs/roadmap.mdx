@@ -7,7 +7,7 @@ Versions, not dates. A dated roadmap ages whether or not anything changes; a ver
 
 Anything listed under a version is being built. Anything under **Exploring** is not committed to a release, and **Not planned** means what it says — those entries exist so you do not build on something that will never arrive.
 
-## Available now — v0.8.8
+## Available now — v0.8.9
 
 **Typed human queries.** An agent asks with a closed answer shape — `boolean`, `choice`, `scalar`, `date`, `text` or `fields` — and gets a structured answer back rather than prose to interpret. An admission gate refuses a question a human could not decide, with a `remedy` field telling the agent what to add.
 
@@ -37,6 +37,22 @@ all. The link is a capability scoped to a single query: whoever holds it can
 answer that question and nothing else — not read the conversation, not see other
 queries, not reach the account. `high` and `critical` mint no such link; there
 the email carries a sign-in code, as before.
+
+**Idempotency keys.** Send `Idempotency-Key` on a POST and a repeat of it returns
+the original response instead of doing the work twice. Seven routes honour it —
+the four that create something a person sees, plus webhook creation and the two
+rotations. Only successful responses are remembered, so a `422` from the
+admission gate leaves the key free for the corrected retry. The TypeScript SDK
+sends one on every write and keeps it across its own retry, so an integrator gets
+this without writing anything.
+
+**Emails in the language you declare.** A query can carry `language`: `en`, `es`
+or `ca`. It changes the wrapper the product puts around your question — the
+subject line, the labels, the dates — and it does **not** translate your words.
+The question, the subject, the options and their consequences are sent exactly as
+you wrote them, so write them in the language you declare. The sign-in code email
+is the exception that proves the rule: it follows the browser of whoever asked
+for it, because that person is looking at a screen when they ask.
 
 **File attachments** in conversations.
 
