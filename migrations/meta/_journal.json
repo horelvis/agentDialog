@@ -71,6 +71,13 @@
       "when": 1787827200000,
       "tag": "0009_query_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787913600000,
+      "tag": "0010_query_language",
+      "breakpoints": true
     }
   ]
 }

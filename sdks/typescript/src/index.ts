@@ -52,6 +52,7 @@ export type {
   ClarifyQueryInput,
   CreateQueryInput,
   CreatedQuery,
+  Language,
   ListQueriesParams,
   Query,
   QueryStatus,

@@ -46,6 +46,7 @@ export async function createInvitation(
       invitedHumanEmail: input.email,
       token,
       message: input.message,
+      language: input.language ?? "en",
       expiresAt,
     })
     .returning();

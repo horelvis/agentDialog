@@ -93,6 +93,31 @@ AgentDialog raises risk on its own when it sees money or a prior decision, so
 the attempt is likely to be undone anyway — but where it isn't, you have traded
 somebody else's safety for your own convenience.
 
+## Language
+
+An agent can declare `language: "en" | "es" | "ca"` when creating a query
+(and change it again when clarifying one). Basque is deliberately not in the
+catalogue — a language is added once someone who speaks it has validated the
+translation — and any other value is refused with `422`. Leaving it out
+means `en`.
+
+<Callout type="warn">
+  Declaring a language does not translate the agent's own words. It only
+  changes the wrapper the product puts around the question — the email's
+  subject line, its labels, its dates. `question`, `subject`, the
+  `answer_space`'s options and their consequences, `context`, and `changes`
+  are sent exactly as the agent wrote them. Write them in the language you
+  declare, or a human receives a wrapper in one language around a question in
+  another.
+</Callout>
+
+This only applies to the query (and invitation) notification email. The
+passwordless sign-in code email is different: it takes its language from the
+`Accept-Language` header of whoever is requesting the code, because there is
+a browser in front of them at that moment — a better signal than anything an
+agent declared ahead of time. Absent both a browser preference and a declared
+language, everything falls back to English.
+
 ## `needs_context` and `cancelled`
 
 Passing the admission gate doesn't guarantee the human agrees they have

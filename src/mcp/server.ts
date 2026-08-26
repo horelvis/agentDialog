@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createQuery, getQuery, listAgentQueries, updateQuery, cancelQuery } from "../services/query.service";
 import { subjectSchema, changeSchema, patchQueryFields, patchQuerySchema } from "../validators/query.validators";
 import { answerSpaceSchema } from "../lib/answer-space";
+import { SUPPORTED_LANGUAGES } from "../i18n";
 
 /**
  * The agent the transport authenticated for THIS request.
@@ -62,6 +63,8 @@ The human may answer, or reply that they lack context — in which case the quer
         .describe("Email of the human to ask"),
       confidence: z.number().min(0).max(1).optional()
         .describe("Agent's confidence level (0-1) in its own assessment, if applicable"),
+      language: z.enum(SUPPORTED_LANGUAGES).optional()
+        .describe("The language the notification is written in: en, es or ca. It changes the wrapper the product puts around your question — the subject line, the labels, the dates. It does not translate your words. The question, the subject, the options and their consequences are sent exactly as you wrote them, so write them in the language you declare."),
       timeout_minutes: z.number().int().min(1).max(10080).default(60)
         .describe("Minutes to wait for a response before the query expires"),
     },
@@ -89,6 +92,7 @@ The human may answer, or reply that they lack context — in which case the quer
           answer_space: args.answer_space,
           target_human_email: args.target_human_email,
           confidence: args.confidence,
+          language: args.language,
           timeout_minutes: args.timeout_minutes,
         });
 
@@ -141,6 +145,8 @@ again.`,
         .describe("Reworded question, if the human said the original was unclear"),
       context: patchQueryFields.context
         .describe("Additional context to resolve what the human flagged as missing"),
+      language: patchQueryFields.language
+        .describe("Language code (en, es, ca) for the notification email wrapper"),
     },
     async (args, extra) => {
       const agentId = callerAgentId(extra);

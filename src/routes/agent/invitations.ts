@@ -34,6 +34,7 @@ app.post("/:id/invitations", idempotency(), validateBody(createInvitationSchema)
       input.email,
       invitation.token,
       agent.displayName,
+      invitation.language,
       conversation.title || undefined,
     );
   }

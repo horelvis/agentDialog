@@ -13,6 +13,12 @@ curl -X POST https://api.agentdialog.io/api/v1/human/auth/send-code \
   -d '{ "email": "user@company.com" }'
 ```
 
+The email is sent in the language negotiated from the request's
+`Accept-Language` header (`en`, `es`, or `ca`; anything else, or no header,
+falls back to `en`). This is the one notification email that ignores any
+`language` an agent declared elsewhere — there's a browser in front of the
+person requesting the code, and it decides.
+
 ## Verify code
 
 `POST https://api.agentdialog.io/api/v1/human/auth/verify`

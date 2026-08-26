@@ -118,3 +118,41 @@ describe("acceptInvitation ownership", () => {
     expect(participants).toHaveLength(1);
   });
 });
+
+describe("Invitation language", () => {
+  it("stores and returns the declared language on standalone invitations", async () => {
+    const { authHeader } = await createTestAgent();
+    const email = `inv-lang-${Date.now()}@example.com`;
+
+    // Create a conversation first
+    const conversationRes = await app.request("/api/v1/agent/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify({
+        title: "Test conversation for language",
+        description: "Testing invitation language",
+      }),
+    });
+    expect(conversationRes.status).toBe(201);
+    const { data: { id } } = await conversationRes.json();
+
+    // Invite with Catalan
+    const inviteRes = await app.request(`/api/v1/agent/conversations/${id}/invitations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify({
+        email,
+        language: "ca",
+      }),
+    });
+    expect(inviteRes.status).toBe(201);
+
+    // Verify the language was stored
+    const db = getDb();
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.invitedHumanEmail, email));
+    expect(invitation.language).toBe("ca");
+  });
+});

@@ -1,7 +1,9 @@
 import { sendEmail } from "../lib/email";
 import { env } from "../env";
+import { messagesFor, localeTag } from "../i18n";
 import type { Subject } from "../admission/decidability";
 import type { Change } from "../validators/query.validators";
+import type { Messages } from "../i18n";
 
 interface SendQueryEmailInput {
   queryId: string;
@@ -16,18 +18,12 @@ interface SendQueryEmailInput {
   invitationToken: string;
   conversationId: string;
   grantToken?: string;
+  language: string;
 }
 
 const CONTEXT_MAX_LENGTH = 2000;
 
-const QUERY_TYPE_LABELS: Record<string, string> = {
-  validation: "Validation",
-  interpretation: "Interpretation",
-  expert_query: "Expert Query",
-  labeling: "Labeling",
-};
-
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -35,8 +31,8 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function formatExpiry(date: Date): string {
-  return date.toLocaleString("en-US", {
+function formatExpiry(date: Date, language: string): string {
+  return date.toLocaleString(localeTag(language), {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -55,7 +51,7 @@ const MATERIAL_CHANGES_MAX = 5;
  * where the human can actually act on it. An email that tried to reproduce
  * it would drift from what respondQuery accepts the moment either one changes.
  */
-function subjectSummary(subject: Subject, changes?: Change[]): { html: string; text: string } {
+function subjectSummary(subject: Subject, m: Messages, changes?: Change[]): { html: string; text: string } {
   const material = (changes ?? []).filter((c) => c.materiality === "material");
 
   let changesHtml = "";
@@ -67,28 +63,29 @@ function subjectSummary(subject: Subject, changes?: Change[]): { html: string; t
       .map((c) => `<li>${escapeHtml(c.path)}: ${escapeHtml(c.before)} &rarr; ${escapeHtml(c.after)}</li>`)
       .join("");
     changesHtml = `
-        <div style="margin-top: 8px; font-size: 12px; color: #868e96; font-weight: 600;">WHAT CHANGED</div>
+        <div style="margin-top: 8px; font-size: 12px; color: #868e96; font-weight: 600;">${m.whatChanged}</div>
         <ul style="margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: #495057;">${itemsHtml}</ul>
-        ${remaining > 0 ? `<div style="margin-top: 4px; font-size: 12px; color: #868e96;">+${remaining} more — see the app for the full list.</div>` : ""}
+        ${remaining > 0 ? `<div style="margin-top: 4px; font-size: 12px; color: #868e96;">${m.moreChanges(remaining)}</div>` : ""}
     `;
-    changesText = "What changed:\n" + shown.map((c) => `  - ${c.path}: ${c.before} -> ${c.after}\n`).join("")
-      + (remaining > 0 ? `  ...and ${remaining} more — see the app for the full list.\n` : "");
+    changesText = m.whatChanged + "\n" + shown.map((c) => `  - ${c.path}: ${c.before} -> ${c.after}\n`).join("")
+      + (remaining > 0 ? `  ${m.moreChanges(remaining)}\n` : "");
   }
 
   const html = `
       <div style="margin: 16px 0; padding: 12px 16px; background: #f8f9fa; border-left: 3px solid #6366f1; border-radius: 4px;">
-        <div style="font-size: 12px; color: #868e96; font-weight: 600;">ABOUT</div>
+        <div style="font-size: 12px; color: #868e96; font-weight: 600;">${m.about}</div>
         <div style="margin-top: 4px; font-size: 15px; font-weight: 500;">${escapeHtml(subject.label)}</div>
         ${changesHtml}
       </div>
   `;
-  const text = `About: ${subject.label}\n${changesText}`;
+  const text = `${m.about}: ${subject.label}\n${changesText}`;
 
   return { html, text };
 }
 
 export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolean> {
   const e = env();
+  const m = messagesFor(input.language);
   // Not a per-query address: inbound email is not ingested, so a reply reaches
   // a person rather than the system. REPLY_TO_ADDRESS is a real mailbox with an
   // auto-responder pointing the sender back to the app. Unset means no Reply-To
@@ -100,28 +97,28 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
   const appUrl = input.grantToken
     ? `${e.APP_URL}/q/${input.grantToken}`
     : `${e.APP_URL}/app/c/${input.conversationId}?email=${encodeURIComponent(input.targetEmail)}`;
-  const typeLabel = QUERY_TYPE_LABELS[input.queryType] || input.queryType;
+  const typeLabel = m.queryType[input.queryType as keyof typeof m.queryType] || input.queryType;
 
   let contextHtml = "";
   let contextText = "";
   if (input.context) {
     const truncated = input.context.length > CONTEXT_MAX_LENGTH
-      ? input.context.slice(0, CONTEXT_MAX_LENGTH) + "... (see full context in app)"
+      ? input.context.slice(0, CONTEXT_MAX_LENGTH) + m.contextTruncated
       : input.context;
     contextHtml = `
       <div style="margin: 16px 0; padding: 12px 16px; background: #f8f9fa; border-left: 3px solid #dee2e6; border-radius: 4px;">
-        <div style="font-size: 12px; color: #868e96; margin-bottom: 8px; font-weight: 600;">CONTEXT</div>
+        <div style="font-size: 12px; color: #868e96; margin-bottom: 8px; font-weight: 600;">${m.context}</div>
         <div style="color: #495057; font-size: 14px; white-space: pre-wrap;">${escapeHtml(truncated)}</div>
       </div>
     `;
-    contextText = `\nContext:\n${truncated}\n`;
+    contextText = `\n${m.context}:\n${truncated}\n`;
   }
 
   const subjectPreview = input.question.length > 60
     ? input.question.slice(0, 57) + "..."
     : input.question;
 
-  const about = subjectSummary(input.subject, input.changes);
+  const about = subjectSummary(input.subject, m, input.changes);
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
@@ -132,7 +129,7 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
           </div>
           <div>
             <div style="font-weight: 600; font-size: 16px;">${escapeHtml(input.agentDisplayName)}</div>
-            <div style="color: #6b7280; font-size: 13px;">has a question for you</div>
+            <div style="color: #6b7280; font-size: 13px;">${m.hasAQuestionForYou}</div>
           </div>
         </div>
 
@@ -150,37 +147,37 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
 
         <div style="text-align: center; margin: 24px 0 12px;">
           <a href="${appUrl}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: 600;">
-            Answer this question
+            ${m.answerThisQuestion}
           </a>
         </div>
 
         <div style="text-align: center; margin-bottom: 20px;">
-          <div style="font-size: 13px; color: #6b7280;">We'll email you a sign-in code — there is no password to remember.</div>
-          <div style="font-size: 12px; color: #9ca3af; margin-top: 6px;">Replying to this email will not reach ${escapeHtml(input.agentDisplayName)}.</div>
+          <div style="font-size: 13px; color: #6b7280;">${m.noPasswordNote}</div>
+          <div style="font-size: 12px; color: #9ca3af; margin-top: 6px;">${m.replyWillNotReach(escapeHtml(input.agentDisplayName))}</div>
         </div>
 
         <div style="border-top: 1px solid #f0f0f0; padding-top: 16px; color: #9ca3af; font-size: 12px; text-align: center;">
-          Expires: ${escapeHtml(formatExpiry(input.expiresAt))}
+          ${m.expires(escapeHtml(formatExpiry(input.expiresAt, input.language)))}
         </div>
       </div>
     </div>
   `;
 
-  const text = `${input.agentDisplayName} has a question for you
+  const text = `${input.agentDisplayName} ${m.hasAQuestionForYou}
 
-Type: ${typeLabel}
+${m.typeLabel}: ${typeLabel}
 
 ${about.text}
-Question:
+${m.questionLabel}:
 ${input.question}
 ${contextText}
 ---
-Answer this question: ${appUrl}
+${m.answerThisQuestion}: ${appUrl}
 
-We'll email you a sign-in code — there is no password to remember.
-Replying to this email will not reach ${input.agentDisplayName}.
+${m.noPasswordNote}
+${m.replyWillNotReach(input.agentDisplayName)}
 
-Expires: ${formatExpiry(input.expiresAt)}
+${m.expires(formatExpiry(input.expiresAt, input.language))}
 `;
 
   return sendEmail({

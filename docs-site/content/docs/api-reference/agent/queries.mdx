@@ -36,6 +36,7 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
     "context": "12 commits since the last release. All checks green.",
     "target_human_email": "oncall@example.com",
     "confidence": 0.8,
+    "language": "es",
     "timeout_minutes": 120
   }'
 ```
@@ -52,6 +53,7 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/queries \
 | `changes` | array | No | Before/after deltas this decision covers — required above `low` risk if this human already decided about this `subject` |
 | `context` | string | No | Extra context — code, data, anything that helps them answer (max 100,000 chars) |
 | `confidence` | number | No | The agent's own confidence in its assessment (0–1) |
+| `language` | string | No | `en`, `es`, or `ca`. Absent means `en`. See [Language](/docs/concepts/queries#language) — it does **not** translate `question`, `subject`, `context`, or `changes` |
 | `timeout_minutes` | number | No | Minutes before the query expires (default 60, max 10080) |
 | `metadata` | object | No | Arbitrary metadata stored with the query |
 
@@ -222,6 +224,7 @@ curl -X PATCH https://api.agentdialog.io/api/v1/agent/queries/{id} \
 | `changes` | array | No | Before/after delta |
 | `question` | string | No | Reworded question |
 | `context` | string | No | Additional context |
+| `language` | string | No | `en`, `es`, or `ca` — replaces the language declared at creation. See [Language](/docs/concepts/queries#language) |
 
 At least one field is required — a bare `PATCH` with nothing to change is
 refused. Fields you omit keep their previous value. The request is checked

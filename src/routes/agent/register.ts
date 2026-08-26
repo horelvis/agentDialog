@@ -4,10 +4,11 @@ import { registerAgent } from "../../services/agent.service";
 import { agentRegisterSchema } from "../../validators/agent.validators";
 import { validateBody } from "../../middleware/validate";
 import { registerRateLimit } from "../../middleware/rate-limit";
+import { getLimitsConfig } from "../../config/limits";
 
 const app = new Hono<AppEnv>();
 
-app.post("/", registerRateLimit(10), validateBody(agentRegisterSchema), async (c) => {
+app.post("/", registerRateLimit(getLimitsConfig().registerRph), validateBody(agentRegisterSchema), async (c) => {
   const input = c.get("validatedBody");
   const { agent, apiKey } = await registerAgent(input);
 

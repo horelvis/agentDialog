@@ -2,6 +2,17 @@ export type QueryType = "validation" | "interpretation" | "expert_query" | "labe
 export type QueryStatus = "pending" | "assigned" | "answered" | "needs_context" | "cancelled" | "expired";
 export type Risk = "low" | "medium" | "high" | "critical";
 
+/**
+ * The closed catalogue of languages a query's email wrapper can be declared
+ * in. Basque is deliberately not here — a language enters the catalogue only
+ * once someone who speaks it has validated the translation.
+ *
+ * This only steers the wrapper (subject line, labels, dates) the product puts
+ * around the agent's own words. It never translates them — see
+ * `CreateQueryInput.language` below.
+ */
+export type Language = "en" | "es" | "ca";
+
 /** What the question is about. A referent the human can actually look at. */
 export interface Subject {
   id: string;
@@ -62,6 +73,13 @@ export interface CreateQueryInput {
   changes?: Change[];
   context?: string;
   confidence?: number;
+  /**
+   * The language the notification email's wrapper is written in — subject
+   * line, labels, dates. Absent means `en`. It does NOT translate `question`,
+   * `subject`, `context`, or `changes`: those travel exactly as written, so
+   * write them in the language you declare here.
+   */
+  language?: Language;
   timeoutMinutes?: number;
   metadata?: Record<string, unknown>;
 }
@@ -73,6 +91,12 @@ export interface ClarifyQueryInput {
   changes?: Change[];
   question?: string;
   context?: string;
+  /**
+   * The language the notification email's wrapper is written in — subject
+   * line, labels, dates. Absent means `en`. It does NOT translate `question`,
+   * `subject`, `context`, or `changes`: those travel exactly as written.
+   */
+  language?: Language;
 }
 
 export interface CreatedQuery {
@@ -258,6 +282,9 @@ export function toCreateQueryBody(input: CreateQueryInput): Record<string, unkno
   if (input.changes !== undefined) body.changes = input.changes;
   if (input.context !== undefined) body.context = input.context;
   if (input.confidence !== undefined) body.confidence = input.confidence;
+  // Identical spelling in camelCase and snake_case, so no case conversion —
+  // just pass it through.
+  if (input.language !== undefined) body.language = input.language;
   if (input.timeoutMinutes !== undefined) body.timeout_minutes = input.timeoutMinutes;
   if (input.metadata !== undefined) body.metadata = input.metadata;
   return body;
@@ -270,6 +297,7 @@ export function toClarifyQueryBody(input: ClarifyQueryInput): Record<string, unk
   if (input.changes !== undefined) body.changes = input.changes;
   if (input.question !== undefined) body.question = input.question;
   if (input.context !== undefined) body.context = input.context;
+  if (input.language !== undefined) body.language = input.language;
   return body;
 }
 

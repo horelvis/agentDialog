@@ -13,7 +13,7 @@ import { ForbiddenError, UnauthorizedError } from "../lib/errors";
 import { env } from "../env";
 import { getOrCreateHuman } from "./human.service";
 
-export async function createVerificationCode(email: string) {
+export async function createVerificationCode(email: string, language: string = "en") {
   const db = getDb();
 
   // Check that the email has at least one pending invitation or is already a participant
@@ -71,7 +71,7 @@ export async function createVerificationCode(email: string) {
     })
     .where(eq(humans.id, human.id));
 
-  return { code, human };
+  return { code, human, language };
 }
 
 export async function verifyCode(email: string, code: string) {
