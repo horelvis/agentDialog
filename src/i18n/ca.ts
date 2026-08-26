@@ -7,6 +7,8 @@ export const ca: Messages = {
   moreChanges: (count) => `+${count} més — la llista completa és a l'aplicació.`,
   context: "CONTEXT",
   contextTruncated: "... (el context complet és a l'aplicació)",
+  typeLabel: "Tipus",
+  questionLabel: "Pregunta",
   answerThisQuestion: "Respondre aquesta pregunta",
   replyWillNotReach: (agentName) => `Respondre aquest correu no arriba a ${agentName}.`,
   expires: (formattedDate) => `Caduca: ${formattedDate}`,

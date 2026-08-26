@@ -46,9 +46,8 @@ describe("Sign-in code language", () => {
       body: JSON.stringify({ email: invitedEmail }),
     });
 
-    if (captured.length > 0) {
-      expect(captured[0]!.subject).toBe("AgentDialog - El teu codi d'accés");
-    }
+    expect(captured.length).toBe(1);
+    expect(captured[0]!.subject).toBe("AgentDialog - El teu codi d'accés");
   });
 
   it("falls back to English with no header", async () => {
@@ -60,9 +59,8 @@ describe("Sign-in code language", () => {
       body: JSON.stringify({ email: invitedEmail }),
     });
 
-    if (captured.length > 0) {
-      expect(captured[0]!.subject).toBe("AgentDialog - Your verification code");
-    }
+    expect(captured.length).toBe(1);
+    expect(captured[0]!.subject).toBe("AgentDialog - Your verification code");
   });
 });
 
@@ -98,14 +96,13 @@ describe("Email HTML escaping", () => {
     });
     expect(inviteRes.status).toBe(201);
 
-    if (captured.length > 0) {
-      const html = captured[0]!.html;
-      // Should contain escaped versions of both agent name and title
-      expect(html).toContain("&lt;script&gt;");
-      expect(html).toContain("&lt;img");
-      // Should NOT contain raw HTML tags
-      expect(html).not.toContain("<script>");
-      expect(html).not.toContain("<img src=x");
-    }
+    expect(captured.length).toBe(1);
+    const html = captured[0]!.html;
+    // Should contain escaped versions of both agent name and title
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&lt;img");
+    // Should NOT contain raw HTML tags
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img src=x");
   });
 });

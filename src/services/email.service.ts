@@ -55,6 +55,9 @@ export async function sendInvitationEmail(
         </p>
       </div>
     `,
-    text: `${agentName} invited you to a conversation on ${e.APP_NAME}. Accept: ${acceptUrl}`,
+    text: `${m.invitationIntro(agentName, conversationTitle)}
+${m.invitationAccept}: ${acceptUrl}
+
+${m.invitationIgnore}`,
   });
 }

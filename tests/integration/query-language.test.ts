@@ -1,5 +1,8 @@
 import { describe, expect, it, beforeAll } from "bun:test";
+import { eq } from "drizzle-orm";
 import { createTestApp } from "../helpers";
+import { getDb } from "../../src/db";
+import { humanQueries } from "../../src/db/schema/human-queries";
 
 describe("Declared language", () => {
   const app = createTestApp();
@@ -60,5 +63,32 @@ describe("Declared language", () => {
     const res = await createQuery("eu");
     expect(res.status).toBe(422);
     expect((await res.json()).error.message).toContain("language");
+  });
+
+  it("changes the stored language when a clarification declares a new one", async () => {
+    // Reuse the agent registered above rather than another createTestAgent
+    // call: registration is rate-limited and shared across the whole suite.
+    const created = await createQuery("es");
+    expect(created.status).toBe(201);
+    const { data } = await created.json();
+
+    // Clarification only applies from needs_context; force the row there
+    // directly rather than going through respondQuery's insufficient-context
+    // path, which would need its own human/participant setup.
+    const db = getDb();
+    await db.update(humanQueries)
+      .set({ status: "needs_context", pausedAt: new Date(Date.now() - 60_000), insufficientReason: "missing_delta" })
+      .where(eq(humanQueries.id, data.query_id));
+
+    const clarified = await app.request(`/api/v1/agent/queries/${data.query_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ language: "ca" }),
+    });
+    expect(clarified.status).toBe(200);
+    expect((await clarified.json()).data.language).toBe("ca");
+
+    const [row] = await db.select().from(humanQueries).where(eq(humanQueries.id, data.query_id));
+    expect(row.language).toBe("ca");
   });
 });

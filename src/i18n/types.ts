@@ -13,6 +13,8 @@ export interface Messages {
   moreChanges: (count: number) => string;
   context: string;
   contextTruncated: string;
+  typeLabel: string;
+  questionLabel: string;
   answerThisQuestion: string;
   replyWillNotReach: (agentName: string) => string;
   expires: (formattedDate: string) => string;

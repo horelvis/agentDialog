@@ -7,6 +7,8 @@ export const en: Messages = {
   moreChanges: (count) => `+${count} more — see the app for the full list.`,
   context: "CONTEXT",
   contextTruncated: "... (see full context in app)",
+  typeLabel: "Type",
+  questionLabel: "Question",
   answerThisQuestion: "Answer this question",
   replyWillNotReach: (agentName) => `Replying to this email will not reach ${agentName}.`,
   expires: (formattedDate) => `Expires: ${formattedDate}`,

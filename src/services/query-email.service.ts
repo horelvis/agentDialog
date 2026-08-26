@@ -111,7 +111,7 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
         <div style="color: #495057; font-size: 14px; white-space: pre-wrap;">${escapeHtml(truncated)}</div>
       </div>
     `;
-    contextText = `\nContext:\n${truncated}\n`;
+    contextText = `\n${m.context}:\n${truncated}\n`;
   }
 
   const subjectPreview = input.question.length > 60
@@ -165,14 +165,14 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
 
   const text = `${input.agentDisplayName} ${m.hasAQuestionForYou}
 
-Type: ${typeLabel}
+${m.typeLabel}: ${typeLabel}
 
 ${about.text}
-Question:
+${m.questionLabel}:
 ${input.question}
 ${contextText}
 ---
-Answer this question: ${appUrl}
+${m.answerThisQuestion}: ${appUrl}
 
 ${m.noPasswordNote}
 ${m.replyWillNotReach(input.agentDisplayName)}

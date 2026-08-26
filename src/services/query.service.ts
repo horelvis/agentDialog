@@ -701,6 +701,7 @@ export async function updateQuery(queryId: string, agentId: string, input: Patch
       changes: input.changes ?? query.changes,
       question: input.question ?? query.question,
       context: input.context ?? query.context,
+      language: input.language ?? query.language,
       expiresAt: new Date(query.expiresAt.getTime() + pausedMs),
       pausedAt: null,
       insufficientReason: null,

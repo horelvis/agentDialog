@@ -56,13 +56,23 @@ describe("Query email language", () => {
 
   it("wraps the plain-text part in the query's language", async () => {
     captured.length = 0;
-    await sendQueryEmail({ ...base, language: "ca" });
+    await sendQueryEmail({ ...base, language: "ca", context: "Contingut de context" });
 
     const mail = captured[0]!;
     // Check Catalan wrapper in the plain-text alternative
     expect(mail.text).toContain("té una pregunta per a tu");
     expect(mail.text).toContain("Respondre aquest correu no arriba a");
     expect(mail.text).toContain("T'enviarem un codi d'accés per correu");
+    // These four labels used to stay in English in the text branch even
+    // though the HTML branch already used the translated ones.
+    expect(mail.text).toContain("Tipus: Validació");
+    expect(mail.text).toContain("CONTEXT:");
+    expect(mail.text).toContain("Pregunta:");
+    expect(mail.text).toContain("Respondre aquesta pregunta:");
+    expect(mail.text).not.toContain("Type:");
+    expect(mail.text).not.toContain("Question:");
+    expect(mail.text).not.toContain("Answer this question:");
+    expect(mail.text).not.toContain("Context:");
   });
 
   it("escapes agent display names containing HTML in the email body", async () => {
