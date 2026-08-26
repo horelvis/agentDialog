@@ -53,6 +53,15 @@ import type {
 const DEFAULT_BASE_URL = "https://api.agentdialog.io";
 const MAX_RETRIES = 3;
 
+/** Lets a caller govern the key, for instance deriving it from its own job id. */
+export interface WriteOptions {
+  idempotencyKey?: string;
+}
+
+function newIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
 export class AgentDialog {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -98,8 +107,15 @@ export class AgentDialog {
 
   // ── API Key ──
 
-  async rotateApiKey(): Promise<RotateKeyResponse> {
-    return this.request<RotateKeyResponse>("POST", "/agent/key/rotate");
+  async rotateApiKey(options: WriteOptions = {}): Promise<RotateKeyResponse> {
+    return this.request<RotateKeyResponse>(
+      "POST",
+      "/agent/key/rotate",
+      undefined,
+      0,
+      undefined,
+      options.idempotencyKey ?? newIdempotencyKey(),
+    );
   }
 
   // ── Conversations ──
@@ -120,8 +136,15 @@ export class AgentDialog {
     } while (cursor);
   }
 
-  async createConversation(input: CreateConversationInput): Promise<Conversation> {
-    return this.request<Conversation>("POST", "/agent/conversations", input);
+  async createConversation(input: CreateConversationInput, options: WriteOptions = {}): Promise<Conversation> {
+    return this.request<Conversation>(
+      "POST",
+      "/agent/conversations",
+      input,
+      0,
+      undefined,
+      options.idempotencyKey ?? newIdempotencyKey(),
+    );
   }
 
   async getConversation(id: string): Promise<Conversation> {
@@ -134,8 +157,15 @@ export class AgentDialog {
 
   // ── Messages ──
 
-  async sendMessage(conversationId: string, input: SendMessageInput): Promise<Message> {
-    return this.request<Message>("POST", `/agent/conversations/${conversationId}/messages`, input);
+  async sendMessage(conversationId: string, input: SendMessageInput, options: WriteOptions = {}): Promise<Message> {
+    return this.request<Message>(
+      "POST",
+      `/agent/conversations/${conversationId}/messages`,
+      input,
+      0,
+      undefined,
+      options.idempotencyKey ?? newIdempotencyKey(),
+    );
   }
 
   async listMessages(
@@ -163,11 +193,14 @@ export class AgentDialog {
 
   // ── Invitations ──
 
-  async inviteHuman(conversationId: string, input: InviteHumanInput): Promise<Invitation> {
+  async inviteHuman(conversationId: string, input: InviteHumanInput, options: WriteOptions = {}): Promise<Invitation> {
     return this.request<Invitation>(
       "POST",
       `/agent/conversations/${conversationId}/invitations`,
       input,
+      0,
+      undefined,
+      options.idempotencyKey ?? newIdempotencyKey(),
     );
   }
 
@@ -187,12 +220,26 @@ export class AgentDialog {
 
   // ── Webhooks ──
 
-  async createWebhook(input: CreateWebhookInput): Promise<WebhookWithSecret> {
-    return this.request<WebhookWithSecret>("POST", "/agent/webhooks", input);
+  async createWebhook(input: CreateWebhookInput, options: WriteOptions = {}): Promise<WebhookWithSecret> {
+    return this.request<WebhookWithSecret>(
+      "POST",
+      "/agent/webhooks",
+      input,
+      0,
+      undefined,
+      options.idempotencyKey ?? newIdempotencyKey(),
+    );
   }
 
-  async rotateWebhookSecret(id: string): Promise<WebhookWithSecret> {
-    return this.request<WebhookWithSecret>("POST", `/agent/webhooks/${id}/rotate-secret`);
+  async rotateWebhookSecret(id: string, options: WriteOptions = {}): Promise<WebhookWithSecret> {
+    return this.request<WebhookWithSecret>(
+      "POST",
+      `/agent/webhooks/${id}/rotate-secret`,
+      undefined,
+      0,
+      undefined,
+      options.idempotencyKey ?? newIdempotencyKey(),
+    );
   }
 
   async listWebhooks(): Promise<Webhook[]> {
@@ -210,11 +257,14 @@ export class AgentDialog {
   // ── Human queries ──
 
   /** Ask a human a question. Returns immediately; the human answers by email. */
-  async createQuery(input: CreateQueryInput): Promise<CreatedQuery> {
+  async createQuery(input: CreateQueryInput, options: WriteOptions = {}): Promise<CreatedQuery> {
     const wire = await this.request<CreatedQueryWire>(
       "POST",
       "/agent/queries",
       toCreateQueryBody(input),
+      0,
+      undefined,
+      options.idempotencyKey ?? newIdempotencyKey(),
     );
     return fromCreatedQueryWire(wire);
   }
@@ -343,6 +393,7 @@ export class AgentDialog {
     body?: unknown,
     retries = 0,
     signal?: AbortSignal,
+    idempotencyKey?: string,
   ): Promise<T> {
     const url = `${this.baseUrl}/api/v1${path}`;
     const headers: Record<string, string> = {
@@ -350,6 +401,11 @@ export class AgentDialog {
     };
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
+    }
+    // The same key travels into the retry below. A retry with a fresh key would be
+    // the duplicate this exists to prevent.
+    if (idempotencyKey !== undefined) {
+      headers["Idempotency-Key"] = idempotencyKey;
     }
 
     const res = await fetch(url, {
@@ -362,7 +418,7 @@ export class AgentDialog {
     if (res.status === 429 && retries < MAX_RETRIES) {
       const retryAfter = parseRetryAfter(res);
       await sleep(retryAfter * 1000, signal);
-      return this.request<T>(method, path, body, retries + 1, signal);
+      return this.request<T>(method, path, body, retries + 1, signal, idempotencyKey);
     }
 
     const json = await res.json() as { data: T };
