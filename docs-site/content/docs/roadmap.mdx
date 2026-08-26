@@ -54,6 +54,14 @@ LangGraph has a better primitive for this. `interrupt()` suspends a graph and a 
 
 Publishing it is therefore not a packaging task. Parity first, then PyPI.
 
+### A document the human can actually open
+
+A query carries text and only text: the subject body, the context, the question. An agent that wants a person to look at a PDF has two ways to do it today and neither is good — paste the extracted text into `context`, which is capped at 100,000 characters and arrives as a wall of prose, or host the file somewhere itself and point at it with `subject.uri`.
+
+Attachments do exist in the product, but they hang off messages rather than queries, and a file download is scoped to the conversation that holds it — which is exactly what the holder of a one-click answer link is not part of. So this is not a matter of wiring up an endpoint that already exists: it needs a file that belongs to a query, and a download a grant can authorise without widening what a grant means.
+
+One thing it will not do is put the document in the email. Mail is forwarded, archived and synced through places nobody here controls; the capability link is the boundary, and the file belongs behind it.
+
 ### An abandoned `needs_context` query expires
 
 When a human replies that they lack the context to decide, the query returns to the agent as `needs_context` and its clock pauses. If the agent never clarifies, that pause has no ceiling and the query stays open with its deadline sliding into the past.
