@@ -325,6 +325,13 @@ start rather than serve with it on.
 credential, so it is left alone; a Secret Manager entry of that name exists and
 is unreferenced, along with `SMTP_FROM`, `SMTP_HOST` and `SMTP_PORT`.
 
+Since **2026-08-26** that username is the project's own account. Until then the
+service authenticated as a personal mailbox, which meant every notification this
+product has ever sent carried a personal address as its sender, and every reply
+landed in a personal inbox. Version 2 of `smtp-password` is the app password of
+the project account; version 1 belonged to the old one and can be disabled once
+nothing has rolled back to it.
+
 ### Why none of these is a plain variable any more
 
 `SESSION_SECRET` and `MINIO_SECRET_KEY` were plain values until 2026-08-25, and
@@ -472,6 +479,11 @@ If `REPLY_TO_ADDRESS` is unset the email carries no `Reply-To` at all, and a
 reply goes to `SMTP_FROM` instead. Point one or the other at a mailbox that has
 the auto-responder; do not leave both pointing somewhere nobody watches.
 
+It was unset on the service until **2026-08-26**, so for the whole life of the
+product replies went to `SMTP_FROM`. It now names the project account, the same
+mailbox that sends — which is the arrangement this paragraph asks for, but only
+once that mailbox actually carries the auto-responder.
+
 ### Three ways to deploy, and only one that is current
 
 | Path | Used | min-instances |
@@ -512,8 +524,8 @@ were never renamed.
 
 ### Email
 
-Outbound email goes through **Gmail SMTP** (`smtp.gmail.com:465`), not through
-Resend or any transactional provider. Resend appears in the codebase only as the
+Outbound email goes through **Gmail SMTP** (`smtp.gmail.com:465`) on the
+project's own Google account, not through Resend or any transactional provider. Resend appears in the codebase only as the
 default value of `INBOUND_EMAIL_PROVIDER` and in the changelog; no Resend account
 is configured.
 
@@ -521,7 +533,11 @@ Two consequences worth knowing:
 
 - A consumer Gmail account caps at roughly 500 messages a day, and messages sent
   from a `@gmail.com` address on behalf of `agentdialog.io` have no aligned SPF
-  or DKIM, which costs deliverability.
+  or DKIM, which costs deliverability. That is also why `SMTP_FROM` cannot simply
+  be set to `noreply@agentdialog.io`: Gmail sends as whoever authenticated, so
+  the address here has to be the account's own. Sending as the domain means a
+  transactional provider and DNS records, which is the same move that would
+  reopen inbound email.
 - **Inbound email is not read at all, by design.** Query emails no longer carry a
   per-query `Reply-To`, and the product no longer tells anyone to answer by
   replying. Neither `agentdialog.io` nor `reply.agentdialog.io` has an MX record

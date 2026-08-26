@@ -27,7 +27,11 @@ export const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(1025),
   SMTP_USER: z.string().default(""),
   SMTP_PASS: z.string().default(""),
-  SMTP_FROM: z.string().default("noreply@agentdialog.io"),
+  // Local only: development sends to MailHog, where the sender is decoration.
+  // Production sets this explicitly, and cannot be noreply@agentdialog.io while
+  // outbound goes through Gmail SMTP — Gmail sends as the account that
+  // authenticated, whatever this says. See docs/operations.md, "Email".
+  SMTP_FROM: z.string().default("agentdialog@localhost"),
   SMTP_SECURE: z.string().default("false").transform((v) => v === "true"),
 
   APP_URL: z.string().url().default("http://localhost:3000"),
