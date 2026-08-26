@@ -2,8 +2,9 @@
 
 **Fecha:** 2026-08-26
 **Estado:** aprobado, pendiente de plan de implementación
-**Origen:** petición del usuario el 2026-08-25 (español, catalán y euskera).
-Decisiones de fuente tomadas ese día; este documento cierra las que quedaban.
+**Origen:** petición del usuario el 2026-08-25. El catálogo se redujo a español y
+catalán el 2026-08-26: el euskera queda fuera. Las decisiones de fuente son de
+aquel día; este documento cierra las que quedaban.
 
 Este spec cubre **la primera y la segunda pieza** de las cuatro en que se
 descompuso el trabajo: el idioma como dato, y los correos traducidos. Las
@@ -36,8 +37,8 @@ Y el defecto es `en` cuando nadie declara nada.
 
 ## El catálogo es cerrado
 
-`language` es un enum de cuatro valores —`en`, `es`, `ca`, `eu`— y no una cadena
-BCP-47 libre.
+`language` es un enum de tres valores —`en`, `es`, `ca`— y no una cadena BCP-47
+libre.
 
 Es el mismo argumento que sostiene `answer_space`: **el catálogo lo declara el
 producto, no el agente**. Una cadena libre nos dejaría con `pt-BR`, `gl` y `zh`
@@ -46,8 +47,10 @@ idioma que no soportamos de una errata. Con un enum, declarar algo que no
 existe es un `422` inmediato con el catálogo dentro del mensaje, que es
 accionable.
 
-Ampliar el catálogo será añadir un valor y cuatro ficheros de mensajes. Ese es el
-coste, y es el correcto: soportar un idioma significa tenerlo escrito.
+Ampliar el catálogo será añadir un valor y un fichero de mensajes. Ese es el
+coste, y es el correcto: **soportar un idioma significa tenerlo escrito y
+revisado por alguien que lo hable**. Por eso el euskera, que estaba en la
+petición original, queda fuera: no se sostiene añadirlo sin quien lo valide.
 
 ## Lo que el idioma gobierna, y lo que no
 
@@ -60,16 +63,16 @@ no llega a nadie, y el formato de la fecha de caducidad.
 sujeto, las opciones, sus consecuencias, el contexto y los cambios. Eso sigue
 llegando tal cual lo mandó.
 
-Declarar `eu` es, por tanto, dos cosas: una instrucción sobre cómo pintamos el
+Declarar `ca` es, por tanto, dos cosas: una instrucción sobre cómo pintamos el
 envoltorio, y **una pista al agente sobre en qué idioma escribir su contenido**.
 Esto tiene que estar documentado con estas palabras en `docs/api/README.md` y en
 la descripción de la herramienta MCP, o el integrador supondrá que traducimos por
-él y lo descubrirá cuando una persona reciba un correo en euskera con una
+él y lo descubrirá cuando una persona reciba un correo en catalán con una
 pregunta en inglés dentro.
 
 ## El dato
 
-**En el cable**: `language`, opcional, enum de cuatro valores, ausente significa
+**En el cable**: `language`, opcional, enum de tres valores, ausente significa
 `en`. Aparece en tres cuerpos, que son los tres que un agente escribe sin nadie
 delante:
 
@@ -118,12 +121,12 @@ pasa cuando dos agentes usaron idiomas distintos con la misma persona: no hay qu
 resolverlo, se le pregunta al navegador.
 
 La cabecera se negocia contra el catálogo: se recorre por orden de preferencia y
-se toma el primer valor soportado, ignorando la región —`eu-ES` cuenta como
-`eu`—, y `en` si ninguno encaja.
+se toma el primer valor soportado, ignorando la región —`ca-ES` cuenta como
+`ca`, y `es-MX` como `es`—, y `en` si ninguno encaja.
 
 Esto cierra un agujero que de otro modo sería visible: en riesgo `high` o
-`critical` no se acuña enlace de un clic, así que un euskaldun recibiría la
-notificación en euskera y el código para entrar en inglés.
+`critical` no se acuña enlace de un clic, así que un catalanoparlante recibiría
+la notificación en catalán y el código para entrar en inglés.
 
 La invitación explícita —la de `POST /agent/conversations/:id/invitations`— la
 dispara un agente sin nadie delante, así que sigue la otra mitad de la regla:
@@ -136,11 +139,11 @@ Catálogos tipados en `src/i18n/`, **sin librería**.
 
 - `src/i18n/types.ts` — el tipo `Language` y una interfaz `Messages` con todas
   las claves.
-- `src/i18n/en.ts`, `es.ts`, `ca.ts`, `eu.ts` — cada uno exporta un `Messages`.
+- `src/i18n/en.ts`, `es.ts`, `ca.ts` — cada uno exporta un `Messages`.
 - `src/i18n/index.ts` — `messagesFor(language: Language): Messages`.
 
 La completitud la garantiza el tipo: un idioma al que le falte una clave **no
-compila**. Eso es lo que hace mantenible tener cuatro idiomas sin un runtime que
+compila**. Eso es lo que hace mantenible tener varios idiomas sin un runtime que
 resuelva claves y falle en producción con la clave cruda pintada en pantalla.
 
 Nada de interpolación con plantillas de terceros: donde haga falta un valor, la
@@ -154,11 +157,15 @@ delata que la traducción es cosmética.
 
 ## Sobre la calidad de las traducciones
 
-Yo puedo redactar los cuatro catálogos, y el castellano y el catalán quedarán
-razonables. **El euskera necesita revisión de alguien que lo hable**: no es un
-idioma donde una traducción aproximada pase desapercibida, y este producto le
-pide a una persona que tome una decisión con consecuencias. El plan debe incluir
-esa revisión como un paso, no como una esperanza.
+Redactar el castellano y el catalán es asumible aquí, y el catalán conviene que
+lo lea alguien que lo hable antes de publicarlo — no por corrección gramatical,
+sino porque este producto le pide a una persona que decida algo con
+consecuencias, y un envoltorio que suena a traducción automática resta autoridad
+a la pregunta que envuelve.
+
+**El euskera se descarta por esa misma regla**, no por dificultad técnica: sin
+alguien que lo valide, añadirlo sería publicar cuatro pantallas que nadie ha
+leído.
 
 ## Lo que este spec no cubre
 
@@ -197,6 +204,7 @@ documentación de producto para un agente y cuenta como uno de esos sitios.
 | Decisión | Por qué |
 |---|---|
 | Enum cerrado, no BCP-47 | El catálogo es del producto, igual que en `answer_space`; una cadena libre acepta idiomas que no existen aquí |
+| Tres idiomas y no cuatro | Soportar un idioma es tenerlo escrito **y revisado**; el euskera sale del catálogo hasta que haya quien lo lea |
 | Columna propia, no dentro de un JSON | La tercera pieza y cualquier informe futuro la van a filtrar |
 | `varchar(8)` para códigos de dos letras | Ampliar el catálogo a `pt-BR` no debería costar una migración; la integridad la da el enum |
 | Catálogos tipados sin librería | Cuatro idiomas y un servidor; la completitud la da el compilador en vez de un fallo en producción |
