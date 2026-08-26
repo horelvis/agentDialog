@@ -145,6 +145,8 @@ again.`,
         .describe("Reworded question, if the human said the original was unclear"),
       context: patchQueryFields.context
         .describe("Additional context to resolve what the human flagged as missing"),
+      language: patchQueryFields.language
+        .describe("Language code (en, es, ca) for the notification email wrapper"),
     },
     async (args, extra) => {
       const agentId = callerAgentId(extra);

@@ -65,3 +65,47 @@ describe("Sign-in code language", () => {
     }
   });
 });
+
+describe("Email HTML escaping", () => {
+  const app = createTestApp();
+
+  it("escapes HTML in invitation agent name and conversation title", async () => {
+    const { authHeader } = await createTestAgent({
+      displayName: "Agent <script>alert('xss')</script>",
+    });
+    const evilEmail = `evil-${Date.now()}@example.com`;
+
+    // Create a conversation with HTML in the title
+    const conversationRes = await app.request("/api/v1/agent/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify({
+        title: "Conversation <img src=x onerror=alert('xss')>",
+        description: "Testing",
+      }),
+    });
+    expect(conversationRes.status).toBe(201);
+    const { data: { id } } = await conversationRes.json();
+
+    captured.length = 0;
+    const inviteRes = await app.request(`/api/v1/agent/conversations/${id}/invitations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify({
+        email: evilEmail,
+        language: "en",
+      }),
+    });
+    expect(inviteRes.status).toBe(201);
+
+    if (captured.length > 0) {
+      const html = captured[0]!.html;
+      // Should contain escaped versions of both agent name and title
+      expect(html).toContain("&lt;script&gt;");
+      expect(html).toContain("&lt;img");
+      // Should NOT contain raw HTML tags
+      expect(html).not.toContain("<script>");
+      expect(html).not.toContain("<img src=x");
+    }
+  });
+});

@@ -91,6 +91,12 @@ export interface ClarifyQueryInput {
   changes?: Change[];
   question?: string;
   context?: string;
+  /**
+   * The language the notification email's wrapper is written in — subject
+   * line, labels, dates. Absent means `en`. It does NOT translate `question`,
+   * `subject`, `context`, or `changes`: those travel exactly as written.
+   */
+  language?: Language;
 }
 
 export interface CreatedQuery {
@@ -291,6 +297,7 @@ export function toClarifyQueryBody(input: ClarifyQueryInput): Record<string, unk
   if (input.changes !== undefined) body.changes = input.changes;
   if (input.question !== undefined) body.question = input.question;
   if (input.context !== undefined) body.context = input.context;
+  if (input.language !== undefined) body.language = input.language;
   return body;
 }
 
