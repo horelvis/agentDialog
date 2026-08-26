@@ -53,4 +53,26 @@ describe("Query email language", () => {
     // es-ES writes the month in Spanish; en-US would say "Sep".
     expect(captured[0]!.text).toContain("sept");
   });
+
+  it("wraps the plain-text part in the query's language", async () => {
+    captured.length = 0;
+    await sendQueryEmail({ ...base, language: "ca" });
+
+    const mail = captured[0]!;
+    // Check Catalan wrapper in the plain-text alternative
+    expect(mail.text).toContain("té una pregunta per a tu");
+    expect(mail.text).toContain("Respondre aquest correu no arriba a");
+    expect(mail.text).toContain("T'enviarem un codi d'accés per correu");
+  });
+
+  it("escapes agent display names containing HTML in the email body", async () => {
+    captured.length = 0;
+    const evilAgent = { ...base, agentDisplayName: 'Agent <script>alert("xss")</script>' };
+    await sendQueryEmail({ ...evilAgent, language: "en" });
+
+    const mail = captured[0]!;
+    // The script tag should be escaped, not present as executable HTML
+    expect(mail.html).toContain("&lt;script&gt;");
+    expect(mail.html).not.toContain("<script>");
+  });
 });

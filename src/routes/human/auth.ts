@@ -5,14 +5,18 @@ import { sendCodeSchema, verifyCodeSchema } from "../../validators/human.validat
 import { validateBody } from "../../middleware/validate";
 import { sendVerificationCodeEmail } from "../../services/email.service";
 import { humanAuth } from "../../middleware/human-auth";
+import { negotiateLanguage } from "../../i18n";
 
 const app = new Hono<AppEnv>();
 
 app.post("/auth/send-code", validateBody(sendCodeSchema), async (c) => {
   const input = c.get("validatedBody") as { email: string };
-  const { code } = await createVerificationCode(input.email);
+  // Whoever asks for a code is looking at a screen right now. Their browser is a
+  // better source than any language we could infer from their history.
+  const language = negotiateLanguage(c.req.header("Accept-Language"));
+  const { code } = await createVerificationCode(input.email, language);
 
-  await sendVerificationCodeEmail(input.email, code);
+  await sendVerificationCodeEmail(input.email, code, language);
 
   return c.json({
     data: { message: "Verification code sent to your email" },

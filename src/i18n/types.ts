@@ -16,6 +16,7 @@ export interface Messages {
   answerThisQuestion: string;
   replyWillNotReach: (agentName: string) => string;
   expires: (formattedDate: string) => string;
+  noPasswordNote: string;
   queryType: Record<"validation" | "interpretation" | "expert_query" | "labeling", string>;
 
   // Sign-in code

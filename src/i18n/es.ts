@@ -10,6 +10,7 @@ export const es: Messages = {
   answerThisQuestion: "Responder a esta pregunta",
   replyWillNotReach: (agentName) => `Responder a este correo no llega a ${agentName}.`,
   expires: (formattedDate) => `Caduca: ${formattedDate}`,
+  noPasswordNote: "Te enviaremos un código de acceso por correo — no hay contraseña que recordar.",
   queryType: {
     validation: "Validación",
     interpretation: "Interpretación",

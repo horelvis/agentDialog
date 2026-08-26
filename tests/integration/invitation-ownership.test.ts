@@ -134,10 +134,10 @@ describe("Invitation language", () => {
       }),
     });
     expect(conversationRes.status).toBe(201);
-    const { data: { conversation_id } } = await conversationRes.json();
+    const { data: { id } } = await conversationRes.json();
 
     // Invite with Catalan
-    const inviteRes = await app.request(`/api/v1/agent/conversations/${conversation_id}/invitations`, {
+    const inviteRes = await app.request(`/api/v1/agent/conversations/${id}/invitations`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: authHeader },
       body: JSON.stringify({

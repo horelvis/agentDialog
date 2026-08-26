@@ -10,6 +10,7 @@ export const ca: Messages = {
   answerThisQuestion: "Respondre aquesta pregunta",
   replyWillNotReach: (agentName) => `Respondre aquest correu no arriba a ${agentName}.`,
   expires: (formattedDate) => `Caduca: ${formattedDate}`,
+  noPasswordNote: "T'enviarem un codi d'accés per correu — no hi ha cap contrasenya per recordar.",
   queryType: {
     validation: "Validació",
     interpretation: "Interpretació",

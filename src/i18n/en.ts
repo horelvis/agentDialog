@@ -10,6 +10,7 @@ export const en: Messages = {
   answerThisQuestion: "Answer this question",
   replyWillNotReach: (agentName) => `Replying to this email will not reach ${agentName}.`,
   expires: (formattedDate) => `Expires: ${formattedDate}`,
+  noPasswordNote: "We'll email you a sign-in code — there is no password to remember.",
   queryType: {
     validation: "Validation",
     interpretation: "Interpretation",

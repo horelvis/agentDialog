@@ -67,8 +67,8 @@ function subjectSummary(subject: Subject, m: Messages, changes?: Change[]): { ht
         <ul style="margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: #495057;">${itemsHtml}</ul>
         ${remaining > 0 ? `<div style="margin-top: 4px; font-size: 12px; color: #868e96;">${m.moreChanges(remaining)}</div>` : ""}
     `;
-    changesText = "What changed:\n" + shown.map((c) => `  - ${c.path}: ${c.before} -> ${c.after}\n`).join("")
-      + (remaining > 0 ? `  ...and ${remaining} more — see the app for the full list.\n` : "");
+    changesText = m.whatChanged + "\n" + shown.map((c) => `  - ${c.path}: ${c.before} -> ${c.after}\n`).join("")
+      + (remaining > 0 ? `  ${m.moreChanges(remaining)}\n` : "");
   }
 
   const html = `
@@ -78,7 +78,7 @@ function subjectSummary(subject: Subject, m: Messages, changes?: Change[]): { ht
         ${changesHtml}
       </div>
   `;
-  const text = `About: ${subject.label}\n${changesText}`;
+  const text = `${m.about}: ${subject.label}\n${changesText}`;
 
   return { html, text };
 }
@@ -152,8 +152,8 @@ export async function sendQueryEmail(input: SendQueryEmailInput): Promise<boolea
         </div>
 
         <div style="text-align: center; margin-bottom: 20px;">
-          <div style="font-size: 13px; color: #6b7280;">We'll email you a sign-in code — there is no password to remember.</div>
-          <div style="font-size: 12px; color: #9ca3af; margin-top: 6px;">${m.replyWillNotReach(input.agentDisplayName)}</div>
+          <div style="font-size: 13px; color: #6b7280;">${m.noPasswordNote}</div>
+          <div style="font-size: 12px; color: #9ca3af; margin-top: 6px;">${m.replyWillNotReach(escapeHtml(input.agentDisplayName))}</div>
         </div>
 
         <div style="border-top: 1px solid #f0f0f0; padding-top: 16px; color: #9ca3af; font-size: 12px; text-align: center;">
@@ -174,7 +174,7 @@ ${contextText}
 ---
 Answer this question: ${appUrl}
 
-We'll email you a sign-in code — there is no password to remember.
+${m.noPasswordNote}
 ${m.replyWillNotReach(input.agentDisplayName)}
 
 ${m.expires(formatExpiry(input.expiresAt, input.language))}
