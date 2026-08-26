@@ -314,6 +314,13 @@ it with `openssl rand -base64 32` — it must decode to exactly 32 bytes, and
 secret for every agent's webhook, with no recovery but each affected agent
 calling `POST /agent/webhooks/:id/rotate-secret`.
 
+`WEBHOOK_ALLOW_PRIVATE_TARGETS` is not a secret and must never be set on the
+service. Unset, it resolves to `NODE_ENV !== "production"`, which is what lets
+the test suite deliver to its own localhost receiver; set to `true` in
+production it disables the guard that keeps an agent's webhook URL away from
+loopback, the private ranges and `169.254.169.254`. `src/env.ts` refuses to
+start rather than serve with it on.
+
 `SMTP_USER` is still a plain value on the service. It is a username, not a
 credential, so it is left alone; a Secret Manager entry of that name exists and
 is unreferenced, along with `SMTP_FROM`, `SMTP_HOST` and `SMTP_PORT`.

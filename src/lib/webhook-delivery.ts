@@ -1,4 +1,5 @@
 import { env } from "../env";
+import { inspectWebhookTarget } from "./webhook-url-guard";
 
 export interface WebhookDelivery {
   body: string;
@@ -19,6 +20,15 @@ export async function deliverWebhook(
 ): Promise<{ success: boolean; statusCode?: number; error?: string }> {
   const e = env();
 
+  // Checked here and not only at registration, because this is the call that
+  // carries the security: a webhook stored before the guard existed, or one
+  // whose hostname has since been repointed at a private address, only ever
+  // meets the guard on its way out.
+  const verdict = await inspectWebhookTarget(url);
+  if (!verdict.allowed) {
+    return { success: false, error: verdict.reason };
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), e.WEBHOOK_TIMEOUT_MS);
 
@@ -35,7 +45,18 @@ export async function deliverWebhook(
       },
       body: delivery.body,
       signal: controller.signal,
+      // A followed redirect walks straight past the check above: a public URL
+      // answering 302 with a Location of 169.254.169.254 was the way in.
+      redirect: "manual",
     });
+
+    if (response.status >= 300 && response.status < 400) {
+      return {
+        success: false,
+        statusCode: response.status,
+        error: "Webhook URL answered with a redirect, which is not followed",
+      };
+    }
 
     return { success: response.ok, statusCode: response.status };
   } catch (error) {
