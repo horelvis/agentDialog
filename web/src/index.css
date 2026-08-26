@@ -56,3 +56,10 @@ body {
 .animate-fade-in {
   animation: fade-in 0.4s ease-out;
 }
+
+/* Dashes travelling along a live edge in the landing's flow demo. */
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}

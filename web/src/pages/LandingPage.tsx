@@ -1,5 +1,5 @@
 import { Hero } from "@/components/landing/Hero";
-import { ChatDemo } from "@/components/landing/ChatDemo";
+import { FlowDemo } from "@/components/landing/FlowDemo";
 import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { CodeExamples } from "@/components/landing/CodeExamples";
@@ -10,7 +10,7 @@ export function LandingPage() {
   return (
     <>
       <Hero />
-      <ChatDemo />
+      <FlowDemo />
       <Features />
       <HowItWorks />
       <CodeExamples />
