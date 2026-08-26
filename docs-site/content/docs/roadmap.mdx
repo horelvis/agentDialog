@@ -48,6 +48,14 @@ The LangChain adapter already works inside a LangGraph graph, because it exposes
 
 LangGraph has a better primitive for this. `interrupt()` suspends a graph and a checkpointer resumes it with the human's value, so waiting costs nothing. Mapping a query onto interrupt and resume is what makes AgentDialog idiomatic there rather than merely usable.
 
+### An answer that reaches the agent, instead of the agent asking again
+
+An MCP client cannot receive a webhook. It is not an HTTP server, and nothing on our side pushes into an MCP session, so an agent running in Claude — or in any other MCP client — finds out that a human answered only by calling `get_query` again. It works, and the answer is there when it looks. But the agent has to decide to look, and every look is a model call spent on "not yet".
+
+What closes it is a tool that waits: ask about a query and block until the human answers or the wait runs out. The server already knows the instant an answer lands, because it publishes it to Redis for the chat's live updates. Waiting means subscribing to that, not asking the database over and over.
+
+It cannot wait indefinitely — a client will time out a request long before a person necessarily answers — so the tool returns *still open* and the agent calls again. That is one call per minute of waiting rather than one per guess. It is also the same primitive the LangGraph work above needs: something that knows the exact moment to resume.
+
 ### The Python SDK, brought up to date and published
 
 `sdks/python` exists and is not published. It also predates typed queries: it covers conversations, messages, invitations and webhooks, and has no query support at all — the product's central primitive is missing from it.
