@@ -5,6 +5,7 @@ import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { CodeExamples } from "@/components/landing/CodeExamples";
 import { IntegrationGuide } from "@/components/landing/IntegrationGuide";
+import { Faq } from "@/components/landing/Faq";
 import { CTA } from "@/components/landing/CTA";
 
 export function LandingPage() {
@@ -45,6 +46,8 @@ export function LandingPage() {
       <HowItWorks />
       <CodeExamples />
       <IntegrationGuide />
+      {/* Objections answered before the last ask, not after it. */}
+      <Faq />
       <CTA />
     </>
   );
