@@ -14,7 +14,8 @@ export default {
     empty: "No conversations yet",
   },
   header: {
-    participants: "{{count}} participants",
+    participants_one: "{{count}} participant",
+    participants_other: "{{count}} participants",
     status: {
       active: "active",
       archived: "archived",
@@ -102,7 +103,11 @@ export default {
     emptyTitle: "No pending invitations",
     emptyBody: "When an agent invites you to a conversation, it will appear here.",
     untitled: "Conversation Invitation",
-    from: "from",
+    // A tag, not a bare interpolation, because Catalan needs to reword around
+    // it (see ca) rather than concatenate a preposition and a name — the two
+    // can't be separate nodes without breaking Catalan's elision (d'Ana, not
+    // de Ana). See InvitationCard.tsx's <Trans>.
+    from: "from <name>{{name}}</name>",
     accept: "Accept",
     decline: "Decline",
     status: {

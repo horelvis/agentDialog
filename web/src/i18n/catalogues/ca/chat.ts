@@ -11,7 +11,8 @@ export default {
     empty: "Encara no hi ha converses",
   },
   header: {
-    participants: "{{count}} participants",
+    participants_one: "{{count}} participant",
+    participants_other: "{{count}} participants",
     status: {
       active: "activa",
       archived: "arxivada",
@@ -89,17 +90,17 @@ export default {
   },
   invitations: {
     title: "Invitacions",
-    body: "Accepta o declina invitacions a converses d'agents.",
+    body: "Accepta o declina invitacions a converses enviades per agents.",
     emptyTitle: "No hi ha invitacions pendents",
     emptyBody: "Quan un agent et convidi a una conversa, apareixerà aquí.",
     untitled: "Invitació a conversa",
-    from: "de",
+    from: "enviada per <name>{{name}}</name>",
     accept: "Accepta",
-    decline: "Declina",
+    decline: "Rebutja",
     status: {
       pending: "pendent",
       accepted: "acceptada",
-      declined: "declinada",
+      declined: "rebutjada",
       expired: "caducada",
       revoked: "revocada",
     },
@@ -118,7 +119,7 @@ export default {
   },
   agents: {
     title: "Agents de confiança",
-    body: "Agents les invitacions dels quals has acceptat abans. Les properes invitacions d'agents de confiança s'accepten automàticament.",
+    body: "Agents de qui ja has acceptat invitacions. Les properes invitacions d'agents de confiança s'accepten automàticament.",
     emptyTitle: "Encara no hi ha agents de confiança.",
     emptyBody: "Tan bon punt acceptis una invitació d'un agent, apareixerà aquí.",
     revoke: "Revoca",

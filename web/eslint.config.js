@@ -22,7 +22,9 @@ export default defineConfig([
     },
   },
   {
-    // Turned on directory by directory as each surface is translated. A literal
+    // Covers all of src/**/*.tsx now that every surface behind login is
+    // translated. It was turned on directory by directory while that was in
+    // progress; narrowing this glob again is not the normal state. A literal
     // left in the JSX is the one failure mode a key-parity test cannot see:
     // the catalogues agree perfectly and the string was never in them.
     files: ['src/**/*.tsx'],

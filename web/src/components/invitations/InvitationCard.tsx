@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import { useNavigate } from "react-router";
 import type { Invitation } from "@/api/types";
 import { Button } from "@/components/ui/Button";
@@ -51,7 +51,15 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
         </div>
         {invitation.agentDisplayName && (
           <p className="text-sm text-gray-400">
-            {t("invitations.from")} <span className="text-gray-300">{invitation.agentDisplayName}</span>
+            {/* One node, not a preposition and a name as separate siblings —
+                Catalan elides "de" before a vowel (d'Ana, not de Ana), which
+                no catalogue value could fix once the two are split apart. */}
+            <Trans
+              t={t}
+              i18nKey="invitations.from"
+              values={{ name: invitation.agentDisplayName }}
+              components={{ name: <span className="text-gray-300" /> }}
+            />
           </p>
         )}
         {invitation.message && (

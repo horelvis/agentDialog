@@ -11,7 +11,8 @@ export default {
     empty: "Todavía no hay conversaciones",
   },
   header: {
-    participants: "{{count}} participantes",
+    participants_one: "{{count}} participante",
+    participants_other: "{{count}} participantes",
     status: {
       active: "activa",
       archived: "archivada",
@@ -89,11 +90,11 @@ export default {
   },
   invitations: {
     title: "Invitaciones",
-    body: "Acepta o rechaza invitaciones a conversaciones de agentes.",
+    body: "Acepta o rechaza invitaciones a conversaciones enviadas por agentes.",
     emptyTitle: "No hay invitaciones pendientes",
     emptyBody: "Cuando un agente te invite a una conversación, aparecerá aquí.",
     untitled: "Invitación a conversación",
-    from: "de",
+    from: "de <name>{{name}}</name>",
     accept: "Aceptar",
     decline: "Rechazar",
     status: {
