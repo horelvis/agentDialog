@@ -7,9 +7,17 @@ import { initI18n } from "./i18n";
 // Rendering before the language is settled paints English and then swaps it,
 // which is worse than waiting: the first thing somebody reads is the wrong
 // thing. This is one dynamic import, not a network round trip.
+//
+// The root is created once, up front, and both branches below render into
+// this same object. `.then(render).catch(fallback)` would let an exception
+// thrown by render() itself — not just a rejected initI18n() — land in the
+// .catch(), which would call createRoot() a second time on a container that
+// already has one; React throws on that. Reusing one root sidesteps it.
+const root = createRoot(document.getElementById("root")!);
+
 void initI18n()
   .then(() => {
-    createRoot(document.getElementById("root")!).render(
+    root.render(
       <StrictMode>
         <App />
       </StrictMode>,
@@ -22,7 +30,7 @@ void initI18n()
     // text is hardcoded English, not translated, on purpose: it is the
     // fallback for the case where translation is exactly what is unavailable.
     console.error("Failed to initialize i18n", error);
-    createRoot(document.getElementById("root")!).render(
+    root.render(
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
         {/* Hardcoded English on purpose — see the comment above: this is the
             fallback for when i18n itself is what failed to load. */}

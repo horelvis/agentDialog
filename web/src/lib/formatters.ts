@@ -23,7 +23,7 @@ export function formatRelativeTime(date: string | Date, language: Language): str
   if (elapsed < DAY) return relative.format(Math.round(seconds / HOUR), "hour");
   if (elapsed < WEEK) return relative.format(Math.round(seconds / DAY), "day");
 
-  return new Date(date).toLocaleDateString(localeTag(language));
+  return formatDate(date, language);
 }
 
 export function formatTime(date: string | Date, language: Language): string {
@@ -31,6 +31,14 @@ export function formatTime(date: string | Date, language: Language): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/**
+ * A date formatted anywhere outside this file is a second, hidden source of
+ * language — QueryContextHeader.tsx used to call toLocaleDateString directly.
+ */
+export function formatDate(date: string | Date, language: Language): string {
+  return new Date(date).toLocaleDateString(localeTag(language));
 }
 
 /**

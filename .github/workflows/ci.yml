@@ -134,7 +134,7 @@ jobs:
   # after merging, when Cloudflare Pages published the landing on entering
   # main without waiting for a release.
   web:
-    name: Web typecheck and lint
+    name: Web test, typecheck, lint and build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -149,13 +149,39 @@ jobs:
         working-directory: web
         run: bun install --frozen-lockfile
 
+      # Already bun:test — just never had a step running it.
+      - name: Test
+        working-directory: web
+        run: bun test src/lib/attribution.test.ts
+
       - name: Typecheck
         working-directory: web
         run: bunx tsc -b
 
-      # The literal-string rule is what keeps a new hard-coded string out of the
-      # JSX. Without it, the catalogues stay perfectly in sync and the page
-      # quietly goes back to being English.
+      # The literal-string rule (mode: jsx-text-only, see web/eslint.config.js)
+      # catches a hard-coded string sitting directly in JSX as text — the most
+      # common way one slips in, and the one a key-parity test cannot see,
+      # since the catalogues stay perfectly in sync and the string was never
+      # in them. It does not see one in an attribute (title, aria-label,
+      # placeholder, alt), inside a ternary or template literal, or assigned
+      # to a variable before use — those still need a human to catch them.
       - name: Lint
         working-directory: web
         run: bunx eslint .
+
+      # `bunx tsc -b` above checks types, not whether the bundle actually
+      # builds — this branch's dynamic `import(`./catalogues/${language}/...`)`
+      # is exactly the construct most likely to build differently from how it
+      # dev-serves. Until this step existed, `vite build` ran for the first
+      # time in Cloudflare Pages, after merge — the gap this whole job's
+      # comment above claims to close.
+      - name: Build
+        working-directory: web
+        run: bun run build
+
+      # `bun run build` regenerates agentdialog-integration-guide.md from
+      # docs/api/README.md (scripts/sync-integration-guide.sh). PR #26 edited
+      # the source and never ran a web build, so the copy went stale with
+      # nothing failing; this catches that the moment it happens again.
+      - name: Check the integration guide is in sync with docs/api/README.md
+        run: git diff --exit-code web/public/agentdialog-integration-guide.md

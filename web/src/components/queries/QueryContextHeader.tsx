@@ -4,7 +4,7 @@ import type { QuerySubject, QueryChange } from "@/api/types";
 import { isHttpUrl } from "@/lib/url";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "@/i18n";
-import { localeTag } from "@/i18n/languages";
+import { formatDate } from "@/lib/formatters";
 
 interface QueryContextHeaderProps {
   subject: QuerySubject;
@@ -31,7 +31,7 @@ export function QueryContextHeader({ subject, changes, priorDecisionAt }: QueryC
       {priorDecisionAt && (
         <p className="text-xs text-amber-400">
           {t("context.priorDecision", {
-            date: new Date(priorDecisionAt).toLocaleDateString(localeTag(language)),
+            date: formatDate(priorDecisionAt, language),
           })}
         </p>
       )}

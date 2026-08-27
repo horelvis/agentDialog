@@ -67,6 +67,13 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
   // In flight for as long as there's a download to make and neither an
   // audio URL nor an error has landed yet — not its own state, so there's
   // nothing here to fall out of sync with audioUrl/error.
+  //
+  // That equivalence, like `hasError`'s, holds only while downloadPath is
+  // stable for a mounted instance of this component — true today only
+  // because MessageList.tsx keys by msg.id. If that key ever changes, a
+  // downloadPath that changes on an already-mounted instance would leave
+  // the previous attempt's audioUrl in state and play the wrong audio while
+  // the new fetch is still in flight, since nothing here clears it.
   const loading = !!downloadPath && !audioUrl && !hasError;
 
   // Load audio blob
