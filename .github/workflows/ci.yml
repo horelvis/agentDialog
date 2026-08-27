@@ -129,3 +129,33 @@ jobs:
       - name: Test SDK
         working-directory: sdks/typescript
         run: bun test tests
+
+  # web/ was invisible to CI until this job: a type error there surfaced only
+  # after merging, when Cloudflare Pages published the landing on entering
+  # main without waiting for a release.
+  web:
+    name: Web typecheck and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: web
+        run: bunx tsc -b
+
+      # The literal-string rule is what keeps a new hard-coded string out of the
+      # JSX. Without it, the catalogues stay perfectly in sync and the page
+      # quietly goes back to being English.
+      - name: Lint
+        working-directory: web
+        run: bunx eslint .

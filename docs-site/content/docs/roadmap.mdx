@@ -46,9 +46,13 @@ admission gate leaves the key free for the corrected retry. The TypeScript SDK
 sends one on every write and keeps it across its own retry, so an integrator gets
 this without writing anything.
 
-**Emails in the language you declare.** A query can carry `language`: `en`, `es`
-or `ca`. It changes the wrapper the product puts around your question — the
-subject line, the labels, the dates — and it does **not** translate your words.
+**Three languages, on the page and in the mail.** The landing page, the answer
+page and the chat are in English, Spanish and Catalan, and they follow your
+browser — with a picker in the footer when it guesses wrong. A query can also
+carry `language`: `en`, `es` or `ca`, and that is what the notification email
+uses, because there is no browser to ask. It changes the wrapper the product
+puts around your question — the subject line, the labels, the dates — and it
+does **not** translate your words.
 The question, the subject, the options and their consequences are sent exactly as
 you wrote them, so write them in the language you declare. The sign-in code email
 is the exception that proves the rule: it follows the browser of whoever asked

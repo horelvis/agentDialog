@@ -163,6 +163,14 @@ guide, run `bun run build` in `web/` and commit the regenerated copy with it.
 text lockfile. The old glob matched nothing, so every `--frozen-lockfile`
 silently ran with no lockfile at all.
 
+**The interface language has three sources and the order matters.** Chosen in
+the picker (`localStorage`) beats what the agent declared on the query, which
+beats the browser, and English is the floor. Only the picker persists:
+`/q/:token` applies the declared language with `persist: false`, and if that
+ever flips, one agent's wrong declaration becomes that person's permanent
+language on that device. `tests/unit/web-language-resolution.test.ts` holds the
+whole table.
+
 **`bun run db:migrate` reads `migrations/meta/_journal.json`, not the
 filesystem.** `scripts/migrate.ts` calls Drizzle's `migrate()`, which applies
 exactly what the journal lists — a hand-written `.sql` file dropped into
@@ -179,6 +187,14 @@ previous entry's — in the same commit as the migration itself.
 
 Code, comments and commit messages in English. The repo's own docs and specs are
 in Spanish; match whatever file you are editing.
+
+User-visible text in `web/` is the exception, and it does not live in the JSX:
+it lives in `web/src/i18n/catalogues/`, in English, Spanish and Catalan. `en` is
+the source and the type — a key missing from it does not compile, and a key
+missing from `es` or `ca` fails `tests/unit/web-catalogue-parity.test.ts`. A new
+string written by hand into a component is caught by `i18next/no-literal-string`
+in `web/`'s ESLint config. What is never translated: anything an agent or a
+person wrote — a question, a subject, an answer option, a message.
 
 The queries REST resource is **snake_case** on the wire (`query_type`,
 `target_human_email`, `timeout_minutes`). The SDK surface is **camelCase** and
