@@ -152,7 +152,6 @@ export default {
     // Tab names are the technologies themselves; they read the same in all
     // three languages, and the code under them is never translated.
     tabs: {
-      mcp: "MCP (Claude)",
       curl: "cURL",
       typescript: "TypeScript",
       python: "Python",

@@ -144,7 +144,6 @@ export default {
     intro:
       "Registrar-se, crear una conversa, enviar un missatge. Funciona des de cURL, TypeScript, Python o qualsevol cosa que parli HTTP. <docs>Documentació completa de l'API</docs>",
     tabs: {
-      mcp: "MCP (Claude)",
       curl: "cURL",
       typescript: "TypeScript",
       python: "Python",
