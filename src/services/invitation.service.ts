@@ -212,7 +212,7 @@ export async function acceptInvitation(token: string, humanId: string) {
   return invitation;
 }
 
-export async function declineInvitation(token: string) {
+export async function declineInvitation(token: string, humanId: string) {
   const db = getDb();
   const [invitation] = await db
     .select()
@@ -221,6 +221,19 @@ export async function declineInvitation(token: string) {
     .limit(1);
 
   if (!invitation) throw new NotFoundError("Invitation");
+
+  // The same rule accept has carried since I4, on the door nobody guarded.
+  // Declining took the token alone and asked nothing, so anyone who could sign
+  // in and had seen a forwarded invitation could refuse a decision addressed to
+  // somebody else: the invited person is then left with a link that no longer
+  // works, and the agent is told they said no.
+  //
+  // Refusing is destructive in a way accepting is not — there is no route back
+  // from `declined`, and nothing tells the person it happened.
+  const [human] = await db.select().from(humans).where(eq(humans.id, humanId)).limit(1);
+  if (!sameEmail(human?.email, invitation.invitedHumanEmail)) {
+    throw new ForbiddenError("This invitation was sent to a different address");
+  }
 
   await db
     .update(invitations)

@@ -23,7 +23,7 @@ app.post("/invitations/:token/accept", async (c) => {
 
 app.post("/invitations/:token/decline", async (c) => {
   const token = c.req.param("token");
-  const invitation = await declineInvitation(token);
+  const invitation = await declineInvitation(token, c.get("humanId"));
   return c.json({ data: invitation });
 });
 
