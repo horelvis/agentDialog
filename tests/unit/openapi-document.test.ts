@@ -62,4 +62,32 @@ describe("the OpenAPI document", () => {
     const header = op.parameters.find((p: any) => p.name === "Idempotency-Key");
     expect(header).toMatchObject({ in: "header", required: false });
   });
+
+  // OpenAPI 3.1 requires every {template} expression in a path to have a
+  // matching `parameters` entry with `in: "path"`. document.ts builds
+  // `requestParams: { path: doc.params }` from RouteDoc's `params`, and
+  // zod-openapi expands that object schema into one parameter per property —
+  // but only where a route actually sets `params`. A route with :id and no
+  // `params` (or a typo passing the wrong schema there) produces a document a
+  // strict validator (Spectral, Redocly, swagger-parser) rejects, and nothing
+  // else in this suite would catch it: createDocument doesn't check it, and
+  // the other tests here only look at one hand-picked route.
+  test("every path template declares its parameter", () => {
+    const doc = buildDocument({});
+    const missing: string[] = [];
+
+    for (const [path, item] of Object.entries<any>(doc.paths)) {
+      const templated = [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
+      if (!templated.length) continue;
+      for (const [method, op] of Object.entries<any>(item)) {
+        const declared = new Set(
+          (op.parameters ?? []).filter((p: any) => p.in === "path").map((p: any) => p.name),
+        );
+        for (const name of templated) {
+          if (!declared.has(name)) missing.push(`${method.toUpperCase()} ${path} → ${name}`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
 });

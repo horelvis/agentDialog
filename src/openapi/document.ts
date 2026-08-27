@@ -32,6 +32,22 @@ export function buildDocument(env: Record<string, string | undefined> = process.
     if (doc.body) {
       operation.requestBody = { content: { "application/json": { schema: doc.body } } };
     }
+    // zod-openapi's own special key, not a raw OpenAPI `parameters` entry: handed
+    // an object schema under `path`/`query`, it expands each property into its
+    // own parameter, deriving `required` from whether that property is optional
+    // (src/openapi/documented.ts's uuidParam and this repo's *QuerySchema are
+    // both plain z.object()s, so this covers every route path/query docs
+    // written so far). A raw `{ in: "path", schema: doc.params }` entry under
+    // `parameters` is not a Zod schema, so createManualParameters would pass it
+    // through unconverted — OpenAPI 3.1 requires one parameter per {template}
+    // expression, and every :id route would still fail that with a whole
+    // ZodObject sitting where a JSON schema belongs.
+    if (doc.params || doc.query) {
+      operation.requestParams = {
+        ...(doc.params ? { path: doc.params } : {}),
+        ...(doc.query ? { query: doc.query } : {}),
+      };
+    }
     if (doc.idempotent) operation.parameters = [IDEMPOTENCY_HEADER];
     if (doc.security === "none") operation.security = [];
 
