@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { LanguageSelector } from "@/components/i18n/LanguageSelector";
 import { Logo } from "@/components/ui/Logo";
 
 interface FooterProps {
@@ -10,6 +12,11 @@ interface FooterProps {
 }
 
 export function Footer({ minimal = false }: FooterProps) {
+  // `common`, not `landing`: this component also mounts on /q/:token in
+  // minimal mode, and that page shouldn't download the landing's whole
+  // catalogue for three strings it mostly hides.
+  const { t } = useTranslation("common");
+
   return (
     <footer className="border-t border-surface-border bg-surface-secondary">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -18,12 +25,17 @@ export function Footer({ minimal = false }: FooterProps) {
             <div className="flex h-6 w-6 items-center justify-center rounded bg-brand-600 p-0.5 text-white">
               <Logo className="h-full w-full" />
             </div>
+            {/* The product's name, the same in every language. */}
+            {/* eslint-disable-next-line i18next/no-literal-string */}
             <span className="text-sm font-semibold text-gray-100">AgentDialog</span>
           </div>
           <div className="flex items-center gap-6">
-            <p className="text-sm text-gray-400">
-              Agent-first messaging platform. Built for the AI era.
-            </p>
+            {/* Kept in minimal mode. That flag drops links which invite
+                somebody away from the one decision the page exists for; a
+                language picker does the opposite — it is what lets them read
+                the decision at all. */}
+            <LanguageSelector />
+            <p className="text-sm text-gray-400">{t("footer.tagline")}</p>
             {!minimal && (
               <>
                 <a
@@ -32,7 +44,7 @@ export function Footer({ minimal = false }: FooterProps) {
                   rel="noopener noreferrer"
                   className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
                 >
-                  GitHub
+                  {t("footer.github")}
                 </a>
                 <a
                   href="https://docs.agentdialog.io"
@@ -40,7 +52,7 @@ export function Footer({ minimal = false }: FooterProps) {
                   rel="noopener noreferrer"
                   className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200"
                 >
-                  Docs
+                  {t("footer.docs")}
                 </a>
               </>
             )}

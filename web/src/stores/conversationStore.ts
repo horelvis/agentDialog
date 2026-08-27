@@ -49,7 +49,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       const res = await convApi.listMessages(conversationId);
       set((s) => ({
         messagesMap: { ...s.messagesMap, [conversationId]: res.data ?? [] },
-        cursors: { ...s.cursors, [conversationId]: (res.pagination as any)?.nextCursor ?? res.pagination?.cursor },
+        cursors: { ...s.cursors, [conversationId]: res.pagination?.nextCursor ?? res.pagination?.cursor },
         hasMore: { ...s.hasMore, [conversationId]: res.pagination?.hasMore ?? false },
       }));
     } catch (e) {

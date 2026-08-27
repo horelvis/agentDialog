@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import type { Message } from "@/api/types";
+import { useLanguage } from "@/i18n";
 
 interface MessageBubbleProps {
   message: Message;
@@ -10,12 +12,14 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, children }: MessageBubbleProps) {
+  const { t } = useTranslation("chat");
   const isHuman = message.senderType === "human";
+  const language = useLanguage();
 
   return (
     <div className={cn("flex gap-3", isHuman && "flex-row-reverse")}>
       <Avatar
-        name={isHuman ? "You" : "Agent"}
+        name={isHuman ? t("shared.you") : t("shared.agent")}
         size="sm"
         className="mt-1 shrink-0"
       />
@@ -36,7 +40,7 @@ export function MessageBubble({ message, children }: MessageBubbleProps) {
             isHuman && "text-right"
           )}
         >
-          {formatTime(message.createdAt)}
+          {formatTime(message.createdAt, language)}
         </p>
       </div>
     </div>

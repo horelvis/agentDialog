@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { Message, ApprovalData } from "@/api/types";
+import { useTranslation } from "react-i18next";
+import type { Message, ApprovalData, ApprovalResponseData } from "@/api/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +12,12 @@ interface ApprovalMessageProps {
 }
 
 export function ApprovalMessage({ message }: ApprovalMessageProps) {
+  const { t } = useTranslation("chat");
+  // Reuses QueryCard's own risk words instead of a second set — see the
+  // note carried forward from Tasks 5/6: two catalogues for the same enum is
+  // how a query card once showed "medio" and this badge showed "MEDIUM" on
+  // the same screen.
+  const { t: tQuery } = useTranslation("query");
   const data = message.structuredData as ApprovalData;
   const sendMessage = useConversationStore((s) => s.sendMessage);
   const messages = useConversationStore(
@@ -20,7 +27,7 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
   const existingResponse = messages.find(
     (m) =>
       m.type === "approval_response" &&
-      (m.structuredData as any)?.approvalId === data.approvalId,
+      (m.structuredData as ApprovalResponseData | undefined)?.approvalId === data.approvalId,
   );
 
   const [loading, setLoading] = useState(false);
@@ -42,7 +49,7 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
 
   const responded = !!existingResponse;
   const decision = responded
-    ? (existingResponse.structuredData as any)?.decision
+    ? (existingResponse.structuredData as ApprovalResponseData | undefined)?.decision
     : null;
 
   return (
@@ -53,15 +60,17 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
       <div className={`p-4 ${RISK_COLORS[data.riskLevel]}`}>
         <div className="flex items-center gap-2">
           <Badge variant="risk" risk={data.riskLevel}>
-            {data.riskLevel.toUpperCase()}
+            {tQuery(`card.risk.${data.riskLevel}`)}
           </Badge>
-          <span className="text-sm font-medium">Approval Required</span>
+          <span className="text-sm font-medium">{t("messages.approval.title")}</span>
         </div>
       </div>
       <div className="p-4">
         {message.content && <p className="text-sm text-gray-300">{message.content}</p>}
         {data.details && <p className="mt-2 text-sm text-gray-400">{data.details}</p>}
-        <p className="mt-2 text-xs font-mono text-gray-500">Action: {data.action}</p>
+        <p className="mt-2 text-xs font-mono text-gray-500">
+          {t("messages.approval.action", { action: data.action })}
+        </p>
 
         {!responded ? (
           <div className="mt-4 flex gap-2">
@@ -71,7 +80,7 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
               onClick={() => handleDecision("approved")}
               loading={loading}
             >
-              Approve
+              {t("messages.approval.approve")}
             </Button>
             <Button
               variant="danger"
@@ -79,7 +88,7 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
               onClick={() => handleDecision("denied")}
               loading={loading}
             >
-              Deny
+              {t("messages.approval.deny")}
             </Button>
           </div>
         ) : (
@@ -91,7 +100,7 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
                   : "bg-red-500/20 text-red-400"
               }`}
             >
-              {decision === "approved" ? "Approved" : "Denied"}
+              {decision === "approved" ? t("messages.approval.approved") : t("messages.approval.denied")}
             </span>
           </div>
         )}

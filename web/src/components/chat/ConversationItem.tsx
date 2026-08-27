@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import type { Conversation } from "@/api/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import { useUiStore } from "@/stores/uiStore";
+import { useLanguage } from "@/i18n";
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -11,8 +13,10 @@ interface ConversationItemProps {
 }
 
 export function ConversationItem({ conversation, isActive }: ConversationItemProps) {
+  const { t } = useTranslation("chat");
   const isMobile = useUiStore((s) => s.isMobile);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
+  const language = useLanguage();
 
   return (
     <Link
@@ -25,11 +29,11 @@ export function ConversationItem({ conversation, isActive }: ConversationItemPro
           : "text-gray-700 hover:bg-gray-100"
       )}
     >
-      <Avatar name={conversation.title ?? "Conversation"} size="sm" />
+      <Avatar name={conversation.title ?? t("shared.newConversation")} size="sm" />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{conversation.title ?? "Untitled"}</p>
+        <p className="truncate font-medium">{conversation.title ?? t("shared.untitledConversation")}</p>
         <p className="truncate text-xs text-gray-500">
-          {formatRelativeTime(conversation.updatedAt)}
+          {formatRelativeTime(conversation.updatedAt, language)}
         </p>
       </div>
     </Link>

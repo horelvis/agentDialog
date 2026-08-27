@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { Message, VoiceNoteData } from "@/api/types";
 import { API_BASE } from "@/lib/constants";
 
@@ -29,6 +30,7 @@ function generateBars(messageId: string, count: number): number[] {
 }
 
 export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
+  const { t } = useTranslation("chat");
   const attachment = message.attachments?.[0];
   const voiceData = message.structuredData as VoiceNoteData | undefined;
   const durationMs = voiceData?.durationMs ?? 0;
@@ -38,8 +40,18 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(durationMs / 1000);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  // Tagged with the downloadPath it happened for, rather than a bare
+  // boolean, so a later fetch attempt doesn't inherit a previous one's
+  // failure. Setting this from the effect body itself (`setError(false)` at
+  // the top, to reset between attempts) trips react-hooks/set-state-in-effect
+  // — confirmed by running the linter, not assumed — because it's a
+  // synchronous write of a value already known during render, exactly the
+  // shape the rule flags. Tagging sidesteps it: `hasError` below is a plain
+  // derivation, so there is nothing to reset.
+  const [error, setError] = useState<{ downloadPath: string | null; failed: boolean }>({
+    downloadPath: null,
+    failed: false,
+  });
   const [dragging, setDragging] = useState(false);
   const waveformRef = useRef<HTMLDivElement>(null);
 
@@ -50,12 +62,24 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     ? `/human/conversations/${message.conversationId}/files/${attachment.id}/download`
     : null;
 
+  const hasError = error.downloadPath === downloadPath && error.failed;
+
+  // In flight for as long as there's a download to make and neither an
+  // audio URL nor an error has landed yet — not its own state, so there's
+  // nothing here to fall out of sync with audioUrl/error.
+  //
+  // That equivalence, like `hasError`'s, holds only while downloadPath is
+  // stable for a mounted instance of this component — true today only
+  // because MessageList.tsx keys by msg.id. If that key ever changes, a
+  // downloadPath that changes on an already-mounted instance would leave
+  // the previous attempt's audioUrl in state and play the wrong audio while
+  // the new fetch is still in flight, since nothing here clears it.
+  const loading = !!downloadPath && !audioUrl && !hasError;
+
   // Load audio blob
   useEffect(() => {
     if (!downloadPath) return;
     let cancelled = false;
-    setLoading(true);
-    setError(false);
 
     const token = localStorage.getItem("token");
     fetch(`${API_BASE}${downloadPath}`, {
@@ -70,14 +94,12 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
       .then((blob) => {
         if (!cancelled) {
           setAudioUrl(URL.createObjectURL(blob));
-          setLoading(false);
         }
       })
       .catch((err) => {
         if (!cancelled) {
           console.error("[VoiceNote] Failed to load audio:", err);
-          setLoading(false);
-          setError(true);
+          setError({ downloadPath, failed: true });
         }
       });
 
@@ -113,7 +135,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     };
     const onError = () => {
       console.error("[VoiceNote] Audio element error:", audio.error);
-      setError(true);
+      setError({ downloadPath, failed: true });
     };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -127,7 +149,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, [audioUrl]);
+  }, [audioUrl, downloadPath]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -141,10 +163,10 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
         .then(() => setPlaying(true))
         .catch((err) => {
           console.error("[VoiceNote] Play failed:", err);
-          setError(true);
+          setError({ downloadPath, failed: true });
         });
     }
-  }, [playing, audioUrl]);
+  }, [playing, audioUrl, downloadPath]);
 
   const seekTo = useCallback(
     (clientX: number) => {
@@ -188,7 +210,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     : formatMmSs(durationMs || duration * 1000);
 
   if (!attachment) {
-    return <p className="text-sm text-gray-400">Voice note not available</p>;
+    return <p className="text-sm text-gray-400">{t("messages.voiceNote.unavailable")}</p>;
   }
 
   return (
@@ -199,7 +221,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
       {/* Play/Pause button */}
       <button
         onClick={togglePlay}
-        disabled={loading || !audioUrl || error}
+        disabled={loading || !audioUrl || hasError}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors"
       >
         {loading ? (
@@ -244,7 +266,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
           })}
         </div>
         <p className="text-xs text-gray-400 mt-0.5">
-          {error ? "Error" : displayTime}
+          {hasError ? t("messages.voiceNote.error") : displayTime}
         </p>
       </div>
     </div>

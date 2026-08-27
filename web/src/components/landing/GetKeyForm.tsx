@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { API_BASE } from "@/lib/constants";
 import {
@@ -12,10 +13,21 @@ import {
 const MCP_URL = "https://api.agentdialog.io/mcp";
 const QUICKSTART_URL = "https://docs.agentdialog.io/docs/quickstart";
 
+/**
+ * A failure is stored as what went wrong, not as a sentence. Freezing the
+ * sentence would leave an error written in the language that was on screen
+ * when it happened, still there after somebody switches. `raw` is the one
+ * exception: a message the API itself sent, which arrives already worded.
+ */
+type Failure =
+  | { key: "form.error.taken" | "form.error.rateLimited" | "form.error.failed" | "form.error.unreachable" }
+  | { key: "form.error.rateLimitedMinutes"; minutes: number }
+  | { raw: string };
+
 type State =
   | { status: "idle" }
   | { status: "submitting" }
-  | { status: "error"; message: string }
+  | { status: "error"; failure: Failure }
   | { status: "done"; slug: string; apiKey: string };
 
 async function register(slug: string, displayName: string, attribution: Attribution) {
@@ -34,6 +46,7 @@ async function register(slug: string, displayName: string, attribution: Attribut
 }
 
 export function GetKeyForm() {
+  const { t } = useTranslation("landing");
   const [name, setName] = useState("");
   const [suffix, setSuffix] = useState(randomSuffix);
   const [state, setState] = useState<State>({ status: "idle" });
@@ -62,10 +75,7 @@ export function GetKeyForm() {
       }
 
       if (res.status === 409) {
-        setState({
-          status: "error",
-          message: "That name is taken twice over. Try a more specific one.",
-        });
+        setState({ status: "error", failure: { key: "form.error.taken" } });
         return;
       }
 
@@ -76,9 +86,9 @@ export function GetKeyForm() {
           : null;
         setState({
           status: "error",
-          message: minutes
-            ? `Too many keys from this network. Try again in ${minutes} min, or register from the terminal — see the quickstart.`
-            : "Too many keys from this network. Register from the terminal instead — see the quickstart.",
+          failure: minutes
+            ? { key: "form.error.rateLimitedMinutes", minutes }
+            : { key: "form.error.rateLimited" },
         });
         return;
       }
@@ -86,19 +96,17 @@ export function GetKeyForm() {
       const body = await res.json().catch(() => null);
 
       if (!res.ok || !body?.data?.apiKey) {
+        const raw: string | undefined = body?.error?.message;
         setState({
           status: "error",
-          message: body?.error?.message ?? "Could not create the key. Try the quickstart instead.",
+          failure: raw ? { raw } : { key: "form.error.failed" },
         });
         return;
       }
 
       setState({ status: "done", slug: body.data.slug, apiKey: body.data.apiKey });
     } catch {
-      setState({
-        status: "error",
-        message: "Could not reach the API. Check your connection and try again.",
-      });
+      setState({ status: "error", failure: { key: "form.error.unreachable" } });
     }
   }
 
@@ -106,10 +114,19 @@ export function GetKeyForm() {
     return <KeyIssued slug={state.slug} apiKey={state.apiKey} />;
   }
 
+  const failure = state.status === "error" ? state.failure : null;
+  const errorMessage = !failure
+    ? null
+    : "raw" in failure
+      ? failure.raw
+      : failure.key === "form.error.rateLimitedMinutes"
+        ? t(failure.key, { minutes: failure.minutes })
+        : t(failure.key);
+
   return (
     <form onSubmit={onSubmit} className="mx-auto w-full max-w-md text-left">
       <label htmlFor="agent-name" className="sr-only">
-        Name your agent
+        {t("form.label")}
       </label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
@@ -117,23 +134,30 @@ export function GetKeyForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={128}
-          placeholder="Name your agent — Release Agent"
+          placeholder={t("form.placeholder")}
           className="block w-full rounded-lg border border-surface-border bg-surface-elevated px-4 py-3 text-base text-gray-100 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
         <Button type="submit" size="lg" loading={state.status === "submitting"} className="shrink-0">
-          Get your API key
+          {t("form.submit")}
         </Button>
       </div>
 
       <p className="mt-2 text-xs text-gray-500">
-        Registers as <code className="text-gray-400">{slug}</code>
+        {/* Safe to interpolate unescaped only because buildSlug guarantees
+            `[a-z0-9-]` — see the comment on its definition. */}
+        <Trans
+          t={t}
+          i18nKey="form.preview"
+          values={{ slug }}
+          components={{ slug: <code className="text-gray-400" /> }}
+        />
       </p>
 
-      {state.status === "error" && (
+      {errorMessage && (
         <p role="alert" className="mt-2 text-sm text-red-400">
-          {state.message}{" "}
+          {errorMessage}{" "}
           <a href={QUICKSTART_URL} className="underline underline-offset-2">
-            Quickstart
+            {t("form.quickstart")}
           </a>
         </p>
       )}
@@ -142,6 +166,10 @@ export function GetKeyForm() {
 }
 
 function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
+  const { t } = useTranslation("landing");
+  // "Copy" and "Copied" are the same two words everywhere in the product, and
+  // they already live in `common`.
+  const { t: tCommon } = useTranslation("common");
   const [copied, setCopied] = useState<"key" | "config" | null>(null);
 
   const config = JSON.stringify(
@@ -167,11 +195,16 @@ function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
   return (
     <div className="mx-auto w-full max-w-xl rounded-xl border border-surface-border bg-surface-secondary p-5 text-left">
       <p className="text-sm font-semibold text-gray-100">
-        <code className="text-brand-400">{slug}</code> is live. Here is its key.
+        {/* slug here is body.data.slug, the server's echo of the same
+            buildSlug output that was submitted — same `[a-z0-9-]` guarantee. */}
+        <Trans
+          t={t}
+          i18nKey="form.issued.title"
+          values={{ slug }}
+          components={{ slug: <code className="text-brand-400" /> }}
+        />
       </p>
-      <p className="mt-1 text-xs text-severity-warning">
-        Shown once. Copy it now — losing it means rotating the key.
-      </p>
+      <p className="mt-1 text-xs text-severity-warning">{t("form.issued.warning")}</p>
 
       <div className="mt-3 flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2">
         <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-sm text-gray-100">
@@ -182,20 +215,22 @@ function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
           onClick={() => copy("key", apiKey)}
           className="shrink-0 rounded-md bg-surface-tertiary px-2 py-1 text-xs text-gray-300 hover:bg-surface-elevated"
         >
-          {copied === "key" ? "Copied" : "Copy"}
+          {copied === "key" ? tCommon("action.copied") : tCommon("action.copy")}
         </button>
       </div>
 
-      <p className="mt-4 text-xs font-medium text-gray-400">Paste into your MCP client config:</p>
+      <p className="mt-4 text-xs font-medium text-gray-400">{t("form.issued.configLabel")}</p>
       <div className="mt-1 rounded-lg bg-gray-900">
         <div className="flex items-center justify-between border-b border-surface-border px-3 py-1.5">
+          {/* The name of the format, not a word: it stays "json" everywhere. */}
+          {/* eslint-disable-next-line i18next/no-literal-string */}
           <span className="text-xs text-gray-500">json</span>
           <button
             type="button"
             onClick={() => copy("config", config)}
             className="text-xs text-gray-400 hover:text-white"
           >
-            {copied === "config" ? "Copied" : "Copy"}
+            {copied === "config" ? tCommon("action.copied") : tCommon("action.copy")}
           </button>
         </div>
         <pre className="overflow-x-auto p-3 text-xs">
@@ -209,7 +244,7 @@ function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
         rel="noopener noreferrer"
         className="mt-4 inline-block text-sm text-brand-400 underline underline-offset-2 hover:text-brand-300"
       >
-        Now ask a human a question →
+        {t("form.issued.next")}
       </a>
     </div>
   );

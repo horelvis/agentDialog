@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import type { Message, FormData as FormDataType } from "@/api/types";
+import { useTranslation } from "react-i18next";
+import type { Message, FormData as FormDataType, FormResponseData } from "@/api/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -10,6 +11,7 @@ interface FormMessageProps {
 }
 
 export function FormMessage({ message }: FormMessageProps) {
+  const { t } = useTranslation("chat");
   const data = message.structuredData as FormDataType;
   const sendMessage = useConversationStore((s) => s.sendMessage);
   const messages = useConversationStore(
@@ -19,7 +21,7 @@ export function FormMessage({ message }: FormMessageProps) {
   const existingResponse = messages.find(
     (m) =>
       m.type === "form_response" &&
-      (m.structuredData as any)?.formId === data.formId,
+      (m.structuredData as FormResponseData | undefined)?.formId === data.formId,
   );
 
   const [values, setValues] = useState<Record<string, unknown>>(() => {
@@ -49,14 +51,14 @@ export function FormMessage({ message }: FormMessageProps) {
 
   if (existingResponse) {
     const responses =
-      (existingResponse.structuredData as any)?.responses ?? {};
+      (existingResponse.structuredData as FormResponseData | undefined)?.responses ?? {};
     return (
       <Card className="overflow-hidden" borderColor="border-l-brand-500">
         <div className="border-b border-surface-border bg-surface-tertiary px-4 py-3">
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-gray-100">{data.title}</h4>
             <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
-              Submitted
+              {t("messages.form.submitted")}
             </span>
           </div>
           {message.content && (
@@ -99,7 +101,7 @@ export function FormMessage({ message }: FormMessageProps) {
                   onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
                   className="block w-full rounded-lg border border-surface-border bg-surface-elevated px-3 py-2 text-sm text-gray-100"
                 >
-                  <option value="">Select...</option>
+                  <option value="">{t("messages.form.select")}</option>
                   {field.options?.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
@@ -157,7 +159,7 @@ export function FormMessage({ message }: FormMessageProps) {
             />
           );
         })}
-        <Button type="submit" loading={loading}>Submit</Button>
+        <Button type="submit" loading={loading}>{t("messages.form.submit")}</Button>
       </form>
     </Card>
   );

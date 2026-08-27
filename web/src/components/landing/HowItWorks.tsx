@@ -1,35 +1,24 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 
+/** The numbers are the same in every language; the words are in the catalogue. */
 const steps = [
-  {
-    step: "1",
-    title: "Agent asks a question",
-    description: "One MCP tool call. Your agent sends a question to any human by email. No dashboards, no config files — just human_query() and you're done.",
-  },
-  {
-    step: "2",
-    title: "Human answers",
-    description: "An email tells them a question is waiting. They open it, sign in with a code — no password to remember — and answer in the chat, alongside the files, forms and approvals of that conversation.",
-  },
-  {
-    step: "3",
-    title: "Agent gets the answer",
-    description: "The answer comes back to the agent automatically, via webhook or MCP poll. No dashboard to watch.",
-  },
-];
+  { step: "1", id: "ask" },
+  { step: "2", id: "answer" },
+  { step: "3", id: "receive" },
+] as const;
 
 export function HowItWorks() {
+  const { t } = useTranslation("landing");
+
   return (
     <section id="how-it-works" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            From zero to dialog in 60 seconds
+            {t("how.heading")}
           </h2>
-          <p className="mt-4 text-lg text-gray-400">
-            Your agent drives the entire flow. Humans never start a conversation —
-            they answer the ones your agent opens.
-          </p>
+          <p className="mt-4 text-lg text-gray-400">{t("how.intro")}</p>
         </div>
 
         <div className="mt-16 grid gap-8 md:grid-cols-3">
@@ -38,17 +27,19 @@ export function HowItWorks() {
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-xl font-bold text-white">
                 {s.step}
               </div>
-              <h3 className="mt-6 text-lg font-semibold text-gray-100">{s.title}</h3>
-              <p className="mt-2 text-sm text-gray-400">{s.description}</p>
+              <h3 className="mt-6 text-lg font-semibold text-gray-100">
+                {t(`how.steps.${s.id}.title`)}
+              </h3>
+              <p className="mt-2 text-sm text-gray-400">{t(`how.steps.${s.id}.description`)}</p>
             </div>
           ))}
         </div>
 
         <div className="mt-12 text-center">
           <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
-            <Button size="lg">Get Started</Button>
+            <Button size="lg">{t("how.cta")}</Button>
           </a>
-          <p className="mt-2 text-sm text-gray-500">Free to use, no credit card</p>
+          <p className="mt-2 text-sm text-gray-500">{t("how.ctaNote")}</p>
         </div>
       </div>
     </section>

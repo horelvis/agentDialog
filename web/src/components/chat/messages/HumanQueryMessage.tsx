@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { Message } from "@/api/types";
 import { QueryCard } from "@/components/queries/QueryCard";
 import { useQueryStore } from "@/stores/queryStore";
@@ -20,6 +21,7 @@ interface HumanQueryMessageProps {
  * as its own human_query_response message.
  */
 export function HumanQueryMessage({ message }: HumanQueryMessageProps) {
+  const { t } = useTranslation("chat");
   const query = useQueryStore((s) =>
     s.queries.find((q) => q.queryMessageId === message.id),
   );
@@ -29,7 +31,7 @@ export function HumanQueryMessage({ message }: HumanQueryMessageProps) {
     return (
       <div className="rounded-lg border border-surface-border bg-surface-secondary p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-          Question
+          {t("messages.humanQuery.question")}
         </p>
         <p className="mt-1 text-sm text-gray-200">{message.content}</p>
       </div>

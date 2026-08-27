@@ -1,4 +1,5 @@
 import { useState, useRef, type KeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { useConversationStore } from "@/stores/conversationStore";
 import * as convApi from "@/api/conversations";
@@ -8,6 +9,7 @@ interface MessageInputProps {
 }
 
 export function MessageInput({ conversationId }: MessageInputProps) {
+  const { t } = useTranslation("chat");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -80,7 +82,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
+          placeholder={t("input.placeholder")}
           rows={1}
           className="max-h-32 flex-1 resize-none rounded-lg border border-surface-border bg-surface-tertiary px-3 py-2 text-sm placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />

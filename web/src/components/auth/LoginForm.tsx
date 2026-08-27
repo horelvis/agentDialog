@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
@@ -6,6 +7,14 @@ import { Input } from "@/components/ui/Input";
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
+
+/**
+ * What went wrong, not a finished sentence — see PublicQueryPage for the same
+ * shape. `raw` is the API's own wording; the other two name a key in this
+ * page's own catalogue so a language switch after the error still shows it
+ * in the language on screen.
+ */
+type Failure = { key: "auth.sendFailed" | "auth.invalidCode" } | { raw: string };
 
 /**
  * Where to go after signing in. Only a path inside our own app: an absolute URL
@@ -24,6 +33,9 @@ function safeNext(next: string | null): string {
 }
 
 export function LoginForm() {
+  // `common`, not `chat`: /login is reached before signing in, and `chat` is
+  // the whole signed-in app's catalogue.
+  const { t } = useTranslation("common");
   const [searchParams] = useSearchParams();
   const nextParam = searchParams.get("next");
 
@@ -32,7 +44,7 @@ export function LoginForm() {
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [step, setStep] = useState<"email" | "code">("email");
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(""));
-  const [error, setError] = useState("");
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -48,7 +60,7 @@ export function LoginForm() {
 
   const handleSendCode = async (e?: FormEvent) => {
     e?.preventDefault();
-    setError("");
+    setFailure(null);
     setLoading(true);
     try {
       await sendCode(email);
@@ -56,21 +68,21 @@ export function LoginForm() {
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: unknown) {
       const apiErr = err as { error?: { message?: string } } | undefined;
-      setError(apiErr?.error?.message || "Failed to send verification code. Please try again.");
+      setFailure(apiErr?.error?.message ? { raw: apiErr.error.message } : { key: "auth.sendFailed" });
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerify = async (fullCode: string) => {
-    setError("");
+    setFailure(null);
     setLoading(true);
     try {
       await verifyCode(email, fullCode);
       navigate(safeNext(nextParam), { replace: true });
     } catch (err: unknown) {
       const apiErr = err as { error?: { message?: string } } | undefined;
-      setError(apiErr?.error?.message || "Invalid or expired code. Please try again.");
+      setFailure(apiErr?.error?.message ? { raw: apiErr.error.message } : { key: "auth.invalidCode" });
       setCode(Array(CODE_LENGTH).fill(""));
       inputRefs.current[0]?.focus();
     } finally {
@@ -125,6 +137,8 @@ export function LoginForm() {
     handleSendCode();
   };
 
+  const errorMessage = failure ? ("raw" in failure ? failure.raw : t(failure.key)) : null;
+
   if (step === "code") {
     return (
       <div className="text-center">
@@ -133,9 +147,19 @@ export function LoginForm() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-100">Check your email</h3>
+        <h3 className="text-lg font-semibold text-gray-100">{t("auth.checkEmail")}</h3>
         <p className="mt-2 text-sm text-gray-400">
-          We sent a 6-digit code to <strong>{email}</strong>
+          {/* Unescaped interpolation into <Trans> — see InvitationCard.tsx for
+              why that needs care. Safe here, but not because this is merely
+              what the person typed: `email` is seeded above from `?email=` in
+              the URL (a mailed link), which is attacker-supplied. What
+              actually keeps `<`, `>` and `"` out is that this render is only
+              reached at step "code", which requires a prior successful submit
+              through <Input type="email" required> below plus the server's
+              own validation. Relax that field to type="text", or add a
+              username sign-in path, and this needs the same
+              shouldUnescape/escapeValue:true treatment. */}
+          <Trans t={t} i18nKey="auth.codeSentTo" values={{ email }} components={{ email: <strong /> }} />
         </p>
 
         <div className="mt-6 flex justify-center gap-2" onPaste={handlePaste}>
@@ -156,7 +180,7 @@ export function LoginForm() {
           ))}
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+        {errorMessage && <p className="mt-3 text-sm text-red-400">{errorMessage}</p>}
 
         <div className="mt-6">
           <button
@@ -165,16 +189,16 @@ export function LoginForm() {
             disabled={cooldown > 0 || loading}
             className="text-sm text-brand-400 hover:text-brand-300 disabled:text-gray-500 disabled:cursor-not-allowed"
           >
-            {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+            {cooldown > 0 ? t("auth.resendCodeIn", { seconds: cooldown }) : t("auth.resendCode")}
           </button>
         </div>
 
         <button
           type="button"
-          onClick={() => { setStep("email"); setError(""); setCode(Array(CODE_LENGTH).fill("")); }}
+          onClick={() => { setStep("email"); setFailure(null); setCode(Array(CODE_LENGTH).fill("")); }}
           className="mt-2 text-sm text-gray-500 hover:text-gray-400"
         >
-          Use a different email
+          {t("auth.useAnotherEmail")}
         </button>
       </div>
     );
@@ -185,15 +209,15 @@ export function LoginForm() {
       <Input
         id="email"
         type="email"
-        label="Email address"
-        placeholder="you@example.com"
+        label={t("auth.emailLabel")}
+        placeholder={t("auth.emailPlaceholder")}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        error={error}
+        error={errorMessage ?? undefined}
         required
       />
       <Button type="submit" className="w-full" loading={loading}>
-        Send Verification Code
+        {t("auth.sendCode")}
       </Button>
     </form>
   );

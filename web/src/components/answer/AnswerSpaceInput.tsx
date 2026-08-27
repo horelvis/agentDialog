@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { AnswerSpace, Answer } from "@/api/types";
 import { BooleanAnswer } from "./BooleanAnswer";
 import { ChoiceAnswer } from "./ChoiceAnswer";
@@ -14,6 +15,8 @@ interface AnswerSpaceInputProps {
 
 /** Dispatches to one renderer per answer shape, by `space.kind`. */
 export function AnswerSpaceInput({ space, value, onChange }: AnswerSpaceInputProps) {
+  const { t } = useTranslation("query");
+
   switch (space.kind) {
     case "boolean":
       return (
@@ -43,41 +46,8 @@ export function AnswerSpaceInput({ space, value, onChange }: AnswerSpaceInputPro
       // the one surface with no automated tests to catch it.
       return (
         <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300">
-          This question asks for an answer of a kind this app doesn&apos;t recognise
-          ({String((space as { kind?: unknown }).kind)}). Reload to pick up the
-          latest version; if it persists, the agent needs to ask again in a shape
-          this app supports.
+          {t("answer.unsupportedKind", { kind: String((space as { kind?: unknown }).kind) })}
         </p>
-      );
-  }
-}
-
-/**
- * Client-side readiness check, for the Respond button only — it never
- * substitutes for the server's own `validateAnswerAgainstSpace`, which is
- * what actually decides whether an answer fits.
- */
-export function isAnswerComplete(space: AnswerSpace, answer: Answer | null): boolean {
-  if (!answer || answer.kind !== space.kind) return false;
-
-  switch (answer.kind) {
-    case "boolean":
-      return true;
-    case "choice":
-      return answer.optionIds.length > 0;
-    case "scalar":
-      return Number.isFinite(answer.value);
-    case "date":
-      return /^\d{4}-\d{2}-\d{2}$/.test(answer.value);
-    case "text":
-      return answer.value.trim().length > 0;
-    case "fields":
-      return (
-        space.kind === "fields" &&
-        space.fields.every((f) => {
-          const v = answer.values[f.id];
-          return v !== undefined && v !== null && v !== "";
-        })
       );
   }
 }

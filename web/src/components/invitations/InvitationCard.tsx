@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import { useNavigate } from "react-router";
 import type { Invitation } from "@/api/types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatRelativeTime } from "@/lib/formatters";
+import { useLanguage } from "@/i18n";
 
 interface InvitationCardProps {
   invitation: Invitation;
@@ -13,8 +15,10 @@ interface InvitationCardProps {
 }
 
 export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCardProps) {
+  const { t } = useTranslation("chat");
   const [loading, setLoading] = useState<"accept" | "decline" | null>(null);
   const navigate = useNavigate();
+  const language = useLanguage();
 
   const handleAccept = async () => {
     setLoading("accept");
@@ -37,24 +41,47 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
 
   return (
     <div className="flex items-center gap-4 rounded-xl border border-surface-border bg-surface-secondary p-4 transition-colors hover:bg-surface-tertiary">
-      <Avatar name={invitation.agentDisplayName ?? "Agent"} size="md" />
+      <Avatar name={invitation.agentDisplayName ?? t("shared.agent")} size="md" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h3 className="truncate font-medium text-gray-100">
-            {invitation.conversationTitle ?? "Conversation Invitation"}
+            {invitation.conversationTitle ?? t("invitations.untitled")}
           </h3>
-          <Badge>{invitation.status}</Badge>
+          <Badge>{t(`invitations.status.${invitation.status}`)}</Badge>
         </div>
         {invitation.agentDisplayName && (
           <p className="text-sm text-gray-400">
-            from <span className="text-gray-300">{invitation.agentDisplayName}</span>
+            {/* One node, not a preposition and a name as separate siblings —
+                Catalan elides "de" before a vowel (d'Ana, not de Ana), which
+                no catalogue value could fix once the two are split apart. */}
+            {/* agentDisplayName is agent-controlled, and this app sets
+                `interpolation.escapeValue: false` globally (React already
+                escapes plain text, and double-escaping would mangle every
+                apostrophe in Spanish and Catalan). For <Trans>, though,
+                react-i18next substitutes `values` into the string *before*
+                parsing it for component tags — with escaping off, a display
+                name like `<name style="x">Ops</name>` closes the real `name`
+                tag early and opens a fake one with attacker-controlled
+                attributes, which threw during render (invalid `style` value)
+                and would otherwise let arbitrary attributes reach the DOM.
+                shouldUnescape + a local escapeValue:true re-enables escaping
+                for this one call, then un-escapes the entities afterwards so
+                accented names and "&" still render as themselves. */}
+            <Trans
+              t={t}
+              i18nKey="invitations.from"
+              shouldUnescape
+              tOptions={{ interpolation: { escapeValue: true } }}
+              values={{ name: invitation.agentDisplayName }}
+              components={{ name: <span className="text-gray-300" /> }}
+            />
           </p>
         )}
         {invitation.message && (
           <p className="mt-1 truncate text-sm text-gray-500">{invitation.message}</p>
         )}
         <p className="mt-1 text-xs text-gray-600">
-          {formatRelativeTime(invitation.createdAt)}
+          {formatRelativeTime(invitation.createdAt, language)}
         </p>
       </div>
       <div className="flex shrink-0 gap-2">
@@ -64,7 +91,7 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
           loading={loading === "accept"}
           disabled={loading !== null}
         >
-          Accept
+          {t("invitations.accept")}
         </Button>
         <Button
           size="sm"
@@ -73,7 +100,7 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
           loading={loading === "decline"}
           disabled={loading !== null}
         >
-          Decline
+          {t("invitations.decline")}
         </Button>
       </div>
     </div>

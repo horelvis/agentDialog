@@ -1,10 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "react-router";
-import { AnswerSpaceInput, isAnswerComplete } from "@/components/answer/AnswerSpaceInput";
+import { useTranslation } from "react-i18next";
+import { AnswerSpaceInput } from "@/components/answer/AnswerSpaceInput";
+import { isAnswerComplete } from "@/components/answer/isAnswerComplete";
 import { Button } from "@/components/ui/Button";
 import { API_BASE } from "@/lib/constants";
 import { answerToWire } from "@/api/queries";
 import { QueryContextHeader } from "@/components/queries/QueryContextHeader";
+import { changeLanguage } from "@/i18n";
+import { persistentStore } from "@/lib/storage";
+import { readStoredLanguage, resolveLanguage } from "@/i18n/resolve";
 import type { Answer, AnswerSpace, QueryChange, QuerySubject } from "@/api/types";
 
 /**
@@ -24,19 +29,30 @@ interface PublicQuery {
   // renewed decision arrived here with its delta and showed none of it.
   changes?: QueryChange[] | null;
   answer_space: AnswerSpace;
+  // Declared by the agent when it asked. It is a hint about who is reading,
+  // not a translation of the question: the words below are the agent's own.
+  language?: string | null;
 }
 
 const REASONS = [
-  { id: "unknown_subject", label: "I don't know what this is about" },
-  { id: "missing_delta", label: "I don't know what changed since last time" },
-  { id: "unclear_consequences", label: "I can't tell what each option would do" },
-  { id: "referent_unreachable", label: "I can't see the thing being asked about" },
-  { id: "not_my_decision", label: "This isn't mine to decide" },
+  "unknown_subject",
+  "missing_delta",
+  "unclear_consequences",
+  "referent_unreachable",
+  "not_my_decision",
 ] as const;
+
+/**
+ * A failure is stored as what went wrong, not as a finished sentence — see
+ * GetKeyForm. `raw` is the API's own wording, already worded and never
+ * retranslated. The other two carry a namespace because this page's own
+ * catalogue and `common` both contribute a possible cause.
+ */
+type Failure = { ns: "query"; key: "page.sendFailed" } | { ns: "common"; key: "error.unreachable" } | { raw: string };
 
 type State =
   | { status: "loading" }
-  | { status: "ready"; query: PublicQuery; error?: string }
+  | { status: "ready"; query: PublicQuery; failure?: Failure }
   | { status: "sending"; query: PublicQuery }
   | { status: "answered" }
   | { status: "returned" }
@@ -44,6 +60,8 @@ type State =
 
 export function PublicQueryPage() {
   const { token } = useParams();
+  const { t } = useTranslation("query");
+  const { t: tCommon } = useTranslation("common");
   const [state, setState] = useState<State>({ status: "loading" });
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [reason, setReason] = useState<string>("");
@@ -58,7 +76,27 @@ export function PublicQueryPage() {
         if (!res.ok) return setState({ status: "gone" });
 
         const body = await res.json();
+        // res.json() is a second suspension point after the `cancelled` check
+        // above: someone can navigate away while it awaits. setState on an
+        // unmounted component is a harmless no-op, but changeLanguage mutates
+        // i18next's global state outside React — unguarded, a slow response
+        // to a query this person left would switch the language of whatever
+        // page they're looking at now.
+        if (cancelled) return;
         setState({ status: "ready", query: body.data });
+
+        // Precedence, and the one place all three sources meet. `persist:
+        // false` is load-bearing: writing the agent's declaration to storage
+        // would make it outrank every later declaration for good, from a
+        // choice this person never made.
+        void changeLanguage(
+          resolveLanguage({
+            stored: readStoredLanguage(persistentStore()),
+            declared: body.data.language,
+            navigator: navigator.languages,
+          }),
+          { persist: false },
+        );
       } catch {
         if (!cancelled) setState({ status: "gone" });
       }
@@ -89,20 +127,21 @@ export function PublicQueryPage() {
       if (res.status === 401) return setState({ status: "gone" });
 
       const body = await res.json().catch(() => null);
+      const raw: string | undefined = body?.error?.message;
       setState({
         status: "ready",
         query,
-        error: body?.error?.message ?? "That didn't send. Try again.",
+        failure: raw ? { raw } : { ns: "query", key: "page.sendFailed" },
       });
     } catch {
-      setState({ status: "ready", query, error: "Could not reach the server. Try again." });
+      setState({ status: "ready", query, failure: { ns: "common", key: "error.unreachable" } });
     }
   }
 
   if (state.status === "loading") {
     return (
       <Shell>
-        <p className="text-gray-400">Loading…</p>
+        <p className="text-gray-400">{tCommon("state.loading")}</p>
       </Shell>
     );
   }
@@ -112,11 +151,8 @@ export function PublicQueryPage() {
   if (state.status === "gone") {
     return (
       <Shell>
-        <h1 className="text-xl font-semibold text-gray-100">This link no longer works</h1>
-        <p className="mt-2 text-gray-400">
-          It may have been used already, or the question may have closed. Sign in to the app to
-          see anything still waiting for you.
-        </p>
+        <h1 className="text-xl font-semibold text-gray-100">{t("page.gone.title")}</h1>
+        <p className="mt-2 text-gray-400">{t("page.gone.body")}</p>
       </Shell>
     );
   }
@@ -124,8 +160,8 @@ export function PublicQueryPage() {
   if (state.status === "answered") {
     return (
       <Shell>
-        <h1 className="text-xl font-semibold text-gray-100">Answer sent</h1>
-        <p className="mt-2 text-gray-400">Thank you — you can close this page.</p>
+        <h1 className="text-xl font-semibold text-gray-100">{t("page.answered.title")}</h1>
+        <p className="mt-2 text-gray-400">{t("page.answered.body")}</p>
       </Shell>
     );
   }
@@ -133,16 +169,22 @@ export function PublicQueryPage() {
   if (state.status === "returned") {
     return (
       <Shell>
-        <h1 className="text-xl font-semibold text-gray-100">Sent back for more detail</h1>
-        <p className="mt-2 text-gray-400">
-          They will get back to you. This link keeps working, so you can return to it.
-        </p>
+        <h1 className="text-xl font-semibold text-gray-100">{t("page.returned.title")}</h1>
+        <p className="mt-2 text-gray-400">{t("page.returned.body")}</p>
       </Shell>
     );
   }
 
   const { query } = state;
   const busy = state.status === "sending";
+  const errorMessage =
+    state.status === "ready" && state.failure
+      ? "raw" in state.failure
+        ? state.failure.raw
+        : state.failure.ns === "common"
+          ? tCommon(state.failure.key)
+          : t(state.failure.key)
+      : null;
 
   return (
     <Shell>
@@ -157,7 +199,7 @@ export function PublicQueryPage() {
           )}
           <div>
             <p className="text-sm font-medium text-gray-100">{query.agent.display_name}</p>
-            <p className="text-xs text-gray-500">is asking you a question</p>
+            <p className="text-xs text-gray-500">{t("page.asking")}</p>
           </div>
         </div>
       )}
@@ -180,7 +222,7 @@ export function PublicQueryPage() {
 
       {query.context && (
         <div className="mt-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Context</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t("page.contextLabel")}</p>
           <p className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap text-sm text-gray-400">
             {query.context}
           </p>
@@ -191,9 +233,9 @@ export function PublicQueryPage() {
         <AnswerSpaceInput space={query.answer_space} value={answer} onChange={setAnswer} />
       </div>
 
-      {state.status === "ready" && state.error && (
+      {errorMessage && (
         <p role="alert" className="mt-4 text-sm text-red-400">
-          {state.error}
+          {errorMessage}
         </p>
       )}
 
@@ -204,22 +246,22 @@ export function PublicQueryPage() {
         disabled={!isAnswerComplete(query.answer_space, answer)}
         onClick={() => answer && send({ outcome: "answer", answer: answerToWire(answer) }, { status: "answered" })}
       >
-        Send answer
+        {t("page.send")}
       </Button>
 
       <details className="mt-6">
-        <summary className="cursor-pointer text-sm text-gray-400">I can't answer this</summary>
+        <summary className="cursor-pointer text-sm text-gray-400">{t("page.cantAnswer")}</summary>
         <div className="mt-3 space-y-2">
-          {REASONS.map((r) => (
-            <label key={r.id} className="flex items-center gap-2 text-sm text-gray-300">
+          {REASONS.map((id) => (
+            <label key={id} className="flex items-center gap-2 text-sm text-gray-300">
               <input
                 type="radio"
                 name="reason"
-                value={r.id}
-                checked={reason === r.id}
-                onChange={() => setReason(r.id)}
+                value={id}
+                checked={reason === id}
+                onChange={() => setReason(id)}
               />
-              {r.label}
+              {t(`reasons.${id}`)}
             </label>
           ))}
           <Button
@@ -229,7 +271,7 @@ export function PublicQueryPage() {
             disabled={!reason}
             onClick={() => send({ outcome: "insufficient_context", reason }, { status: "returned" })}
           >
-            Send it back
+            {t("page.sendBack")}
           </Button>
         </div>
       </details>

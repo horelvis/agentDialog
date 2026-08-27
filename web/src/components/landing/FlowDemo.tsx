@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 
 /**
@@ -38,14 +39,26 @@ const NODE_LABELS: Record<NodeId, string> = {
   end: "__end__",
 };
 
-/** What each node did, in the words of whoever did it. */
-const NODE_DETAIL: Partial<Record<NodeId, string>> = {
-  start: "the agent invokes its graph",
-  gather_context: "reads 4 sources · 8s",
-  ask_human: "hands the decision over",
-  apply_decision: "writes the answer back · 0.4s",
-  end: "the agent closes the operation",
-};
+/**
+ * What each node did, in the words of whoever did it — as catalogue keys. The
+ * node *names* above are code and stay; these are sentences and do not.
+ */
+const NODE_DETAIL_KEY = {
+  start: "flow.node.start",
+  gather_context: "flow.node.gatherContext",
+  ask_human: "flow.node.askHuman",
+  apply_decision: "flow.node.applyDecision",
+  end: "flow.node.end",
+} as const satisfies Partial<Record<NodeId, string>>;
+
+/** The detail line for a node, or nothing for one that has no line of its own. */
+function useNodeDetail(): (id: NodeId) => string | undefined {
+  const { t } = useTranslation("landing");
+  return (id) =>
+    id in NODE_DETAIL_KEY
+      ? t(NODE_DETAIL_KEY[id as keyof typeof NODE_DETAIL_KEY])
+      : undefined;
+}
 
 /**
  * The script. Written out frame by frame rather than derived from a clock,
@@ -115,8 +128,8 @@ const FRAMES: Frame[] = [
  * not confirming a decision the agent already made.
  */
 const OPTIONS = [
-  { label: "Option A", consequence: "Applied now. The operation closes today.", branch: "apply" },
-  { label: "Option B", consequence: "Held for review. Nothing is written yet.", branch: "escalate" },
+  { id: "apply", branch: "apply" },
+  { id: "escalate", branch: "escalate" },
 ] as const;
 
 /** The frame the demo jumps to when a visitor answers it themselves. */
@@ -146,6 +159,8 @@ function NodeDot({ state }: { state: NodeState }) {
   }
   if (state === "done") {
     return (
+      // A glyph, not a word: the tick drawn inside a finished node.
+      // eslint-disable-next-line i18next/no-literal-string
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[8px] leading-none text-white">
         &#10003;
       </span>
@@ -207,6 +222,7 @@ function QueryPanel({
   choice: number;
   onChoose: (index: number) => void;
 }) {
+  const { t } = useTranslation("landing");
   const answered = state === "answered";
   return (
     <div
@@ -217,21 +233,23 @@ function QueryPanel({
     >
       <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2">
         <span className="rounded-full bg-risk-medium/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-risk-medium">
-          medium risk
+          {t("flow.query.risk")}
         </span>
-        <span className="text-[11px] text-gray-500">Subject · record #A-1042</span>
+        <span className="text-[11px] text-gray-500">{t("flow.query.subject")}</span>
         <span
           className={cn(
             "ml-auto font-mono text-[11px] tabular-nums",
             answered ? "text-gray-500" : "text-risk-medium",
           )}
         >
-          {answered ? "answered" : `waiting ${formatSeconds(seconds)}`}
+          {answered
+            ? t("flow.query.answered")
+            : t("flow.query.waiting", { clock: formatSeconds(seconds) })}
         </span>
       </div>
 
       <div className="px-3 py-3">
-        <p className="text-sm text-gray-200">Approve this operation?</p>
+        <p className="text-sm text-gray-200">{t("flow.query.question")}</p>
 
         <div className="mt-2.5 space-y-1.5">
           {OPTIONS.map((option, index) => {
@@ -239,7 +257,7 @@ function QueryPanel({
             const dropped = answered && index !== choice;
             return (
               <button
-                key={option.label}
+                key={option.id}
                 type="button"
                 onClick={() => onChoose(index)}
                 aria-pressed={picked}
@@ -260,7 +278,7 @@ function QueryPanel({
                       picked ? "text-brand-200" : "text-gray-200",
                     )}
                   >
-                    {option.label}
+                    {t(`flow.options.${option.id}.label`)}
                   </span>
                   <span
                     className={cn(
@@ -268,11 +286,11 @@ function QueryPanel({
                       picked ? "bg-brand-500/20 text-brand-200" : "bg-surface-hover/60 text-gray-400",
                     )}
                   >
-                    {picked ? "chosen" : "choose"}
+                    {picked ? t("flow.query.chosen") : t("flow.query.choose")}
                   </span>
                 </span>
                 <span className="mt-0.5 block text-[11px] leading-snug text-gray-500">
-                  {option.consequence}
+                  {t(`flow.options.${option.id}.consequence`)}
                 </span>
               </button>
             );
@@ -352,11 +370,13 @@ function NodeChip({
   above?: boolean;
   detail?: string;
 }) {
+  const { t } = useTranslation("landing");
+  const nodeDetail = useNodeDetail();
   const { x, y } = POSITIONS[id];
   // A node the run passed over can only say that it was passed over. Leaving its
   // own description under it claims work that never happened.
   const detail =
-    state === "untaken" ? (detailOverride ?? "not taken this run") : NODE_DETAIL[id];
+    state === "untaken" ? (detailOverride ?? t("flow.node.untaken")) : nodeDetail(id);
 
   return (
     <div
@@ -394,6 +414,7 @@ const edgeFor = (target: NodeState): EdgeState =>
 
 /** The wide layout: the agent's rail across the top, the person underneath it. */
 function HorizontalFlow({ view }: { view: FlowView }) {
+  const { t } = useTranslation("landing");
   const { frame, states, takesApply, answered, waitSeconds, choice, onChoose, idle } = view;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [scrollable, setScrollable] = useState(false);
@@ -468,10 +489,10 @@ function HorizontalFlow({ view }: { view: FlowView }) {
             </svg>
 
             <span className="absolute left-0 top-[7%] font-mono text-[10px] uppercase tracking-[0.2em] text-gray-600">
-              agent
+              {t("flow.laneAgent")}
             </span>
             <span className="absolute left-0 top-[52%] font-mono text-[10px] uppercase tracking-[0.2em] text-gray-600">
-              human
+              {t("flow.laneHuman")}
             </span>
 
             <NodeChip id="start" state={states.start} />
@@ -483,7 +504,7 @@ function HorizontalFlow({ view }: { view: FlowView }) {
               <NodeChip
                 id="escalate"
                 state={states.escalate}
-                detail={takesApply ? undefined : "held for review · nothing written"}
+                detail={takesApply ? undefined : t("flow.node.escalateHeld")}
               />
             ) : null}
 
@@ -516,9 +537,13 @@ function HorizontalFlow({ view }: { view: FlowView }) {
 
 /** A node as a row: the dot on the rail, its name and its detail beside it. */
 function VerticalNode({ id, state, detail }: { id: NodeId; state: NodeState; detail?: string }) {
+  const { t } = useTranslation("landing");
+  const nodeDetail = useNodeDetail();
   // Always a string, so the line is always in the layout: a detail that appears
   // only once a node resolves would shift everything under it mid-loop.
-  const shown = state === "untaken" ? (detail ?? "not taken this run") : (NODE_DETAIL[id] ?? detail ?? "not taken this run");
+  const untaken = t("flow.node.untaken");
+  const shown =
+    state === "untaken" ? (detail ?? untaken) : (nodeDetail(id) ?? detail ?? untaken);
   return (
     <div className="flex items-start gap-3 text-left">
       <span className="mt-0.5">
@@ -553,11 +578,12 @@ function VerticalRail({ state }: { state: NodeState }) {
  * one shape that keeps every label full size.
  */
 function VerticalFlow({ view }: { view: FlowView }) {
+  const { t } = useTranslation("landing");
   const { frame, states, takesApply, waitSeconds, choice, onChoose, idle } = view;
 
   return (
     <div className={cn("mx-auto max-w-sm", idle && "animate-pulse")}>
-      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-600">agent</p>
+      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-600">{t("flow.laneAgent")}</p>
 
       <VerticalNode id="start" state={states.start} />
       <VerticalRail state={states.gather_context} />
@@ -569,7 +595,7 @@ function VerticalFlow({ view }: { view: FlowView }) {
           the space it needs is its own height instead of a number guessed here —
           and the page below never moves while the loop plays. */}
       <div className="ml-[6px] border-l border-surface-border pl-5 pt-2">
-        <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-600">human</p>
+        <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-600">{t("flow.laneHuman")}</p>
         <div className={cn(frame.query === "hidden" && "invisible")} aria-hidden={frame.query === "hidden"}>
           <QueryPanel
             state={frame.query === "hidden" ? "asking" : frame.query}
@@ -592,7 +618,11 @@ function VerticalFlow({ view }: { view: FlowView }) {
             takesApply ? "border-surface-border" : "border-brand-700",
           )}
         />
-        <VerticalNode id="escalate" state={states.escalate} detail={takesApply ? undefined : "held for review · nothing written"} />
+        <VerticalNode
+          id="escalate"
+          state={states.escalate}
+          detail={takesApply ? undefined : t("flow.node.escalateHeld")}
+        />
       </div>
     </div>
   );
@@ -619,6 +649,7 @@ function useIsNarrow(): boolean {
 }
 
 export function FlowDemo() {
+  const { t } = useTranslation("landing");
   const [frameIndex, setFrameIndex] = useState(0);
   const [choice, setChoice] = useState(0);
   const [tick, setTick] = useState(0);
@@ -715,18 +746,17 @@ export function FlowDemo() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            See the full loop in action
+            {t("flow.heading")}
           </h2>
-          <p className="mt-4 text-lg text-gray-400">
-            A graph runs until it reaches a decision that is not the agent&apos;s to make. It stops
-            there, a person answers with the consequences spelled out, and the answer comes back
-            structured — so the graph carries on and closes the operation.
-          </p>
+          <p className="mt-4 text-lg text-gray-400">{t("flow.intro")}</p>
         </div>
 
         <div ref={containerRef} className="mx-auto mt-14 max-w-4xl">
           <div className="mb-3 flex items-center gap-2 px-1">
+            {/* Both are code: the call and the name of the pattern. */}
+            {/* eslint-disable-next-line i18next/no-literal-string */}
             <code className="font-mono text-xs text-brand-300">graph.invoke()</code>
+            {/* eslint-disable-next-line i18next/no-literal-string */}
             <span className="text-xs text-gray-500">human_in_the_loop</span>
             <span className="ml-auto flex items-center gap-1.5">
               <span
@@ -740,15 +770,17 @@ export function FlowDemo() {
                 )}
               />
               <span className="text-[10px] uppercase tracking-wide text-gray-500">
-                {idle
-                  ? "ready"
-                  : askState === "waiting"
-                    ? "paused on a human"
-                    : !takesApply && answered
-                      ? "held for review"
-                      : states.end === "done"
-                        ? "closed"
-                        : "running"}
+                {t(
+                  idle
+                    ? "flow.status.ready"
+                    : askState === "waiting"
+                      ? "flow.status.waiting"
+                      : !takesApply && answered
+                        ? "flow.status.held"
+                        : states.end === "done"
+                          ? "flow.status.closed"
+                          : "flow.status.running",
+                )}
               </span>
             </span>
           </div>
@@ -756,9 +788,7 @@ export function FlowDemo() {
           {narrow ? <VerticalFlow view={view} /> : <HorizontalFlow view={view} />}
 
           <p className="mt-2 text-center text-[11px] text-gray-600">
-            {reduced
-              ? "Animation paused: your system asks for reduced motion."
-              : "A person took the place of a hardcoded rule. Everything else is the graph you already have."}
+            {t(reduced ? "flow.footnoteReduced" : "flow.footnote")}
           </p>
         </div>
       </div>

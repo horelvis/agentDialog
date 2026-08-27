@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useTrustedAgentStore } from "@/stores/trustedAgentStore";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function TrustedAgentsPage() {
+  const { t } = useTranslation("chat");
   const { agents, loading, fetchTrustedAgents, revoke } = useTrustedAgentStore();
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
@@ -26,10 +28,8 @@ export function TrustedAgentsPage() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <header className="border-b border-surface-border bg-surface-secondary px-6 py-4">
-        <h1 className="text-lg font-semibold text-gray-100">Trusted Agents</h1>
-        <p className="text-sm text-gray-400">
-          Agents you've previously accepted invitations from. Future invitations from trusted agents are auto-accepted.
-        </p>
+        <h1 className="text-lg font-semibold text-gray-100">{t("agents.title")}</h1>
+        <p className="text-sm text-gray-400">{t("agents.body")}</p>
       </header>
       <div className="flex-1 p-6">
         {loading ? (
@@ -41,8 +41,8 @@ export function TrustedAgentsPage() {
             <svg className="mx-auto mb-3 h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            <p>No trusted agents yet.</p>
-            <p className="mt-1 text-sm">Once you accept an invitation from an agent, they'll appear here.</p>
+            <p>{t("agents.emptyTitle")}</p>
+            <p className="mt-1 text-sm">{t("agents.emptyBody")}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -69,7 +69,7 @@ export function TrustedAgentsPage() {
                   loading={revokingId === agent.agentId}
                   onClick={() => handleRevoke(agent.agentId)}
                 >
-                  Revoke
+                  {t("agents.revoke")}
                 </Button>
               </div>
             ))}

@@ -1,8 +1,10 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { useQueryStore } from "@/stores/queryStore";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { useNow } from "@/hooks/useNow";
 import type { HumanQuery, QueryType } from "@/api/types";
 
 /**
@@ -15,19 +17,23 @@ import type { HumanQuery, QueryType } from "@/api/types";
  * across several conversations still needs somewhere to see them together.
  */
 
-const queryTypeBadge: Record<QueryType, { label: string; color: string }> = {
-  validation: { label: "Validation", color: "bg-blue-600" },
-  interpretation: { label: "Interpretation", color: "bg-purple-600" },
-  expert_query: { label: "Expert", color: "bg-amber-600" },
-  labeling: { label: "Labeling", color: "bg-green-600" },
+// Colors only — the words come from QueryCard's own `query:card.type.*` keys,
+// so a query type reads the same badge wherever it's answered from.
+const queryTypeColor: Record<QueryType, string> = {
+  validation: "bg-blue-600",
+  interpretation: "bg-purple-600",
+  expert_query: "bg-amber-600",
+  labeling: "bg-green-600",
 };
 
 function QueryRow({ query }: { query: HumanQuery }) {
-  const badge = queryTypeBadge[query.queryType];
-  const expiresIn = Math.max(
-    0,
-    Math.round((new Date(query.expiresAt).getTime() - Date.now()) / 60000),
-  );
+  const { t } = useTranslation("chat");
+  const { t: tQuery } = useTranslation("query");
+  const now = useNow();
+  const expiresIn =
+    now == null
+      ? null
+      : Math.max(0, Math.round((new Date(query.expiresAt).getTime() - now) / 60000));
 
   return (
     <Link
@@ -36,28 +42,29 @@ function QueryRow({ query }: { query: HumanQuery }) {
     >
       <div className="flex items-start gap-3">
         <span
-          className={`inline-flex shrink-0 items-center rounded px-2 py-0.5 text-xs font-medium text-white ${badge.color}`}
+          className={`inline-flex shrink-0 items-center rounded px-2 py-0.5 text-xs font-medium text-white ${queryTypeColor[query.queryType]}`}
         >
-          {badge.label}
+          {tQuery(`card.type.${query.queryType}`)}
         </span>
         <Badge variant="risk" risk={query.risk}>
-          {query.risk}
+          {tQuery(`card.risk.${query.risk}`)}
         </Badge>
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-gray-100">{query.question}</p>
           <p className="mt-1 text-xs text-gray-500">
             {query.status === "needs_context"
-              ? "Waiting on the agent to clarify"
-              : `Expires in ${expiresIn} min`}
+              ? t("queries.waitingOnAgent")
+              : expiresIn != null && tQuery("card.expiresIn", { minutes: expiresIn })}
           </p>
         </div>
-        <span className="shrink-0 self-center text-xs text-brand-400">Answer →</span>
+        <span className="shrink-0 self-center text-xs text-brand-400">{t("queries.answerCta")}</span>
       </div>
     </Link>
   );
 }
 
 export function QueriesPage() {
+  const { t } = useTranslation("chat");
   const { queries, loading, fetchQueries } = useQueryStore();
 
   useEffect(() => {
@@ -67,10 +74,8 @@ export function QueriesPage() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <header className="border-b border-surface-border bg-surface-secondary px-6 py-4">
-        <h1 className="text-lg font-semibold text-gray-100">Queries</h1>
-        <p className="text-sm text-gray-400">
-          Questions from agents. Open one to answer it in its conversation.
-        </p>
+        <h1 className="text-lg font-semibold text-gray-100">{t("queries.title")}</h1>
+        <p className="text-sm text-gray-400">{t("queries.body")}</p>
       </header>
       <div className="flex-1 p-6">
         {loading ? (
@@ -82,8 +87,8 @@ export function QueriesPage() {
             <svg className="mx-auto mb-3 h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p>No pending queries.</p>
-            <p className="mt-1 text-sm">When agents send you questions, they'll appear here.</p>
+            <p>{t("queries.emptyTitle")}</p>
+            <p className="mt-1 text-sm">{t("queries.emptyBody")}</p>
           </div>
         ) : (
           <div className="space-y-3">

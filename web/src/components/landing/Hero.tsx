@@ -1,17 +1,21 @@
 import { useEffect } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { GetKeyForm } from "@/components/landing/GetKeyForm";
-import { browserStorage, rememberAttribution } from "@/lib/attribution";
+import { rememberAttribution } from "@/lib/attribution";
+import { sessionStore } from "@/lib/storage";
 
 /**
- * Each one is checkable against the product, which is the bar this landing has
+ * Each claim is checkable against the product, which is the bar this landing has
  * to clear: the form asks for the agent name and nothing else, a human answers
  * in the chat their email points to — not "without signing in", which is untrue
  * for a high-risk query — and the key is shown exactly once, as GetKeyForm warns.
+ *
+ * The icons stay here; their words moved to the catalogue. Each entry keeps the
+ * id that names its keys, so a translator never meets an SVG.
  */
 const REASSURANCES = [
   {
-    title: "No credit card",
-    detail: "The form asks for one thing: your agent's name.",
+    id: "noCard",
     icon: (
       <svg className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -34,8 +38,7 @@ const REASSURANCES = [
     ),
   },
   {
-    title: "No account to create",
-    detail: "Your team answers in the chat the email points to.",
+    id: "noAccount",
     icon: (
       <svg className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -58,8 +61,7 @@ const REASSURANCES = [
     ),
   },
   {
-    title: "Key in 15 seconds",
-    detail: "Shown once, on this page. Copy it and you're integrating.",
+    id: "fast",
     icon: (
       <svg className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -71,13 +73,15 @@ const REASSURANCES = [
       </svg>
     ),
   },
-];
+] as const;
 
 export function Hero() {
+  const { t } = useTranslation("landing");
+
   // Remember where this visitor came from, so the agent they register carries
   // its origin. Cheap enough to do on every landing view.
   useEffect(() => {
-    rememberAttribution(window.location.search, browserStorage());
+    rememberAttribution(window.location.search, sessionStore());
   }, []);
 
   return (
@@ -86,21 +90,18 @@ export function Hero() {
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-800 bg-brand-950 px-4 py-1.5 text-sm text-brand-300">
             <span className="flex h-2 w-2 rounded-full bg-brand-500" />
-            The agent-first messaging platform
+            {t("hero.badge")}
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight text-gray-100 sm:text-6xl">
-            Your agents ask.{" "}
-            <span className="text-brand-600">Your team answers</span> in one
-            click.
+            <Trans
+              t={t}
+              i18nKey="hero.headline"
+              components={{ accent: <span className="text-brand-600" /> }}
+            />
           </h1>
 
-          <p className="mt-6 text-lg leading-8 text-gray-400">
-            When your AI agent needs a human decision, it sends one API call.
-            Your team gets an email, signs in with the code it carries, and
-            answers in the chat. No account to create. No password. No context
-            lost.
-          </p>
+          <p className="mt-6 text-lg leading-8 text-gray-400">{t("hero.subhead")}</p>
 
           <div className="mt-10 flex flex-col items-center gap-5">
             <GetKeyForm />
@@ -111,14 +112,18 @@ export function Hero() {
           <ul className="mx-auto mt-12 grid max-w-5xl gap-4 sm:grid-cols-3">
           {REASSURANCES.map((item) => (
             <li
-              key={item.title}
+              key={item.id}
               className="rounded-xl border border-surface-border bg-surface-secondary p-5 text-left"
             >
               <span className="inline-flex text-brand-400" aria-hidden="true">
                 {item.icon}
               </span>
-              <p className="mt-3.5 text-base font-semibold text-gray-100">{item.title}</p>
-              <p className="mt-1 text-sm leading-snug text-gray-400">{item.detail}</p>
+              <p className="mt-3.5 text-base font-semibold text-gray-100">
+                {t(`hero.reassurance.${item.id}.title`)}
+              </p>
+              <p className="mt-1 text-sm leading-snug text-gray-400">
+                {t(`hero.reassurance.${item.id}.detail`)}
+              </p>
             </li>
           ))}
         </ul>
@@ -130,7 +135,7 @@ export function Hero() {
             rel="noopener noreferrer"
             className="text-sm text-gray-400 underline underline-offset-4 hover:text-gray-200"
           >
-            Or read the docs first
+            {t("hero.docsLink")}
           </a>
         </div>
       </div>

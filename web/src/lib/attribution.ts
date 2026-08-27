@@ -5,6 +5,10 @@
  * analytics vendor: `select metadata->>'utm_campaign' from agents`.
  */
 
+import { sessionStore, type StorageLike } from "./storage";
+
+export type { StorageLike };
+
 export const ATTRIBUTION_KEY = "agentdialog:attribution";
 
 /** Parameters we keep. Anything else in the URL is somebody else's business. */
@@ -19,11 +23,8 @@ const SLUG_FALLBACK = "agent";
 
 export type Attribution = Record<string, string>;
 
-/** A `Storage`, narrowed to what we use, so tests can hand us a fake. */
-export interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
+/** Attribution is a per-visit thing, so it lives in session storage. */
+export const browserStorage = sessionStore;
 
 export function parseAttribution(search: string): Attribution {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -116,6 +117,15 @@ export function randomSuffix(rand: () => number = Math.random): string {
  * A slug nobody else has taken. `my-agent` is gone the moment this form is
  * public, and the API answers a taken slug with a 409, so we never offer the
  * bare one.
+ *
+ * Load-bearing beyond that: the result is always `[a-z0-9-]` — `slugify`
+ * restricts `name` to that set and `suffix` only ever comes from
+ * `randomSuffix`'s `SUFFIX_ALPHABET`, itself `[a-z0-9]`. GetKeyForm.tsx hands
+ * this string straight to `<Trans values={{ slug }}>`, where react-i18next
+ * substitutes it before parsing markup — safe here only because the result
+ * can never contain a `<`, `>` or `"`. Widen this alphabet and that call site
+ * needs the same `shouldUnescape` treatment InvitationCard.tsx uses for a
+ * value it doesn't control.
  */
 export function buildSlug(name: string, suffix: string): string {
   const room = MAX_SLUG_LENGTH - suffix.length - 1;
@@ -136,30 +146,4 @@ export function appendAttribution(url: string, attribution: Attribution): string
   }
 
   return relative ? `${parsed.pathname}${parsed.search}${parsed.hash}` : parsed.toString();
-}
-
-/**
- * Session storage, or an in-memory stand-in when the browser refuses it —
- * private windows and blocked site data make the accessor itself throw, and a
- * landing page must not die over attribution.
- */
-const fallbackStore: Record<string, string> = {};
-
-export function browserStorage(): StorageLike {
-  try {
-    const store = globalThis.sessionStorage;
-    if (store) {
-      store.getItem(ATTRIBUTION_KEY); // probe: throws when site data is blocked
-      return store;
-    }
-  } catch {
-    // Fall through to memory.
-  }
-
-  return {
-    getItem: (key) => (key in fallbackStore ? fallbackStore[key] : null),
-    setItem: (key, value) => {
-      fallbackStore[key] = value;
-    },
-  };
 }
