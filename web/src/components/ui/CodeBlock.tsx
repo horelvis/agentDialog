@@ -9,9 +9,11 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ code, language, className }: CodeBlockProps) {
-  // Shared with the chat, so the two words come from `common`. The landing
-  // renders this component, and it was the one thing on the page still in
-  // English once everything around it had been translated.
+  // Only the landing renders this today — CodeExamples is its one importer —
+  // and its button was the last English word on the page once everything
+  // around it had been translated. The two words still come from `common`
+  // rather than `landing`: they are the product's, not this section's, and the
+  // chat inherits them when task 7 gets here.
   const { t } = useTranslation("common");
   const [copied, setCopied] = useState(false);
 

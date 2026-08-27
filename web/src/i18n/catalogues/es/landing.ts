@@ -5,7 +5,7 @@ export default {
     code: "Código",
     docs: "Docs",
     github: "GitHub",
-    toggleMenu: "Abrir el menú",
+    toggleMenu: "Abrir o cerrar el menú",
     dashboard: "Panel",
     login: "Entrar",
   },
@@ -13,7 +13,7 @@ export default {
     badge: "La plataforma de mensajería pensada para agentes",
     headline: "Tus agentes preguntan. <accent>Tu equipo responde</accent> en un clic.",
     subhead:
-      "Cuando tu agente de IA necesita que decida una persona, envía una llamada a la API. Tu equipo recibe un correo, entra con el código que lleva dentro y responde en el chat. Sin crear cuenta. Sin contraseña. Sin perder el contexto.",
+      "Cuando tu agente de IA necesita que decida una persona, envía una sola llamada a la API. Tu equipo recibe un correo, entra con el código que lleva dentro y responde en el chat. Sin crear cuenta. Sin contraseña. Sin perder el contexto.",
     docsLink: "O lee primero la documentación",
     reassurance: {
       noCard: {
@@ -96,7 +96,7 @@ export default {
       risk: {
         title: "Aprobaciones con el riesgo delante",
         description:
-          "Los agentes etiquetan cada acción con un nivel de riesgo — bajo, medio, alto o crítico. Quien responde ve la gravedad de un vistazo y aprueba o deniega en un clic.",
+          "Los agentes etiquetan cada acción con un nivel de riesgo — bajo, medio, alto o crítico: low, medium, high, critical. Quien responde ve la gravedad de un vistazo y aprueba o deniega en un clic.",
       },
       forms: {
         title: "Formularios interactivos",
@@ -119,7 +119,7 @@ export default {
     heading: "De cero a diálogo en 60 segundos",
     intro:
       "Tu agente lleva todo el flujo. Nadie empieza una conversación desde el otro lado: se responde a las que abre tu agente.",
-    cta: "Empezar",
+    cta: "Empieza",
     ctaNote: "Gratis, sin tarjeta de crédito",
     steps: {
       ask: {
@@ -154,7 +154,7 @@ export default {
     badge: "Guía de desarrollo",
     heading: "Todo lo que necesitas en un solo documento",
     intro:
-      "Lee la guía de integración completa y ten a tu agente hablando con personas en minutos. Lo único que necesita es una API key.",
+      "Lee la guía de integración completa y en unos minutos tu agente estará hablando con personas. Lo único que necesita es una API key.",
     docsLink: "Lee la documentación",
     download: "o descárgala en Markdown",
     highlights: {
@@ -178,7 +178,7 @@ export default {
       inboundEmail: {
         question: "¿Y si alguien contesta al correo?",
         answer:
-          "No lo lee nadie, y es una decisión, no un descuido. El correo entrante no se procesa: la respuesta llega a un buzón con una respuesta automática que devuelve a quien escribe a la aplicación. Se responde en el chat o en el enlace de un clic.",
+          "No lo lee nadie, y es una decisión, no un descuido. El correo entrante no se procesa: una contestación llega a un buzón con una respuesta automática que remite de vuelta a la aplicación a quien escribe. Se responde en el chat o en el enlace de un clic.",
       },
       delivery: {
         question: "¿Cómo se entera mi agente de la respuesta?",
@@ -188,7 +188,7 @@ export default {
       admission: {
         question: "¿Puedo preguntar cualquier cosa?",
         answer:
-          "No, y ahí está el producto. Una query es tipada, y un filtro de admisión rechaza las preguntas que nadie podría decidir de verdad: un asunto sin nada que mirar, un riesgo por encima de <code>low</code> sin las consecuencias escritas, una decisión repetida que no dice qué ha cambiado. El <code>422</code> trae un campo <code>remedy</code> que nombra lo que falta.",
+          "No, y ahí está el producto. Una query está tipada, y un filtro de admisión rechaza las preguntas que nadie podría decidir de verdad: un asunto sin nada que mirar, un riesgo por encima de <code>low</code> sin las consecuencias escritas, una decisión repetida que no dice qué ha cambiado. El <code>422</code> trae un campo <code>remedy</code> que nombra lo que falta.",
       },
       linkSafety: {
         question: "¿Es seguro mandar ese enlace por correo?",
@@ -208,7 +208,7 @@ export default {
       keyLeak: {
         question: "¿Y si se filtra mi API key? ¿Alguien puede hacerse pasar por mi agente?",
         answer:
-          "Rótala con <code>POST /agent/key/rotate</code>: se emite la nueva y la anterior deja de funcionar al instante. Las claves se guardan como hashes bcrypt y se muestran una sola vez, así que una filtración tiene que venir de tu lado, no del nuestro. Por MCP, quien llama se saca de las credenciales en cada petición y nunca del identificador de sesión — tener la sesión de otra persona no basta para actuar en su nombre.",
+          "Rótala con <code>POST /agent/key/rotate</code>: se emite la nueva y la anterior deja de funcionar al instante. Las claves se guardan como hashes bcrypt y se muestran una sola vez, así que una filtración tiene que venir de tu lado, no del nuestro. Por MCP, quien llama se deduce de las credenciales en cada petición y nunca del identificador de sesión — tener la sesión de otra persona no basta para actuar en su nombre.",
       },
       webhookSignature: {
         question: "¿Cómo sé que una entrega viene de verdad de vosotros?",
@@ -232,7 +232,7 @@ export default {
     preview: "Se registra como <slug>{{slug}}</slug>",
     quickstart: "Arranque rápido",
     error: {
-      taken: "Ese nombre ya está pillado dos veces. Prueba con uno más concreto.",
+      taken: "Ese nombre ya está en uso dos veces. Prueba con uno más concreto.",
       rateLimitedMinutes:
         "Demasiadas claves desde esta red. Vuelve a intentarlo en {{minutes}} min, o regístrate desde la terminal — mira el arranque rápido.",
       rateLimited:

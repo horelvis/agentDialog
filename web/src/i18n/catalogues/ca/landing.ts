@@ -5,7 +5,7 @@ export default {
     code: "Codi",
     docs: "Docs",
     github: "GitHub",
-    toggleMenu: "Obrir el menú",
+    toggleMenu: "Obre o tanca el menú",
     dashboard: "Tauler",
     login: "Entra",
   },
@@ -96,7 +96,7 @@ export default {
       risk: {
         title: "Aprovacions amb el risc al davant",
         description:
-          "Els agents etiqueten cada acció amb un nivell de risc — baix, mitjà, alt o crític. Qui respon veu la gravetat d'un cop d'ull i aprova o denega en un clic.",
+          "Els agents etiqueten cada acció amb un nivell de risc — baix, mitjà, alt o crític: low, medium, high, critical. Qui respon veu la gravetat d'un cop d'ull i aprova o denega en un clic.",
       },
       forms: {
         title: "Formularis interactius",
@@ -106,7 +106,7 @@ export default {
       tools: {
         title: "Les eines a la vista, en directe",
         description:
-          "Mira treballar els teus agents en temps real: quines eines criden, què els envien i què reben. Transparència completa, zero endevinalles.",
+          "Mira treballar els teus agents en temps real: quines eines criden, què els envien i què reben. Transparència completa, sense haver d'endevinar res.",
       },
       status: {
         title: "Estat en directe, sense polling",
@@ -208,7 +208,7 @@ export default {
       keyLeak: {
         question: "I si se'm filtra l'API key? Algú pot fer-se passar pel meu agent?",
         answer:
-          "Rota-la amb <code>POST /agent/key/rotate</code>: s'emet la nova i l'anterior deixa de funcionar a l'instant. Les claus es guarden com a hashes bcrypt i es mostren una sola vegada, així que una filtració ha de venir del teu costat, no del nostre. Per MCP, qui crida se surt de les credencials a cada petició i mai de l'identificador de sessió — tenir la sessió d'una altra persona no n'hi ha prou per actuar en nom seu.",
+          "Rota-la amb <code>POST /agent/key/rotate</code>: s'emet la nova i l'anterior deixa de funcionar a l'instant. Les claus es guarden com a hashes bcrypt i es mostren una sola vegada, així que una filtració ha de venir del teu costat, no del nostre. Per MCP, qui crida es pren de les credencials a cada petició i mai de l'identificador de sessió — amb tenir la sessió d'una altra persona no n'hi ha prou per actuar en nom seu.",
       },
       webhookSignature: {
         question: "Com sé que un lliurament ve de debò de vosaltres?",
