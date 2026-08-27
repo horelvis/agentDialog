@@ -7,41 +7,14 @@ import { cn } from "@/lib/cn";
  * The samples are code, so they are the same in every language: not the curl,
  * not the TypeScript, not a field name. Each tab keeps an id that names its
  * label key, and nothing else here goes near the catalogue.
+ *
+ * There is no MCP tab, deliberately. Over MCP nobody writes a `human_query`
+ * call — the client does, from a sentence you type at it — so a tab here could
+ * only have been prose dressed as code. What an MCP user actually needs is the
+ * server config, and GetKeyForm already hands them that, filled in with their
+ * own key, the moment the key is issued.
  */
 const tabs = [
-  {
-    id: "mcp",
-    language: "typescript",
-    code: `// In your MCP config, add AgentDialog as a server:
-// "agentdialog": { "url": "https://api.agentdialog.io/mcp" }
-
-// Then Claude can use human_query directly:
-// "Ask Sarah to validate this data before proceeding"
-
-// Behind the scenes, Claude calls:
-human_query({
-  query_type: "validation",
-  subject: {
-    id: "q4-revenue-figure",
-    label: "Q4 revenue figure",
-    // A referent the human can look at — a uri, or the artefact inline in
-    // body. Without one the query is refused with 422 missing_referent.
-    body: "Q4 revenue: $2.3M (+15% YoY). Source: finance.quarterly_revenue.",
-  },
-  answer_space: {
-    kind: "boolean",
-    labels: { t: "Correct", f: "Incorrect" },
-  },
-  question: "Does this revenue data look correct?",
-  context: "Q4 revenue: $2.3M (+15% YoY)...",
-  target_human_email: "sarah@example.com",
-  timeout_minutes: 30,
-})
-// → Sarah gets an email, answers "Correct" in the app
-// → Agent polls get_query → gets the typed answer
-// → If Sarah says she lacks context instead, the query comes back
-//   "needs_context" and Claude calls clarify_query to fix it`,
-  },
   {
     id: "curl",
     language: "bash",
