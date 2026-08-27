@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 import { useConversationStore } from "@/stores/conversationStore";
 import { useInvitationStore } from "@/stores/invitationStore";
@@ -12,6 +13,7 @@ import { Logo } from "@/components/ui/Logo";
 import { useLanguage } from "@/i18n";
 
 export function Sidebar() {
+  const { t } = useTranslation("chat");
   const { id: activeId } = useParams();
   const conversations = useConversationStore((s) => s.conversations);
   const invitations = useInvitationStore((s) => s.invitations);
@@ -39,6 +41,8 @@ export function Sidebar() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 p-1 text-white">
               <Logo className="h-full w-full" />
             </div>
+            {/* The wordmark — same as Navbar's, deliberately not in the catalogue. */}
+            {/* eslint-disable-next-line i18next/no-literal-string */}
             <span className="font-bold text-gray-100">AgentDialog</span>
           </Link>
           {isMobile && (
@@ -58,7 +62,7 @@ export function Sidebar() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            Invitations
+            {t("invitations.title")}
             {invitations.length > 0 && (
               <span className="ml-auto rounded-full bg-brand-600 px-2 py-0.5 text-xs text-white">
                 {invitations.length}
@@ -73,7 +77,7 @@ export function Sidebar() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Queries
+            {t("queries.title")}
             {pendingQueries.length > 0 && (
               <span className="ml-auto rounded-full bg-brand-600 px-2 py-0.5 text-xs text-white">
                 {pendingQueries.length}
@@ -88,11 +92,11 @@ export function Sidebar() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            Trusted Agents
+            {t("agents.title")}
           </Link>
 
           <div className="px-3 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            Conversations
+            {t("list.sectionTitle")}
           </div>
 
           {conversations.map((conv) => (
@@ -107,9 +111,9 @@ export function Sidebar() {
                   : "text-gray-300 hover:bg-surface-hover"
               )}
             >
-              <Avatar name={conv.title ?? "Conversation"} size="sm" />
+              <Avatar name={conv.title ?? t("shared.newConversation")} size="sm" />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{conv.title ?? "Untitled"}</p>
+                <p className="truncate font-medium">{conv.title ?? t("shared.untitledConversation")}</p>
                 <p className="truncate text-xs text-gray-400">
                   {formatRelativeTime(conv.updatedAt, language)}
                 </p>
@@ -119,7 +123,7 @@ export function Sidebar() {
 
           {conversations.length === 0 && (
             <p className="px-3 py-4 text-center text-sm text-gray-400">
-              No conversations yet
+              {t("list.empty")}
             </p>
           )}
         </nav>
@@ -129,7 +133,7 @@ export function Sidebar() {
             <LanguageSelector className="w-full [&>select]:w-full" />
           </div>
           <div className="flex items-center gap-3">
-            <Avatar name={human?.displayName ?? human?.email ?? "User"} size="sm" />
+            <Avatar name={human?.displayName ?? human?.email ?? t("shared.user")} size="sm" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{human?.displayName ?? human?.email}</p>
             </div>

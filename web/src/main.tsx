@@ -24,12 +24,12 @@ void initI18n()
     console.error("Failed to initialize i18n", error);
     createRoot(document.getElementById("root")!).render(
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
+        {/* Hardcoded English on purpose — see the comment above: this is the
+            fallback for when i18n itself is what failed to load. */}
+        {/* eslint-disable-next-line i18next/no-literal-string */}
         <h1 className="text-xl font-semibold">AgentDialog failed to load</h1>
-        <button
-          type="button"
-          onClick={() => location.reload()}
-          className="rounded bg-brand-600 px-4 py-2 text-white"
-        >
+        {/* eslint-disable-next-line i18next/no-literal-string -- same fallback screen, same reason as the h1 above */}
+        <button type="button" onClick={() => location.reload()} className="rounded bg-brand-600 px-4 py-2 text-white">
           Reload
         </button>
       </div>,
