@@ -9,6 +9,7 @@ import {
   webhookRotateSecretResponse,
   webhookDeleteResponse,
 } from "../../src/validators/webhook.responses";
+import { webhookDeliveryBody } from "../../src/validators/webhook-delivery.responses";
 
 /**
  * The test the codebase did not have, and the reason a signature keyed with a
@@ -84,6 +85,11 @@ describe("Webhook signature", () => {
 
     expect(captured).toHaveLength(1);
     expect(verify(captured[0], data.secret)).toBe(true);
+
+    // The outbound delivery body itself — asserted by nothing else on this
+    // branch, unlike every inbound response, which has a test somewhere
+    // parsing it against its schema.
+    expect(() => webhookDeliveryBody.parse(JSON.parse(captured[0].body))).not.toThrow();
   });
 
   it("signs with both secrets during the rotation window", async () => {

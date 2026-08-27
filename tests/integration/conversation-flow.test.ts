@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { createTestApp } from "../helpers";
-import { conversationResponse } from "../../src/validators/conversation.responses";
+import {
+  conversationResponse,
+  conversationListResponse,
+  conversationWithParticipantsResponse,
+} from "../../src/validators/conversation.responses";
 import { messageResponse, messageListResponse } from "../../src/validators/message.responses";
 import { invitationCreateResponse } from "../../src/validators/invitation.responses";
 import { agentProfileResponse, agentProfileUpdateResponse } from "../../src/validators/agent.responses";
@@ -66,6 +70,26 @@ describe("Conversation Flow", () => {
     expect(() => conversationResponse.parse(convResBody)).not.toThrow();
     const { data: conversation } = await convRes.json();
     expect(conversation.title).toBe("Test Conversation");
+
+    // 3b. List conversations, and get this one back with its participants —
+    // conversationListResponse and conversationWithParticipantsResponse are
+    // otherwise asserted by nothing; the latter is the most hand-derived
+    // shape in the document and the only written record of
+    // getConversationWithParticipants's output.
+    const listConvRes = await app.request("/api/v1/agent/conversations", {
+      headers: { Authorization: agentAuth },
+    });
+    expect(listConvRes.status).toBe(200);
+    const listConvBody = await listConvRes.clone().json();
+    expect(() => conversationListResponse.parse(listConvBody)).not.toThrow();
+
+    const getConvRes = await app.request(`/api/v1/agent/conversations/${conversation.id}`, {
+      headers: { Authorization: agentAuth },
+    });
+    expect(getConvRes.status).toBe(200);
+    const getConvBody = await getConvRes.clone().json();
+    expect(() => conversationWithParticipantsResponse.parse(getConvBody)).not.toThrow();
+    expect(getConvBody.data.participants.length).toBeGreaterThan(0);
 
     // 4. Send a message as agent
     const msgRes = await app.request(`/api/v1/agent/conversations/${conversation.id}/messages`, {

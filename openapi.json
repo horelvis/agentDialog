@@ -63,6 +63,7 @@
         "description": "The only route on this surface with no bearer auth. The response carries the new API key in clear, once — only its hash is stored thereafter.",
         "security": [],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -126,7 +127,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The agent, registered. `apiKey` is returned in clear this one time — only its hash is stored from here on.",
             "content": {
               "application/json": {
                 "schema": {
@@ -234,7 +235,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "`slug` is already taken by another agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -243,8 +244,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -255,6 +259,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -267,7 +274,7 @@
         "summary": "Get the authenticated agent's profile",
         "responses": {
           "200": {
-            "description": "",
+            "description": "The authenticated agent's own profile.",
             "content": {
               "application/json": {
                 "schema": {
@@ -396,6 +403,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -405,6 +415,7 @@
         ],
         "summary": "Update the authenticated agent's profile",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -464,7 +475,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "The profile, updated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -571,7 +582,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "The authenticated agent no longer exists.",
             "content": {
               "application/json": {
                 "schema": {
@@ -580,8 +591,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -592,6 +606,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -616,7 +633,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "The new API key, returned in clear this one time.",
             "content": {
               "application/json": {
                 "schema": {
@@ -653,7 +670,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "The authenticated agent no longer exists.",
             "content": {
               "application/json": {
                 "schema": {
@@ -665,8 +682,21 @@
           "409": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
+          "422": {
+            "description": "The Idempotency-Key header is empty or longer than 255 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -689,6 +719,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -726,7 +757,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The conversation, created.",
             "content": {
               "application/json": {
                 "schema": {
@@ -771,6 +802,13 @@
                           "type": [
                             "string",
                             "null"
+                          ],
+                          "enum": [
+                            "permission",
+                            "clarification",
+                            "solicitation",
+                            "notification",
+                            null
                           ]
                         },
                         "settings": {
@@ -813,8 +851,11 @@
           "409": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -825,6 +866,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -855,7 +899,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Conversations the authenticated agent created, newest first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -902,6 +946,13 @@
                             "type": [
                               "string",
                               "null"
+                            ],
+                            "enum": [
+                              "permission",
+                              "clarification",
+                              "solicitation",
+                              "notification",
+                              null
                             ]
                           },
                           "settings": {
@@ -959,7 +1010,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "422": {
-            "description": "",
+            "description": "The `limit` or `cursor` query parameter failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -970,6 +1021,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -993,7 +1047,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "The conversation and everyone in it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1038,6 +1092,13 @@
                           "type": [
                             "string",
                             "null"
+                          ],
+                          "enum": [
+                            "permission",
+                            "clarification",
+                            "solicitation",
+                            "notification",
+                            null
                           ]
                         },
                         "settings": {
@@ -1126,7 +1187,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1136,7 +1197,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "No such conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1147,6 +1208,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -1167,6 +1231,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1203,7 +1268,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "The conversation, updated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1248,6 +1313,13 @@
                           "type": [
                             "string",
                             "null"
+                          ],
+                          "enum": [
+                            "permission",
+                            "clarification",
+                            "solicitation",
+                            "notification",
+                            null
                           ]
                         },
                         "settings": {
@@ -1288,7 +1360,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "Only the agent that created this conversation may update it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1298,7 +1370,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "No such conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1307,8 +1379,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1319,6 +1394,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -1350,6 +1428,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1402,7 +1481,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The message, created and delivered over the WebSocket and any subscribed webhook.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1570,7 +1649,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1582,8 +1661,11 @@
           "409": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1594,6 +1676,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -1633,7 +1718,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Messages in the conversation, paginated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1827,7 +1912,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1837,7 +1922,7 @@
             }
           },
           "422": {
-            "description": "",
+            "description": "The `limit` or `cursor` query parameter failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1848,6 +1933,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -1871,13 +1959,16 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
                 "properties": {
                   "file": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to attach, as a binary multipart/form-data field named `file`."
                   }
                 },
                 "required": [
@@ -1889,7 +1980,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The file, attached to a new message of type \"file\".",
             "content": {
               "application/json": {
                 "schema": {
@@ -2057,7 +2148,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2066,8 +2157,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "No `file` field was sent, or it exceeds the configured maximum file size.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2078,6 +2172,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -2101,16 +2198,20 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
                 "properties": {
                   "audio": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The recording, as a binary multipart/form-data field named `audio` (must be audio/*)."
                   },
                   "durationMs": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Optional recording duration, as a numeric form field."
                   }
                 },
                 "required": [
@@ -2122,7 +2223,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The recording, attached to a new message of type \"voice_note\".",
             "content": {
               "application/json": {
                 "schema": {
@@ -2290,7 +2391,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2299,8 +2400,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "No `audio` field was sent, it isn't an audio/* type, it exceeds the configured maximum file size, or `durationMs` isn't a positive number.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2311,6 +2415,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -2333,13 +2440,15 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
                   "fileName": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -2351,7 +2460,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "A URL to PUT the file to directly, and the storage key it will be stored under.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2388,7 +2497,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2397,8 +2506,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2409,6 +2521,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -2440,6 +2555,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2477,7 +2593,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The invitation, created — or, if this agent already has a prior accepted invitation with this human and no revoked trust since, auto-accepted immediately (`autoAccepted: true`, `status: \"accepted\"`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2521,7 +2637,12 @@
                           ]
                         },
                         "language": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "en",
+                            "es",
+                            "ca"
+                          ]
                         },
                         "expiresAt": {
                           "type": "string",
@@ -2566,7 +2687,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2576,7 +2697,7 @@
             }
           },
           "409": {
-            "description": "May also indicate a reused `Idempotency-Key`; the `code` field distinguishes them.",
+            "description": "A pending invitation to this email already exists for this conversation. May also indicate a reused `Idempotency-Key`; the `code` field distinguishes them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2585,8 +2706,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2597,6 +2721,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -2618,7 +2745,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Invitations sent for this conversation, in any status.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2664,7 +2791,12 @@
                             ]
                           },
                           "language": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "en",
+                              "es",
+                              "ca"
+                            ]
                           },
                           "expiresAt": {
                             "type": "string",
@@ -2706,7 +2838,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "The authenticated agent is not a participant in this conversation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2717,6 +2849,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -2741,7 +2876,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "The invitation, revoked.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2785,7 +2920,12 @@
                           ]
                         },
                         "language": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "en",
+                            "es",
+                            "ca"
+                          ]
                         },
                         "expiresAt": {
                           "type": "string",
@@ -2826,7 +2966,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "Only a pending invitation can be revoked.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2836,7 +2976,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "No such invitation, or it wasn't created by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2847,6 +2987,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -2870,6 +3013,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2886,7 +3030,8 @@
                     },
                     "default": [
                       "*"
-                    ]
+                    ],
+                    "description": "The events to receive: any of `message.new`, `query.needs_context`, `query.answered`, or `\"*\"` for all of them."
                   }
                 },
                 "required": [
@@ -2898,7 +3043,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The webhook, registered. `secret` is returned in clear this one time — only its sealed form is stored.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2922,7 +3067,8 @@
                           "type": "array",
                           "items": {
                             "type": "string"
-                          }
+                          },
+                          "description": "The events this webhook is subscribed to: any of `message.new`, `query.needs_context`, `query.answered`, or `\"*\"` for all of them."
                         },
                         "isActive": {
                           "type": "boolean"
@@ -2974,7 +3120,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "",
+            "description": "This agent already has the maximum number of webhooks registered.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2986,8 +3132,11 @@
           "409": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation, or `url` resolves to loopback, a private range, or a cloud metadata address.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2998,6 +3147,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -3008,7 +3160,7 @@
         "summary": "List webhooks",
         "responses": {
           "200": {
-            "description": "",
+            "description": "Webhooks registered by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3034,7 +3186,8 @@
                             "type": "array",
                             "items": {
                               "type": "string"
-                            }
+                            },
+                            "description": "The events this webhook is subscribed to: any of `message.new`, `query.needs_context`, `query.answered`, or `\"*\"` for all of them."
                           },
                           "isActive": {
                             "type": "boolean"
@@ -3084,6 +3237,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -3106,6 +3262,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -3131,7 +3288,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "The webhook, updated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3155,7 +3312,8 @@
                           "type": "array",
                           "items": {
                             "type": "string"
-                          }
+                          },
+                          "description": "The events this webhook is subscribed to: any of `message.new`, `query.needs_context`, `query.answered`, or `\"*\"` for all of them."
                         },
                         "isActive": {
                           "type": "boolean"
@@ -3203,7 +3361,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "No such webhook, or it wasn't registered by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3212,8 +3370,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation, `url` resolves to a disallowed address, or `isActive: true` was sent for a webhook with no live signing secret — rotate the secret first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3224,6 +3385,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -3245,7 +3409,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "The webhook, deleted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3269,7 +3433,8 @@
                           "type": "array",
                           "items": {
                             "type": "string"
-                          }
+                          },
+                          "description": "The events this webhook is subscribed to: any of `message.new`, `query.needs_context`, `query.answered`, or `\"*\"` for all of them."
                         },
                         "isActive": {
                           "type": "boolean"
@@ -3317,7 +3482,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "No such webhook, or it wasn't registered by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3328,6 +3493,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -3338,7 +3506,7 @@
           "webhooks"
         ],
         "summary": "Rotate a webhook's signing secret",
-        "description": "The response carries the new secret in clear, once. The previous secret keeps signing deliveries for a grace window (see retireCurrentSecret in src/services/webhook.service.ts).",
+        "description": "The response carries the new secret in clear, once. The previous secret keeps signing deliveries for a grace window before it stops working, so a receiver mid-rotation never drops a delivery.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -3361,7 +3529,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "The new secret, returned in clear this one time.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3385,7 +3553,8 @@
                           "type": "array",
                           "items": {
                             "type": "string"
-                          }
+                          },
+                          "description": "The events this webhook is subscribed to: any of `message.new`, `query.needs_context`, `query.answered`, or `\"*\"` for all of them."
                         },
                         "isActive": {
                           "type": "boolean"
@@ -3437,7 +3606,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "No such webhook, or it wasn't registered by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3449,8 +3618,21 @@
           "409": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
+          "422": {
+            "description": "The Idempotency-Key header is empty or longer than 255 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -3473,6 +3655,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -3979,7 +4162,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "The query, admitted and sent to the human.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4037,8 +4220,11 @@
           "409": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation, or the admission gate refused an undecidable question — see `reason`, `detail` and `remedy` in the error envelope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4049,6 +4235,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -4057,7 +4246,7 @@
           "queries"
         ],
         "summary": "List your queries",
-        "description": "A bare list, not a paginated one: listAgentQueries returns every matching row up to `limit`, with no cursor or hasMore.",
+        "description": "A bare list, not a paginated one: this returns every matching row up to `limit`, with no cursor or hasMore.",
         "parameters": [
           {
             "in": "query",
@@ -4087,7 +4276,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Queries the authenticated agent has asked.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4169,7 +4358,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "422": {
-            "description": "",
+            "description": "The `status` or `limit` query parameter failed validation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4180,6 +4369,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -4203,7 +4395,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "The query.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4332,7 +4524,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "No such query, or it wasn't created by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4343,6 +4535,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       },
@@ -4363,6 +4558,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -4820,7 +5016,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "The query, updated with what was missing and re-admitted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4949,7 +5145,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "No such query, or it wasn't created by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4959,7 +5155,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "The query is not awaiting clarification (its status is not `needs_context`), or it changed underneath this request between the check and the write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4968,8 +5164,11 @@
               }
             }
           },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
           "422": {
-            "description": "",
+            "description": "The request body failed validation, or the admission gate refused the patched question.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4980,6 +5179,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -5003,7 +5205,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "The query, cancelled.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5132,7 +5334,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "",
+            "description": "No such query, or it wasn't created by the authenticated agent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5142,7 +5344,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "The query already reached a terminal state and cannot be cancelled.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5153,6 +5355,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -5165,7 +5370,7 @@
           "webhooks"
         ],
         "summary": "A delivery to the URL you registered",
-        "description": "Signed per Standard Webhooks. The signed content covers the timestamp, so a captured delivery cannot be replayed. Verify with verifyWebhook from @agentdialog/sdk/webhooks, or any off-the-shelf implementation.",
+        "description": "Signed per Standard Webhooks. The signature covering the timestamp makes the timestamp trustworthy, not replay-proof by itself — it's the verifier rejecting a timestamp outside its tolerance window that stops a captured delivery from being replayed. verifyWebhook from @agentdialog/sdk/webhooks checks both; an off-the-shelf implementation needs a tolerance window of its own to do the same.",
         "parameters": [
           {
             "name": "webhook-id",
@@ -5322,6 +5527,26 @@
       },
       "IdempotencyKeyReused": {
         "description": "The Idempotency-Key header was reused, either by a request still in flight or by one whose original request had a different body.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "The request body exceeded the server's configured maximum size (see app.ts's bodyLimit).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "An unexpected error. The error envelope carries no further detail than `message`.",
         "content": {
           "application/json": {
             "schema": {
