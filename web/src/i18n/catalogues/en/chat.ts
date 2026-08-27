@@ -137,18 +137,4 @@ export default {
     emptyBody: "Once you accept an invitation from an agent, they'll appear here.",
     revoke: "Revoke",
   },
-  auth: {
-    title: "Sign in to AgentDialog",
-    subtitle: "Enter your email and we'll send you a verification code.",
-    emailLabel: "Email address",
-    emailPlaceholder: "you@example.com",
-    sendCode: "Send Verification Code",
-    checkEmail: "Check your email",
-    codeSentTo: "We sent a 6-digit code to <email>{{email}}</email>",
-    useAnotherEmail: "Use a different email",
-    resendCode: "Resend code",
-    resendCodeIn: "Resend code in {{seconds}}s",
-    sendFailed: "Failed to send verification code. Please try again.",
-    invalidCode: "Invalid or expired code. Please try again.",
-  },
 } as const;

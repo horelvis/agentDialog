@@ -247,11 +247,6 @@ export default {
       next: "Ahora pregúntale algo a una persona →",
     },
   },
-  footer: {
-    tagline: "Plataforma de mensajería pensada para agentes. Hecha para la era de la IA.",
-    github: "GitHub",
-    docs: "Docs",
-  },
   notFound: {
     message: "Página no encontrada",
     home: "Volver al inicio",

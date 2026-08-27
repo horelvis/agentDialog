@@ -12,7 +12,10 @@ interface FooterProps {
 }
 
 export function Footer({ minimal = false }: FooterProps) {
-  const { t } = useTranslation("landing");
+  // `common`, not `landing`: this component also mounts on /q/:token in
+  // minimal mode, and that page shouldn't download the landing's whole
+  // catalogue for three strings it mostly hides.
+  const { t } = useTranslation("common");
 
   return (
     <footer className="border-t border-surface-border bg-surface-secondary">

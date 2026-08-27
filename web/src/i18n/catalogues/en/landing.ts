@@ -262,11 +262,6 @@ export default {
       next: "Now ask a human a question →",
     },
   },
-  footer: {
-    tagline: "Agent-first messaging platform. Built for the AI era.",
-    github: "GitHub",
-    docs: "Docs",
-  },
   notFound: {
     message: "Page not found",
     home: "Go Home",

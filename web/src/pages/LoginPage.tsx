@@ -3,7 +3,9 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { Logo } from "@/components/ui/Logo";
 
 export function LoginPage() {
-  const { t } = useTranslation("chat");
+  // `common`, not `chat`: /login is reached before signing in, and `chat` is
+  // the whole signed-in app's catalogue.
+  const { t } = useTranslation("common");
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4">

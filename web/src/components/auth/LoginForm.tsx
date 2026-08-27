@@ -33,7 +33,9 @@ function safeNext(next: string | null): string {
 }
 
 export function LoginForm() {
-  const { t } = useTranslation("chat");
+  // `common`, not `chat`: /login is reached before signing in, and `chat` is
+  // the whole signed-in app's catalogue.
+  const { t } = useTranslation("common");
   const [searchParams] = useSearchParams();
   const nextParam = searchParams.get("next");
 
