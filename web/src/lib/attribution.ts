@@ -5,6 +5,10 @@
  * analytics vendor: `select metadata->>'utm_campaign' from agents`.
  */
 
+import { sessionStore, type StorageLike } from "./storage";
+
+export type { StorageLike };
+
 export const ATTRIBUTION_KEY = "agentdialog:attribution";
 
 /** Parameters we keep. Anything else in the URL is somebody else's business. */
@@ -19,11 +23,8 @@ const SLUG_FALLBACK = "agent";
 
 export type Attribution = Record<string, string>;
 
-/** A `Storage`, narrowed to what we use, so tests can hand us a fake. */
-export interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
+/** Attribution is a per-visit thing, so it lives in session storage. */
+export const browserStorage = sessionStore;
 
 export function parseAttribution(search: string): Attribution {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -136,30 +137,4 @@ export function appendAttribution(url: string, attribution: Attribution): string
   }
 
   return relative ? `${parsed.pathname}${parsed.search}${parsed.hash}` : parsed.toString();
-}
-
-/**
- * Session storage, or an in-memory stand-in when the browser refuses it —
- * private windows and blocked site data make the accessor itself throw, and a
- * landing page must not die over attribution.
- */
-const fallbackStore: Record<string, string> = {};
-
-export function browserStorage(): StorageLike {
-  try {
-    const store = globalThis.sessionStorage;
-    if (store) {
-      store.getItem(ATTRIBUTION_KEY); // probe: throws when site data is blocked
-      return store;
-    }
-  } catch {
-    // Fall through to memory.
-  }
-
-  return {
-    getItem: (key) => (key in fallbackStore ? fallbackStore[key] : null),
-    setItem: (key, value) => {
-      fallbackStore[key] = value;
-    },
-  };
 }

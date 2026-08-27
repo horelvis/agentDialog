@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { GetKeyForm } from "@/components/landing/GetKeyForm";
-import { browserStorage, rememberAttribution } from "@/lib/attribution";
+import { rememberAttribution } from "@/lib/attribution";
+import { sessionStore } from "@/lib/storage";
 
 /**
  * Each one is checkable against the product, which is the bar this landing has
@@ -77,7 +78,7 @@ export function Hero() {
   // Remember where this visitor came from, so the agent they register carries
   // its origin. Cheap enough to do on every landing view.
   useEffect(() => {
-    rememberAttribution(window.location.search, browserStorage());
+    rememberAttribution(window.location.search, sessionStore());
   }, []);
 
   return (
