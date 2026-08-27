@@ -556,35 +556,7 @@ git commit -m "Serve an OpenAPI document, with one route in it"
 
 ## Tasks 2-4: los 25 endpoints restantes
 
-Las tres tareas son **el mismo procedimiento** sobre recursos distintos. Se describen
-una vez aquí y cada tarea dice solo qué recursos le tocan.
-
-**Procedimiento, por recurso:**
-
-1. **Lee lo que el servicio devuelve de verdad** — la función de `src/services/` que
-   alimenta la ruta — y escribe `src/validators/<recurso>.responses.ts` a partir de
-   eso. No de `docs/api/README.md`: la guía es prosa y puede haber envejecido; el
-   servicio es lo que responde.
-2. **Convierte el fichero de rutas** a `documented(hono, { basePath, tag })` y añade el
-   `RouteDoc` a cada ruta. Los handlers no se tocan.
-3. **`idempotent: true` solo en las siete** que llevan `idempotency()` en su cadena de
-   middlewares. Compruébalo mirando la línea, no la memoria.
-4. **`security: "none"` solo en `register`.**
-5. **Añade la afirmación del esquema** en el test de integración que ya cubre ese
-   recurso, como en el paso 10 de la tarea 1. Si no hay test para ese endpoint, dilo en
-   el informe en vez de inventar uno: es una laguna real que conviene conocer.
-6. **Códigos de respuesta**: documenta los que el handler puede devolver de verdad —
-   el éxito, más `apiError` para los que su servicio lanza. No inventes un 500 en cada
-   endpoint, y no omitas el 422 donde hay `validateBody`.
-
-**Verificación de cada tarea:**
-
-```bash
-bun test tests/unit tests/integration
-bunx tsc --noEmit
-bunx biome check src/
-curl -s localhost:3000/openapi.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['paths']), 'paths')"
-```
+Cada una es autónoma: el procedimiento va escrito entero dentro de las tres.
 
 ### Task 2: queries y conversations — 8 endpoints
 
@@ -593,7 +565,77 @@ curl -s localhost:3000/openapi.json | python3 -c "import json,sys; d=json.load(s
 - [ ] `src/validators/conversation.responses.ts`
 - [ ] `GET /queries` usa `paginated(...)`; comprueba en el servicio si de verdad pagina o si devuelve una lista pelada, y documenta lo que haya
 - [ ] Afirmaciones en `tests/integration/agent-queries.test.ts` y `conversation-flow.test.ts`
-- [ ] Commit
+
+**Procedimiento, paso a paso. Se repite entero en cada una de las tareas 2, 3 y 4
+porque cada una la ejecuta alguien que solo lee la suya.**
+
+- [ ] **Paso 1: lee lo que el servicio devuelve de verdad.** Abre la función de
+  `src/services/` que alimenta cada ruta y escribe
+  `src/validators/<recurso>.responses.ts` a partir de lo que construye su `return`.
+  **No de `docs/api/README.md`**: la guía es prosa y puede haber envejecido; el
+  servicio es lo que responde. Usa `ok(...)` y `paginated(...)` de
+  `src/validators/response.helpers.ts` para el sobre, y `nullable()` —no
+  `optional()`— donde el servicio emite la clave con `null` dentro, porque un cliente
+  que compruebe con `in` sería engañado por `optional`.
+
+- [ ] **Paso 2: convierte el fichero de rutas.** Sustituye
+
+  ```ts
+  const app = new Hono<AppEnv>();
+  ```
+
+  por
+
+  ```ts
+  const hono = new Hono<AppEnv>();
+  const app = documented(hono, { basePath: "<el prefijo real>", tag: "<recurso>" });
+  ```
+
+  y al final `export default hono;` — el envoltorio es solo para registrar; `app.route(...)`
+  en `src/app.ts` necesita un Hono de verdad. El `basePath` es el prefijo con el que
+  `src/app.ts` monta ese fichero; búscalo ahí, no lo deduzcas.
+
+- [ ] **Paso 3: añade el `RouteDoc` a cada ruta**, como segundo argumento, antes de los
+  middlewares. Los handlers **no se tocan, ni una línea**.
+
+- [ ] **Paso 4: `idempotent: true` solo donde hay `idempotency()`** en la cadena de
+  middlewares de esa ruta. Míralo en la línea, no de memoria: son siete en toda la API
+  y documentarlo donde no se respeta es peor que omitirlo.
+
+- [ ] **Paso 5: los códigos de respuesta son los que el handler puede devolver de
+  verdad.** El éxito con su esquema, más `apiError` para lo que su servicio lanza. No
+  inventes un 500 en cada endpoint, y no omitas el 422 donde hay `validateBody`.
+
+- [ ] **Paso 6: afirma la respuesta real contra el esquema** en el test de integración
+  que ya cubre ese recurso, igual que el paso 10 de la tarea 1:
+
+  ```ts
+  expect(() => <esquema>.parse(await res.clone().json())).not.toThrow();
+  ```
+
+  El `clone()` importa: el cuerpo suele consumirse más abajo en esos tests. **Si no hay
+  test de integración para un endpoint, no inventes uno** — dilo en el informe, que es
+  una laguna real y conviene conocerla.
+
+- [ ] **Paso 7: verifica.**
+
+  ```bash
+  bun test tests/unit tests/integration
+  bunx tsc --noEmit
+  bunx biome check src/
+  ```
+
+  Y con el servidor levantado, que el documento haya crecido:
+
+  ```bash
+  curl -s localhost:3000/openapi.json | python3 -c "import json,sys; print(len(json.load(sys.stdin)['paths']), 'paths')"
+  ```
+
+  Un `429` en integración es el límite de altas de agente en Redis, no un fallo tuyo:
+  `redis-cli -n 1 FLUSHDB` contra la base de datos de pruebas.
+
+- [ ] **Paso 8: commit**, con las rutas explícitas. Este checkout tiene trabajo ajeno
+  sin commitear bajo `docs-site/`: nunca `git add .`.
 
 ### Task 3: messages, invitations y upload — 8 endpoints
 
@@ -604,7 +646,77 @@ curl -s localhost:3000/openapi.json | python3 -c "import json,sys; d=json.load(s
       `application/json`, y describe la respuesta, que sí es JSON. `/upload/presigned`
       sí es JSON en ambos sentidos
 - [ ] Afirmaciones en los tests de integración correspondientes
-- [ ] Commit
+
+**Procedimiento, paso a paso. Se repite entero en cada una de las tareas 2, 3 y 4
+porque cada una la ejecuta alguien que solo lee la suya.**
+
+- [ ] **Paso 1: lee lo que el servicio devuelve de verdad.** Abre la función de
+  `src/services/` que alimenta cada ruta y escribe
+  `src/validators/<recurso>.responses.ts` a partir de lo que construye su `return`.
+  **No de `docs/api/README.md`**: la guía es prosa y puede haber envejecido; el
+  servicio es lo que responde. Usa `ok(...)` y `paginated(...)` de
+  `src/validators/response.helpers.ts` para el sobre, y `nullable()` —no
+  `optional()`— donde el servicio emite la clave con `null` dentro, porque un cliente
+  que compruebe con `in` sería engañado por `optional`.
+
+- [ ] **Paso 2: convierte el fichero de rutas.** Sustituye
+
+  ```ts
+  const app = new Hono<AppEnv>();
+  ```
+
+  por
+
+  ```ts
+  const hono = new Hono<AppEnv>();
+  const app = documented(hono, { basePath: "<el prefijo real>", tag: "<recurso>" });
+  ```
+
+  y al final `export default hono;` — el envoltorio es solo para registrar; `app.route(...)`
+  en `src/app.ts` necesita un Hono de verdad. El `basePath` es el prefijo con el que
+  `src/app.ts` monta ese fichero; búscalo ahí, no lo deduzcas.
+
+- [ ] **Paso 3: añade el `RouteDoc` a cada ruta**, como segundo argumento, antes de los
+  middlewares. Los handlers **no se tocan, ni una línea**.
+
+- [ ] **Paso 4: `idempotent: true` solo donde hay `idempotency()`** en la cadena de
+  middlewares de esa ruta. Míralo en la línea, no de memoria: son siete en toda la API
+  y documentarlo donde no se respeta es peor que omitirlo.
+
+- [ ] **Paso 5: los códigos de respuesta son los que el handler puede devolver de
+  verdad.** El éxito con su esquema, más `apiError` para lo que su servicio lanza. No
+  inventes un 500 en cada endpoint, y no omitas el 422 donde hay `validateBody`.
+
+- [ ] **Paso 6: afirma la respuesta real contra el esquema** en el test de integración
+  que ya cubre ese recurso, igual que el paso 10 de la tarea 1:
+
+  ```ts
+  expect(() => <esquema>.parse(await res.clone().json())).not.toThrow();
+  ```
+
+  El `clone()` importa: el cuerpo suele consumirse más abajo en esos tests. **Si no hay
+  test de integración para un endpoint, no inventes uno** — dilo en el informe, que es
+  una laguna real y conviene conocerla.
+
+- [ ] **Paso 7: verifica.**
+
+  ```bash
+  bun test tests/unit tests/integration
+  bunx tsc --noEmit
+  bunx biome check src/
+  ```
+
+  Y con el servidor levantado, que el documento haya crecido:
+
+  ```bash
+  curl -s localhost:3000/openapi.json | python3 -c "import json,sys; print(len(json.load(sys.stdin)['paths']), 'paths')"
+  ```
+
+  Un `429` en integración es el límite de altas de agente en Redis, no un fallo tuyo:
+  `redis-cli -n 1 FLUSHDB` contra la base de datos de pruebas.
+
+- [ ] **Paso 8: commit**, con las rutas explícitas. Este checkout tiene trabajo ajeno
+  sin commitear bajo `docs-site/`: nunca `git add .`.
 
 ### Task 4: webhooks, profile, key y register — 9 endpoints
 
@@ -616,7 +728,77 @@ curl -s localhost:3000/openapi.json | python3 -c "import json,sys; d=json.load(s
 - [ ] **`register` es la única con `security: "none"`**, y su respuesta lleva la clave
       en claro, también una sola vez
 - [ ] Afirmaciones en `tests/integration/agent-register.test.ts` y las de webhooks
-- [ ] Commit
+
+**Procedimiento, paso a paso. Se repite entero en cada una de las tareas 2, 3 y 4
+porque cada una la ejecuta alguien que solo lee la suya.**
+
+- [ ] **Paso 1: lee lo que el servicio devuelve de verdad.** Abre la función de
+  `src/services/` que alimenta cada ruta y escribe
+  `src/validators/<recurso>.responses.ts` a partir de lo que construye su `return`.
+  **No de `docs/api/README.md`**: la guía es prosa y puede haber envejecido; el
+  servicio es lo que responde. Usa `ok(...)` y `paginated(...)` de
+  `src/validators/response.helpers.ts` para el sobre, y `nullable()` —no
+  `optional()`— donde el servicio emite la clave con `null` dentro, porque un cliente
+  que compruebe con `in` sería engañado por `optional`.
+
+- [ ] **Paso 2: convierte el fichero de rutas.** Sustituye
+
+  ```ts
+  const app = new Hono<AppEnv>();
+  ```
+
+  por
+
+  ```ts
+  const hono = new Hono<AppEnv>();
+  const app = documented(hono, { basePath: "<el prefijo real>", tag: "<recurso>" });
+  ```
+
+  y al final `export default hono;` — el envoltorio es solo para registrar; `app.route(...)`
+  en `src/app.ts` necesita un Hono de verdad. El `basePath` es el prefijo con el que
+  `src/app.ts` monta ese fichero; búscalo ahí, no lo deduzcas.
+
+- [ ] **Paso 3: añade el `RouteDoc` a cada ruta**, como segundo argumento, antes de los
+  middlewares. Los handlers **no se tocan, ni una línea**.
+
+- [ ] **Paso 4: `idempotent: true` solo donde hay `idempotency()`** en la cadena de
+  middlewares de esa ruta. Míralo en la línea, no de memoria: son siete en toda la API
+  y documentarlo donde no se respeta es peor que omitirlo.
+
+- [ ] **Paso 5: los códigos de respuesta son los que el handler puede devolver de
+  verdad.** El éxito con su esquema, más `apiError` para lo que su servicio lanza. No
+  inventes un 500 en cada endpoint, y no omitas el 422 donde hay `validateBody`.
+
+- [ ] **Paso 6: afirma la respuesta real contra el esquema** en el test de integración
+  que ya cubre ese recurso, igual que el paso 10 de la tarea 1:
+
+  ```ts
+  expect(() => <esquema>.parse(await res.clone().json())).not.toThrow();
+  ```
+
+  El `clone()` importa: el cuerpo suele consumirse más abajo en esos tests. **Si no hay
+  test de integración para un endpoint, no inventes uno** — dilo en el informe, que es
+  una laguna real y conviene conocerla.
+
+- [ ] **Paso 7: verifica.**
+
+  ```bash
+  bun test tests/unit tests/integration
+  bunx tsc --noEmit
+  bunx biome check src/
+  ```
+
+  Y con el servidor levantado, que el documento haya crecido:
+
+  ```bash
+  curl -s localhost:3000/openapi.json | python3 -c "import json,sys; print(len(json.load(sys.stdin)['paths']), 'paths')"
+  ```
+
+  Un `429` en integración es el límite de altas de agente en Redis, no un fallo tuyo:
+  `redis-cli -n 1 FLUSHDB` contra la base de datos de pruebas.
+
+- [ ] **Paso 8: commit**, con las rutas explícitas. Este checkout tiene trabajo ajeno
+  sin commitear bajo `docs-site/`: nunca `git add .`.
 
 ---
 
