@@ -11,37 +11,45 @@ export interface StorageLike {
   setItem(key: string, value: string): void;
 }
 
-const fallbackStore: Record<string, string> = {};
-
-function memoryStore(): StorageLike {
+function createMemoryStore(): StorageLike {
+  const data: Record<string, string> = {};
   return {
-    getItem: (key) => (key in fallbackStore ? fallbackStore[key] : null),
+    getItem: (key) => (key in data ? data[key] : null),
     setItem: (key, value) => {
-      fallbackStore[key] = value;
+      data[key] = value;
     },
   };
 }
 
+// One fallback per kind, not shared — otherwise blocking both real stores
+// would quietly merge session and persistent state into a single bucket.
+const sessionFallback = createMemoryStore();
+const persistentFallback = createMemoryStore();
+
 const PROBE_KEY = "agentdialog:probe";
 
-function usable(store: Storage | undefined): store is Storage {
+/**
+ * `get` is called inside the try because reading the property itself —
+ * `globalThis.localStorage`, not just calling a method on it — is what
+ * throws in WebKit when site data is blocked.
+ */
+function usable(get: () => Storage | undefined): Storage | null {
   try {
-    if (!store) return false;
+    const store = get();
+    if (!store) return null;
     store.getItem(PROBE_KEY); // throws when site data is blocked
-    return true;
+    return store;
   } catch {
-    return false;
+    return null;
   }
 }
 
 /** Lives for this tab only. Where attribution goes. */
 export function sessionStore(): StorageLike {
-  const store = globalThis.sessionStorage;
-  return usable(store) ? store : memoryStore();
+  return usable(() => globalThis.sessionStorage) ?? sessionFallback;
 }
 
 /** Survives closing the tab. Where a deliberate language choice goes. */
 export function persistentStore(): StorageLike {
-  const store = globalThis.localStorage;
-  return usable(store) ? store : memoryStore();
+  return usable(() => globalThis.localStorage) ?? persistentFallback;
 }

@@ -6,7 +6,7 @@ import {
   writeStoredLanguage,
 } from "../../web/src/i18n/resolve";
 import { localeTag, narrow } from "../../web/src/i18n/languages";
-import type { StorageLike } from "../../web/src/lib/storage";
+import { persistentStore, type StorageLike } from "../../web/src/lib/storage";
 
 /** A storage we control, so the test never touches a real browser. */
 function fakeStorage(initial: Record<string, string> = {}): StorageLike {
@@ -101,5 +101,32 @@ describe("narrow and localeTag", () => {
     expect(localeTag("en")).toBe("en-US");
     expect(localeTag("es")).toBe("es-ES");
     expect(localeTag("ca")).toBe("ca-ES");
+  });
+});
+
+describe("persistentStore", () => {
+  test("a throwing property access, not just a throwing method, falls back to memory", () => {
+    // WebKit with blocked site data throws on *reading* `localStorage` itself
+    // — before any method on it is ever called.
+    const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get() {
+        throw new Error("SecurityError: The operation is insecure.");
+      },
+    });
+
+    try {
+      const storage = persistentStore();
+      expect(() => storage.setItem(LANGUAGE_KEY, "ca")).not.toThrow();
+      expect(storage.getItem(LANGUAGE_KEY)).toBe("ca");
+    } finally {
+      if (original) {
+        Object.defineProperty(globalThis, "localStorage", original);
+      } else {
+        // @ts-expect-error -- test-only cleanup of a property we just defined
+        delete globalThis.localStorage;
+      }
+    }
   });
 });
