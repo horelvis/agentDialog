@@ -30,7 +30,8 @@ export function buildDocument(env: Record<string, string | undefined> = process.
     };
 
     if (doc.body) {
-      operation.requestBody = { content: { "application/json": { schema: doc.body } } };
+      const contentType = doc.bodyContentType ?? "application/json";
+      operation.requestBody = { content: { [contentType]: { schema: doc.body } } };
     }
     // zod-openapi's own special key, not a raw OpenAPI `parameters` entry: handed
     // an object schema under `path`/`query`, it expands each property into its

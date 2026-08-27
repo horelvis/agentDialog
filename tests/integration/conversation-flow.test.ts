@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { createTestApp } from "../helpers";
 import { conversationResponse } from "../../src/validators/conversation.responses";
+import { messageResponse, messageListResponse } from "../../src/validators/message.responses";
+import { invitationCreateResponse } from "../../src/validators/invitation.responses";
 
 describe("Conversation Flow", () => {
   const app = createTestApp();
@@ -57,6 +59,8 @@ describe("Conversation Flow", () => {
       }),
     });
     expect(msgRes.status).toBe(201);
+    const msgResBody = await msgRes.clone().json();
+    expect(() => messageResponse.parse(msgResBody)).not.toThrow();
 
     // 5. Send a tool_call message
     const toolRes = await app.request(`/api/v1/agent/conversations/${conversation.id}/messages`, {
@@ -82,6 +86,8 @@ describe("Conversation Flow", () => {
       headers: { Authorization: agentAuth },
     });
     expect(listRes.status).toBe(200);
+    const listResBody = await listRes.clone().json();
+    expect(() => messageListResponse.parse(listResBody)).not.toThrow();
     const { data: messageList } = await listRes.json();
     expect(messageList.length).toBe(2);
 
@@ -98,6 +104,8 @@ describe("Conversation Flow", () => {
       }),
     });
     expect(invRes.status).toBe(201);
+    const invResBody = await invRes.clone().json();
+    expect(() => invitationCreateResponse.parse(invResBody)).not.toThrow();
 
     // 8. Send an approval request
     const approvalRes = await app.request(`/api/v1/agent/conversations/${conversation.id}/messages`, {

@@ -5,6 +5,13 @@ export interface RouteDoc {
   description?: string;
   /** Reuse the very schema that validates the request. Never a copy of it. */
   body?: ZodTypeAny;
+  /**
+   * Defaults to "application/json". Set to "multipart/form-data" for the
+   * three routes that read c.req.formData() instead of validateBody — there
+   * is no Zod schema behind those, so `body` there is a documentation-only
+   * approximation of the form fields, not a reused validator.
+   */
+  bodyContentType?: "application/json" | "multipart/form-data";
   query?: ZodTypeAny;
   params?: ZodTypeAny;
   responses: Record<number, ZodTypeAny>;
