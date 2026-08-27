@@ -400,8 +400,18 @@ export function buildDocument(env: Record<string, string | undefined> = process.
 - [ ] **Paso 7: describe la primera ruta**
 
 Escribe `src/validators/query.responses.ts` con la forma de una query devuelta. Sácala
-de lo que devuelve `shapeHumanQuery` (`src/services/query.service.ts`), **no** de la
-guía: es la respuesta real la que manda.
+del servicio, **no** de la guía: es la respuesta real la que manda.
+
+**Cuidado, que hay dos formas y es fácil coger la que no es.** `src/services/query.service.ts`
+tiene `shapeQuery` —lo que ve **el agente**, y por tanto lo que devuelven las rutas de
+esta superficie— y `shapeHumanQuery`, que es lo que ve el humano y lleva campos que un
+agente nunca recibe (`conversation_id`, `query_message_id`, `subject`, `changes`,
+`risk`, `answer_space`, `prior_decision_at`). **Para `/api/v1/agent/**` manda
+`shapeQuery`.**
+
+Y una tercera: `createQuery` no devuelve ninguna de las dos, sino un acuse pequeño
+—`{ query_id, status, conversation_id, message, next_step, expires_at }`— así que la
+respuesta 201 de `POST /queries` tiene su propio esquema.
 
 ```ts
 import { z } from "zod";
