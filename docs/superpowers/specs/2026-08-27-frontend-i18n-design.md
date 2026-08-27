@@ -181,6 +181,14 @@ corrección de la tabla.
 alguien abrió para responder una pregunta. Falla en silencio y esa visita se
 queda con el idioma que ya estaba.
 
+Y no se escribe ese guardado desde cero: `web/src/lib/attribution.ts` ya tiene
+exactamente esa pieza —`StorageLike`, la sonda que detecta el almacenamiento
+bloqueado, y el respaldo en memoria— resuelta para la atribución. La única
+diferencia es cuál: la atribución usa `sessionStorage` y el idioma necesita
+`localStorage`, que sobrevive a cerrar la pestaña. Se saca a un
+`web/src/lib/storage.ts` y lo usan los dos; duplicar la sonda sería tener dos
+versiones de la misma respuesta a Safari.
+
 ## El resolutor
 
 Una función pura, sin React ni `i18next` dentro, que es lo que la hace
@@ -250,10 +258,22 @@ ejecuten.
    idioma es lo único que impide que una traducción se quede a medias en
    silencio.
 
-**Restricción al escribirlas**: importan el resolutor y los ficheros de catálogo
-por ruta relativa, y **nunca el `index.ts` de `web/src/i18n/`**, que es donde
-vive el `declare module "i18next"`. Arrastrarlo metería los tipos de i18next y
-el JSX de `web/` dentro del `bunx tsc --noEmit` de la raíz.
+**Dos restricciones al escribirlas**, ambas por cómo resuelve Bun desde la raíz:
+
+1. **Importan por ruta relativa, nunca por el alias `@/`.** Ese alias existe en
+   los dos `tsconfig`, y apunta a sitios distintos: en `web/` a `web/src/`, en
+   la raíz a `src/`, que es el backend. Un `@/lib/storage` escrito en un fichero
+   de `web/` y ejecutado desde la raíz no falla — resuelve al backend, que es
+   peor que fallar. Los ficheros que estas pruebas importan usan rutas
+   relativas.
+2. **No importan el `index.ts` de `web/src/i18n/`**, que es donde se inicializa
+   i18next y donde vive el `declare module "i18next"`. Importarlo desde la suite
+   arrancaría i18next fuera de un navegador. El resolutor y los catálogos son
+   ficheros aparte precisamente para que se puedan importar solos.
+
+Lo que **no** es un motivo, aunque lo parezca: el `tsc --noEmit` de la raíz no
+entra aquí. Su `tsconfig.json` declara `include: ["src/**/*.ts"]` y excluye
+`tests`, así que nunca ha mirado la suite.
 
 **Un job `web` en CI**, que este trabajo abre y por tanto le toca cerrar:
 `bun install` en `web/`, `tsc -b`, y nada más. Hoy un error de tipos en `web/`
@@ -304,5 +324,5 @@ riesgo `low` o `medium`, que son las únicas que acuñan enlace.
 | selector > declarado > navegador | La elección explícita es la única señal deliberada; lo declarado vence al navegador porque el navegador es del dispositivo | Nada relevante |
 | react-i18next | Decisión del usuario: ICU y una forma conocida | ~20 kB, y claves que hay que tipar a mano con `CustomTypeOptions` |
 | Catálogos duplicados, no compartidos con el backend | Cruzar dos tsconfig y dos bundlers por cinco cadenas | Cinco cadenas en dos sitios |
-| Las pruebas en `tests/unit/` de la raíz | Es lo único que CI ejecuta | El resolutor no puede importar el `index.ts` de i18n |
+| Las pruebas en `tests/unit/` de la raíz | Es lo único que CI ejecuta | El resolutor y los catálogos importan por ruta relativa y no pueden tocar el `index.ts` de i18n |
 | Un job `web` en CI | Cuarenta ficheros tocados y hoy los tipos de `web/` los valida Cloudflare después de fusionar | ~15 líneas de YAML |
