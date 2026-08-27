@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "bunx biome check src/",
     "format": "bunx biome format --write src/",
-    "demo": "bun run scripts/demo-agent.ts"
+    "demo": "bun run scripts/demo-agent.ts",
+    "openapi": "bun run scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.1",

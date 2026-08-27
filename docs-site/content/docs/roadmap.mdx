@@ -28,6 +28,8 @@ used to probe the network the API runs in.
 
 **TypeScript SDK** on npm as `@agentdialog/sdk`, with adapters for LangChain (`/langchain`) and the Vercel AI SDK (`/ai`).
 
+**OpenAPI 3.1 contract.** `GET /openapi.json` describes every agent endpoint, generated straight from the route declarations that serve the traffic rather than hand-written, so it cannot drift out of sync. A router-coverage test fails the build if a route ships without one.
+
 **A web chat for humans.** They answer there — no account to create, no
 password.
 

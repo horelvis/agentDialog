@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { buildDocument } from "../../src/openapi/document";
+import { registeredRoutes } from "../../src/openapi/documented";
 
 // Side-effect import: `documented()` registers a route the moment its file is
 // evaluated, and this test imports document.ts directly rather than going
@@ -89,5 +90,79 @@ describe("the OpenAPI document", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  // A full OpenAPI 3.1 meta-schema is a JSON-Schema validator dependency for
+  // one test. Instead, this asserts by hand the structural invariants a
+  // meta-schema run would catch: required top-level fields present, every
+  // operation has at least one response, and every $ref this document emits
+  // resolves inside the document itself.
+  test("passes hand-written structural checks in place of a full meta-schema validator", () => {
+    const doc: any = buildDocument({});
+
+    expect(doc.openapi).toStartWith("3.1");
+    expect(doc.info.title).toBeString();
+    expect(doc.info.title.length).toBeGreaterThan(0);
+    expect(doc.info.version).toBeString();
+    expect(doc.info.version.length).toBeGreaterThan(0);
+
+    const emptyResponses: string[] = [];
+    for (const [path, item] of Object.entries<any>(doc.paths)) {
+      for (const [method, op] of Object.entries<any>(item)) {
+        if (Object.keys(op.responses ?? {}).length === 0) {
+          emptyResponses.push(`${method.toUpperCase()} ${path}`);
+        }
+      }
+    }
+    expect(emptyResponses).toEqual([]);
+
+    function resolveRef(ref: string): unknown {
+      let node: unknown = doc;
+      for (const part of ref.replace(/^#\//, "").split("/")) {
+        node = (node as any)?.[part];
+      }
+      return node;
+    }
+    function collectRefs(node: unknown, refs: string[]): void {
+      if (!node || typeof node !== "object") return;
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (key === "$ref" && typeof value === "string") refs.push(value);
+        else collectRefs(value, refs);
+      }
+    }
+    const refs: string[] = [];
+    collectRefs(doc, refs);
+    const unresolved = refs.filter((ref) => resolveRef(ref) === undefined);
+    expect(unresolved).toEqual([]);
+  });
+
+  // What stops task 5's work (the three middleware responses) from unravelling
+  // in silence: 401 wherever authentication is required, 429 on every one of
+  // the 26 agent operations, and 409 on every one of the seven idempotent
+  // ones. This is a necessary condition, not an exclusivity check: a handful
+  // of routes (register's duplicate slug, queries' domain conflicts) declare
+  // their own, unrelated 409 with no idempotency involved, so more than seven
+  // operations legitimately carry a 409 in the final document.
+  test("declares 401, 429 and 409 wherever the middleware can return them", () => {
+    const doc: any = buildDocument({});
+    const routes = registeredRoutes();
+
+    expect(routes.length).toBe(26);
+    expect(routes.filter((r) => r.doc.idempotent).length).toBe(7);
+
+    for (const route of routes) {
+      const op = doc.paths[route.path][route.method.toLowerCase()];
+      const codes = Object.keys(op.responses);
+
+      expect(codes).toContain("429");
+
+      if (route.doc.security !== "none") {
+        expect(codes).toContain("401");
+      }
+
+      if (route.doc.idempotent) {
+        expect(codes).toContain("409");
+      }
+    }
   });
 });

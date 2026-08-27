@@ -3,7 +3,7 @@ import { createTestApp } from "../helpers";
 import { conversationResponse } from "../../src/validators/conversation.responses";
 import { messageResponse, messageListResponse } from "../../src/validators/message.responses";
 import { invitationCreateResponse } from "../../src/validators/invitation.responses";
-import { agentProfileResponse } from "../../src/validators/agent.responses";
+import { agentProfileResponse, agentProfileUpdateResponse } from "../../src/validators/agent.responses";
 
 describe("Conversation Flow", () => {
   const app = createTestApp();
@@ -29,6 +29,24 @@ describe("Conversation Flow", () => {
     expect(meRes.status).toBe(200);
     const meBody = await meRes.clone().json();
     expect(() => agentProfileResponse.parse(meBody)).not.toThrow();
+
+    // 2b. Update agent profile — PATCH /me's schema is otherwise never
+    // checked against a real response (see tests/unit/openapi-document.test.ts
+    // for the contract side of this route). Reuses the agent this test
+    // already registered rather than registering a second one, since
+    // registration is rate-limited and the counter is shared across files.
+    const patchMeRes = await app.request("/api/v1/agent/me", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: agentAuth,
+      },
+      body: JSON.stringify({ displayName: "Flow Test Agent, Updated" }),
+    });
+    expect(patchMeRes.status).toBe(200);
+    const patchMeBody = await patchMeRes.clone().json();
+    expect(() => agentProfileUpdateResponse.parse(patchMeBody)).not.toThrow();
+    expect(patchMeBody.data.displayName).toBe("Flow Test Agent, Updated");
 
     // 3. Create conversation
     const convRes = await app.request("/api/v1/agent/conversations", {
