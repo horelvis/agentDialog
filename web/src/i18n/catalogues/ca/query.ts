@@ -2,7 +2,7 @@ export default {
   page: {
     gone: {
       title: "Aquest enllaç ja no funciona",
-      body: "Pot ser que ja s'hagi fet servir, o que la pregunta s'hagi tancat. Inicia sessió a l'app per veure tot allò que encara espera resposta.",
+      body: "Pot ser que ja s'hagi fet servir, o que la pregunta s'hagi tancat. Inicia sessió a l'app per veure tot allò que encara espera la teva resposta.",
     },
     answered: {
       title: "Resposta enviada",
