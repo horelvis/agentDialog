@@ -368,11 +368,16 @@ export function buildDocument(env: Record<string, string | undefined> = process.
     // OpenAPI 3.1 requires every {template} in a path to have a matching
     // parameter entry, so a route with :id and no `params` produces a document
     // a strict validator rejects. createDocument does not check this.
-    const parameters: unknown[] = [];
-    if (doc.params) parameters.push({ in: "path", schema: doc.params });
-    if (doc.query) parameters.push({ in: "query", schema: doc.query });
-    if (doc.idempotent) parameters.push(IDEMPOTENCY_HEADER);
-    if (parameters.length) operation.parameters = parameters;
+    //
+    // It has to go through `requestParams`, not `parameters`. A hand-built
+    // parameters array only expands elements that are individual ZodTypes
+    // carrying .openapi({ param: { name, in } }); an object schema handed to it
+    // passes through unconverted, which looks populated and is still invalid.
+    // requestParams expands an object into one parameter per property and
+    // derives `required` from optionality.
+    if (doc.params) (operation.requestParams ??= {}).path = doc.params;
+    if (doc.query) (operation.requestParams ??= {}).query = doc.query;
+    if (doc.idempotent) operation.parameters = [IDEMPOTENCY_HEADER];
 
     if (doc.security === "none") operation.security = [];
 
