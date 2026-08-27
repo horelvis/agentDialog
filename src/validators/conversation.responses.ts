@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { ok } from "./response.helpers";
+import { conversationStatusEnum } from "../db/schema/enums";
+import { CONVERSATION_INTENT_TYPES } from "./conversation.validators";
 
 /**
  * Read off createConversation / updateConversation in
@@ -18,9 +20,9 @@ export const conversationObject = z.object({
   createdByAgentId: z.string().uuid(),
   title: z.string().nullable(),
   description: z.string().nullable(),
-  status: z.enum(["active", "archived", "closed"]),
+  status: z.enum(conversationStatusEnum.enumValues),
   context: z.record(z.unknown()),
-  intentType: z.string().nullable(),
+  intentType: z.enum(CONVERSATION_INTENT_TYPES).nullable(),
   settings: z.record(z.unknown()),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -55,10 +57,10 @@ export const conversationWithParticipantsResponse = ok(conversationWithParticipa
  * GET /conversations builds its own envelope by hand (route, not
  * listAgentConversations) — `{ data, pagination: { hasMore, count } }` — and
  * never includes nextCursor or prevCursor despite paginationQuery accepting a
- * cursor. That is a narrower shape than response.helpers.ts's paginated(),
- * which requires both; asserting the real response against paginated() would
- * fail here, so this documents what the route actually sends rather than the
- * generic envelope.
+ * cursor. This documents what the route actually sends, which is why there is
+ * no shared generic pagination envelope here: this shape, message.responses.ts's
+ * and query.responses.ts's listQueryResponse all differ in exactly which of
+ * hasMore/nextCursor/prevCursor/count they carry.
  */
 export const conversationListResponse = z.object({
   data: z.array(conversationObject),

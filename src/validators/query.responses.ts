@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { ok } from "./response.helpers";
+import { queryStatusEnum, queryTypeEnum } from "../db/schema/enums";
+import { SUPPORTED_LANGUAGES } from "../i18n";
 
 /**
  * Read off shapeQuery in src/services/query.service.ts — what every
@@ -17,15 +19,16 @@ import { ok } from "./response.helpers";
  */
 export const queryObject = z.object({
   query_id: z.string().uuid(),
-  // "assigned" is a real status (src/db/schema/enums.ts's query_status enum) —
-  // the human has accepted the invitation but hasn't answered yet.
-  status: z.enum(["pending", "assigned", "needs_context", "answered", "expired", "cancelled"]),
+  // From the enum columns themselves (src/db/schema/enums.ts), not a
+  // hand-copied list — "assigned" is a real status: the human has accepted
+  // the invitation but hasn't answered yet.
+  status: z.enum(queryStatusEnum.enumValues),
   status_description: z.string(),
-  query_type: z.enum(["validation", "interpretation", "expert_query", "labeling"]),
+  query_type: z.enum(queryTypeEnum.enumValues),
   question: z.string(),
   context: z.string().nullable(),
   confidence: z.number().nullable(),
-  language: z.enum(["en", "es", "ca"]),
+  language: z.enum(SUPPORTED_LANGUAGES),
   answer: z.record(z.unknown()).nullable(),
   comment: z.string().nullable(),
   human_confidence: z.number().nullable(),
@@ -46,8 +49,8 @@ export const queryResponse = ok(queryObject);
  */
 export const listQueryObject = z.object({
   query_id: z.string().uuid(),
-  status: z.enum(["pending", "assigned", "needs_context", "answered", "expired", "cancelled"]),
-  query_type: z.enum(["validation", "interpretation", "expert_query", "labeling"]),
+  status: z.enum(queryStatusEnum.enumValues),
+  query_type: z.enum(queryTypeEnum.enumValues),
   question: z.string(),
   human_email: z.string().email(),
   answer: z.record(z.unknown()).nullable(),
@@ -58,8 +61,8 @@ export const listQueryObject = z.object({
 /**
  * listAgentQueries returns a bare array with no cursor or hasMore — despite
  * the resource being named "queries" like the paginated conversations list,
- * this one does not paginate at all, so `paginated(...)` would describe
- * fields (`pagination.hasMore`, `nextCursor`, ...) the response never sends.
+ * this one does not paginate at all, so a `pagination` field here would
+ * describe something the response never sends.
  */
 export const listQueryResponse = ok(z.array(listQueryObject));
 

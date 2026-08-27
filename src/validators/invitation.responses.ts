@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { ok } from "./response.helpers";
+import { invitationStatusEnum } from "../db/schema/enums";
+import { SUPPORTED_LANGUAGES } from "../i18n";
 
 /**
  * Read off createInvitation / listConversationInvitations / revokeInvitation
@@ -18,9 +20,9 @@ const invitationRow = z.object({
   invitedByAgentId: z.string().uuid(),
   invitedHumanEmail: z.string(),
   token: z.string(),
-  status: z.enum(["pending", "accepted", "declined", "expired", "revoked"]),
+  status: z.enum(invitationStatusEnum.enumValues),
   message: z.string().nullable(),
-  language: z.string(),
+  language: z.enum(SUPPORTED_LANGUAGES),
   expiresAt: z.string().datetime(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -45,10 +47,8 @@ export const invitationCreateResponse = ok(
 export const invitationListResponse = ok(z.array(invitationRow));
 
 /**
- * DELETE /invitations/:id: revokeInvitation returns the row it fetched
- * *before* updating the status column, not a re-read of the row it just
- * wrote — so `status` in this response is still "pending", the value the
- * ownership/state check required it to have, even though the database now
- * says "revoked".
+ * DELETE /invitations/:id: revokeInvitation's `.returning()` on the same
+ * update that sets status to "revoked", so this reports the row as it now
+ * stands, not the "pending" one the ownership/state check read beforehand.
  */
 export const invitationRevokeResponse = ok(invitationRow);

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ok } from "./response.helpers";
+import { agentStatusEnum } from "../db/schema/enums";
 
 /**
  * description, avatarUrl, homepageUrl, provider and model are nullable
@@ -27,7 +28,7 @@ export const agentProfileObject = z.object({
   provider: z.string().nullable(),
   model: z.string().nullable(),
   capabilities: z.array(z.string()),
-  status: z.enum(["active", "suspended", "deactivated"]),
+  status: z.enum(agentStatusEnum.enumValues),
   apiKeyPrefix: z.string(),
   rateLimitRpm: z.number().int(),
   metadata: z.record(z.unknown()),

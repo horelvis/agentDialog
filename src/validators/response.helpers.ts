@@ -42,15 +42,3 @@ export const apiError = z.object({
 export function ok<T extends z.ZodTypeAny>(schema: T) {
   return z.object({ data: schema });
 }
-
-export function paginated<T extends z.ZodTypeAny>(schema: T) {
-  return z.object({
-    data: z.array(schema),
-    pagination: z.object({
-      hasMore: z.boolean(),
-      nextCursor: z.string().nullable(),
-      prevCursor: z.string().nullable(),
-      count: z.number().int(),
-    }),
-  });
-}

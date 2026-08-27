@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ok } from "./response.helpers";
+import { messageTypeEnum } from "../db/schema/enums";
 
 /**
  * Read off createMessage / listMessages in src/services/message.service.ts,
@@ -28,12 +29,10 @@ export const messageObject = z.object({
   senderType: z.enum(["agent", "human"]),
   senderAgentId: z.string().uuid().nullable(),
   senderHumanId: z.string().uuid().nullable(),
-  type: z.enum([
-    "text", "structured", "file", "tool_call", "tool_result",
-    "form", "form_response", "approval", "approval_response",
-    "notification", "system", "voice_note",
-    "human_query", "human_query_response",
-  ]),
+  // From the enum column itself (src/db/schema/enums.ts), not a hand-copied
+  // list — a value added there, the way human_query_response was, now
+  // reaches this schema for free instead of leaving it stale.
+  type: z.enum(messageTypeEnum.enumValues),
   content: z.string().nullable(),
   structuredData: z.record(z.unknown()).nullable(),
   replyToId: z.string().uuid().nullable(),
@@ -50,10 +49,11 @@ export const messageResponse = ok(messageObject);
 
 /**
  * What GET /:id/messages actually sends: the route builds its own pagination
- * object (`{ hasMore, nextCursor, count }`), not response.helpers.ts's
- * paginated(), which also requires prevCursor — this route never returns
- * one. nextCursor is `.nullable()`, not `.optional()`: listMessages always
- * sets the key, to either an ISO string or null.
+ * object (`{ hasMore, nextCursor, count }`) — no prevCursor, unlike
+ * conversation.responses.ts's conversationListResponse and unlike this
+ * route's own query parameters, which do accept a cursor for either
+ * direction. nextCursor is `.nullable()`, not `.optional()`: listMessages
+ * always sets the key, to either an ISO string or null.
  */
 export const messageListResponse = z.object({
   data: z.array(messageObject),
