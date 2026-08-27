@@ -4,7 +4,6 @@ export default {
     how: "Cómo funciona",
     code: "Código",
     docs: "Docs",
-    github: "GitHub",
     toggleMenu: "Abrir o cerrar el menú",
     dashboard: "Panel",
     login: "Entrar",
