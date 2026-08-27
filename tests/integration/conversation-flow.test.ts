@@ -3,6 +3,7 @@ import { createTestApp } from "../helpers";
 import { conversationResponse } from "../../src/validators/conversation.responses";
 import { messageResponse, messageListResponse } from "../../src/validators/message.responses";
 import { invitationCreateResponse } from "../../src/validators/invitation.responses";
+import { agentProfileResponse } from "../../src/validators/agent.responses";
 
 describe("Conversation Flow", () => {
   const app = createTestApp();
@@ -26,6 +27,8 @@ describe("Conversation Flow", () => {
       headers: { Authorization: agentAuth },
     });
     expect(meRes.status).toBe(200);
+    const meBody = await meRes.clone().json();
+    expect(() => agentProfileResponse.parse(meBody)).not.toThrow();
 
     // 3. Create conversation
     const convRes = await app.request("/api/v1/agent/conversations", {

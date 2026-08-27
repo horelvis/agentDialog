@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll } from "bun:test";
 import { createTestApp } from "../helpers";
+import { agentRegisterResponse } from "../../src/validators/agent.responses";
 
 describe("Agent Registration", () => {
   const app = createTestApp();
@@ -19,7 +20,8 @@ describe("Agent Registration", () => {
     });
 
     expect(res.status).toBe(201);
-    const body = await res.json();
+    const body = await res.clone().json();
+    expect(() => agentRegisterResponse.parse(body)).not.toThrow();
     expect(body.data.apiKey).toStartWith("mge_ag_");
     expect(body.data.slug).toContain("test-agent-");
     expect(body.data.displayName).toBe("Integration Test Agent");
