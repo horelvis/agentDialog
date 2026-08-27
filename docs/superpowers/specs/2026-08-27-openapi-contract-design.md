@@ -13,10 +13,13 @@ Un integrador que quiera conectar su agente tiene hoy exactamente una vía: leer
 un generador de clientes, en Postman, ni pegarle a un modelo para que escriba la
 integración. La forma exacta de cada respuesta se descubre provocándola.
 
-El catálogo de errores es el caso más claro. `src/lib/errors.ts` define nueve
-códigos —`NOT_FOUND`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT`, `VALIDATION_ERROR`,
-`RATE_LIMIT`, `IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_KEY_REUSED`,
-`UNDECIDABLE_QUERY`— y la única forma de conocerlos es leer prosa o encontrárselos.
+El catálogo de errores es el caso más claro. Son **once códigos**, y ni siquiera
+viven todos en el mismo sitio: nueve en `src/lib/errors.ts` —`NOT_FOUND`,
+`UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT`, `VALIDATION_ERROR`, `RATE_LIMIT`,
+`IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_KEY_REUSED`, `UNDECIDABLE_QUERY`—, más
+`PAYLOAD_TOO_LARGE`, que emite el `bodyLimit` de `app.ts`, e `INTERNAL_ERROR`, que
+emite el manejador de errores cuando no reconoce la excepción. La única forma de
+conocerlos hoy es leer prosa o encontrárselos.
 
 ## Para qué es, y por qué eso decide el resto
 
@@ -116,7 +119,15 @@ evitan repetir el sobre veintiséis veces:
 - `ok(schema)` → `{ data }`
 - `paginated(schema)` → `{ data, pagination }`
 - `apiError` → `{ error: { code, message, details?, retryAfter? } }`, con `code`
-  como enum de los nueve.
+  como enum de los once.
+
+  **El sobre de error no es uniforme, y el esquema tiene que decirlo.**
+  `src/middleware/error-handler.ts` esparce campos extra *al lado* de `code`, no
+  dentro de `details`: `retryAfter` en un `RateLimitError`, y `reason`, `detail`,
+  `remedy` y `prior_query_id` en un `UndecidableQueryError` — que es precisamente
+  el error más importante de la API, el rechazo de la puerta de admisión, el que
+  le dice al agente qué le falta a su pregunta. Un `apiError` que solo declarase
+  `code` y `message` describiría mal justo el caso que más se lee.
 
 ## Qué contiene el documento
 
