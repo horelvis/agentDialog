@@ -4,6 +4,7 @@ import { readyInNeedsContext } from "../helpers/queries";
 import { getDb } from "../../src/db";
 import { humanQueries } from "../../src/db/schema/human-queries";
 import { eq } from "drizzle-orm";
+import { queryResponse } from "../../src/validators/query.responses";
 
 const app = createTestApp();
 
@@ -29,6 +30,8 @@ describe("POST /agent/queries/:id/cancel", () => {
       method: "POST", headers: { Authorization: agentAuth },
     });
     expect(res.status).toBe(200);
+    const resBody = await res.clone().json();
+    expect(() => queryResponse.parse(resBody)).not.toThrow();
     const { data } = await res.json();
 
     expect(data.query_id).toBe(queryId);

@@ -4,7 +4,7 @@ import { readyInNeedsContext } from "../helpers/queries";
 import { getDb } from "../../src/db";
 import { humanQueries } from "../../src/db/schema/human-queries";
 import { eq } from "drizzle-orm";
-import { createQueryResponse } from "../../src/validators/query.responses";
+import { createQueryResponse, queryResponse, listQueryResponse } from "../../src/validators/query.responses";
 
 describe("Agent queries REST API", () => {
   const app = createTestApp();
@@ -40,6 +40,8 @@ describe("Agent queries REST API", () => {
       headers: { Authorization: authHeader },
     });
     expect(getRes.status).toBe(200);
+    const getResBody = await getRes.clone().json();
+    expect(() => queryResponse.parse(getResBody)).not.toThrow();
     const { data: fetched } = await getRes.json();
     expect(fetched.question).toBe("Should we deploy on a Friday?");
     expect(fetched.answer).toBeNull();
@@ -48,6 +50,8 @@ describe("Agent queries REST API", () => {
       headers: { Authorization: authHeader },
     });
     expect(listRes.status).toBe(200);
+    const listResBody = await listRes.clone().json();
+    expect(() => listQueryResponse.parse(listResBody)).not.toThrow();
     const { data: list } = await listRes.json();
     expect(list.some((q: any) => q.query_id === created.query_id)).toBe(true);
   });

@@ -34,7 +34,22 @@ export function documented(
   opts: { basePath: string; tag: string },
 ) {
   function register(method: Method) {
-    return (path: string, doc: RouteDoc, ...handlers: MiddlewareHandler[]) => {
+    // Generic over the literal path so the route handler's c.req.param("id")
+    // is typed from :id in `path`, exactly as it would be calling
+    // app.get(path, ...) directly. A bare `MiddlewareHandler[]` here would
+    // erase that and widen every path param to `string | undefined`.
+    //
+    // Only the *last* handler is pinned to P. Earlier ones (validateBody,
+    // idempotency, ...) come back from src/middleware as
+    // MiddlewareHandler<AppEnv> — P defaulted to plain `string` — and mixing
+    // that into a single `MiddlewareHandler<any, P>[]` array type would force
+    // TypeScript to unify P down to `string` for every handler, undoing the
+    // literal inference for the one handler that actually reads the params.
+    return <P extends string>(
+      path: P,
+      doc: RouteDoc,
+      ...handlers: [...MiddlewareHandler<any, string>[], MiddlewareHandler<any, P>]
+    ) => {
       registry.push({
         method: method.toUpperCase(),
         path: toOpenApiPath(opts.basePath, path),

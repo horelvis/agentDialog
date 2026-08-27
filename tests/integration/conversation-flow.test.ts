@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { createTestApp } from "../helpers";
+import { conversationResponse } from "../../src/validators/conversation.responses";
 
 describe("Conversation Flow", () => {
   const app = createTestApp();
@@ -38,6 +39,8 @@ describe("Conversation Flow", () => {
       }),
     });
     expect(convRes.status).toBe(201);
+    const convResBody = await convRes.clone().json();
+    expect(() => conversationResponse.parse(convResBody)).not.toThrow();
     const { data: conversation } = await convRes.json();
     expect(conversation.title).toBe("Test Conversation");
 
