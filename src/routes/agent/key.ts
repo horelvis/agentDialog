@@ -3,6 +3,7 @@ import type { AppEnv } from "../../types/hono";
 import { idempotency } from "../../middleware/idempotency";
 import { rotateApiKey } from "../../services/agent.service";
 import { documented } from "../../openapi/documented";
+import { res } from "../../openapi/types";
 import { agentKeyRotateResponse } from "../../validators/agent.responses";
 import { apiError } from "../../validators/response.helpers";
 
@@ -14,7 +15,13 @@ app.post(
   {
     summary: "Rotate the authenticated agent's API key",
     description: "The response carries the new key in clear, once — only its hash is stored.",
-    responses: { 200: agentKeyRotateResponse, 404: apiError },
+    responses: {
+      200: res(agentKeyRotateResponse, "The new API key, returned in clear this one time."),
+      404: res(apiError, "The authenticated agent no longer exists."),
+      // idempotency() calls assertValidIdempotencyKey before this route has a
+      // body to blame it on — the only 422 on this surface with no doc.body.
+      422: res(apiError, "The Idempotency-Key header is empty or longer than 255 characters."),
+    },
     idempotent: true,
   },
   idempotency(),

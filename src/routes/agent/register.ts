@@ -6,6 +6,7 @@ import { validateBody } from "../../middleware/validate";
 import { registerRateLimit } from "../../middleware/rate-limit";
 import { getLimitsConfig } from "../../config/limits";
 import { documented } from "../../openapi/documented";
+import { res } from "../../openapi/types";
 import { agentRegisterResponse } from "../../validators/agent.responses";
 import { apiError } from "../../validators/response.helpers";
 
@@ -22,7 +23,11 @@ app.post(
     summary: "Register a new agent",
     description: "The only route on this surface with no bearer auth. The response carries the new API key in clear, once — only its hash is stored thereafter.",
     body: agentRegisterSchema,
-    responses: { 201: agentRegisterResponse, 409: apiError, 422: apiError },
+    responses: {
+      201: res(agentRegisterResponse, "The agent, registered. `apiKey` is returned in clear this one time — only its hash is stored from here on."),
+      409: res(apiError, "`slug` is already taken by another agent."),
+      422: res(apiError, "The request body failed validation."),
+    },
     security: "none",
   },
   registerRateLimit(getLimitsConfig().registerRph),

@@ -11,6 +11,7 @@ import { getLimit } from "../../lib/pagination";
 import { getRedis } from "../../lib/redis";
 import { dispatchWebhooks } from "../../services/webhook.service";
 import { documented } from "../../openapi/documented";
+import { res } from "../../openapi/types";
 import { messageResponse, messageListResponse } from "../../validators/message.responses";
 import { apiError } from "../../validators/response.helpers";
 
@@ -23,7 +24,11 @@ app.post(
     summary: "Send a message in a conversation",
     params: uuidParam,
     body: createMessageSchema,
-    responses: { 201: messageResponse, 403: apiError, 422: apiError },
+    responses: {
+      201: res(messageResponse, "The message, created and delivered over the WebSocket and any subscribed webhook."),
+      403: res(apiError, "The authenticated agent is not a participant in this conversation."),
+      422: res(apiError, "The request body failed validation."),
+    },
     idempotent: true,
   },
   idempotency(),
@@ -62,7 +67,11 @@ app.get(
       "Paginated, but not with the API's usual envelope: this route builds its own pagination object with hasMore, nextCursor and count, and never returns prevCursor.",
     params: uuidParam,
     query: paginationQuery,
-    responses: { 200: messageListResponse, 403: apiError, 422: apiError },
+    responses: {
+      200: res(messageListResponse, "Messages in the conversation, paginated."),
+      403: res(apiError, "The authenticated agent is not a participant in this conversation."),
+      422: res(apiError, "The `limit` or `cursor` query parameter failed validation."),
+    },
   },
   validateQuery(paginationQuery),
   async (c) => {

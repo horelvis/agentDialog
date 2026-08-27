@@ -5,6 +5,7 @@ import { validateBody, validateQuery } from "../../middleware/validate";
 import { idempotency } from "../../middleware/idempotency";
 import { createQuerySchema, listQueriesQuerySchema, patchQuerySchema } from "../../validators/query.validators";
 import { documented } from "../../openapi/documented";
+import { res } from "../../openapi/types";
 import { createQueryResponse, queryResponse, listQueryResponse } from "../../validators/query.responses";
 import { apiError } from "../../validators/response.helpers";
 import { uuidParam } from "../../validators/common.validators";
@@ -17,7 +18,13 @@ app.post(
   {
     summary: "Ask a human a question",
     body: createQuerySchema,
-    responses: { 201: createQueryResponse, 422: apiError },
+    responses: {
+      201: res(createQueryResponse, "The query, admitted and sent to the human."),
+      422: res(
+        apiError,
+        "The request body failed validation, or the admission gate refused an undecidable question — see `reason`, `detail` and `remedy` in the error envelope.",
+      ),
+    },
     idempotent: true,
   },
   idempotency(),
@@ -35,9 +42,12 @@ app.get(
   {
     summary: "List your queries",
     description:
-      "A bare list, not a paginated one: listAgentQueries returns every matching row up to `limit`, with no cursor or hasMore.",
+      "A bare list, not a paginated one: this returns every matching row up to `limit`, with no cursor or hasMore.",
     query: listQueriesQuerySchema,
-    responses: { 200: listQueryResponse, 422: apiError },
+    responses: {
+      200: res(listQueryResponse, "Queries the authenticated agent has asked."),
+      422: res(apiError, "The `status` or `limit` query parameter failed validation."),
+    },
   },
   validateQuery(listQueriesQuerySchema),
   async (c) => {
@@ -53,7 +63,10 @@ app.get(
   {
     summary: "Get a query",
     params: uuidParam,
-    responses: { 200: queryResponse, 404: apiError },
+    responses: {
+      200: res(queryResponse, "The query."),
+      404: res(apiError, "No such query, or it wasn't created by the authenticated agent."),
+    },
   },
   async (c) => {
     const agentId = c.get("agentId");
@@ -68,7 +81,18 @@ app.patch(
     summary: "Answer a needs_context query with what was missing",
     params: uuidParam,
     body: patchQuerySchema,
-    responses: { 200: queryResponse, 404: apiError, 409: apiError, 422: apiError },
+    responses: {
+      200: res(queryResponse, "The query, updated with what was missing and re-admitted."),
+      404: res(apiError, "No such query, or it wasn't created by the authenticated agent."),
+      409: res(
+        apiError,
+        "The query is not awaiting clarification (its status is not `needs_context`), or it changed underneath this request between the check and the write.",
+      ),
+      422: res(
+        apiError,
+        "The request body failed validation, or the admission gate refused the patched question.",
+      ),
+    },
   },
   validateBody(patchQuerySchema),
   async (c) => {
@@ -84,7 +108,11 @@ app.post(
   {
     summary: "Withdraw a query",
     params: uuidParam,
-    responses: { 200: queryResponse, 404: apiError, 409: apiError },
+    responses: {
+      200: res(queryResponse, "The query, cancelled."),
+      404: res(apiError, "No such query, or it wasn't created by the authenticated agent."),
+      409: res(apiError, "The query already reached a terminal state and cannot be cancelled."),
+    },
   },
   async (c) => {
     const agentId = c.get("agentId");

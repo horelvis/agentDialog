@@ -13,6 +13,7 @@ import { getConversation } from "../../services/conversation.service";
 import { isParticipant } from "../../services/conversation.service";
 import { ForbiddenError } from "../../lib/errors";
 import { documented } from "../../openapi/documented";
+import { res } from "../../openapi/types";
 import { uuidParam } from "../../validators/common.validators";
 import {
   invitationCreateResponse,
@@ -30,7 +31,15 @@ app.post(
     summary: "Invite a human to a conversation",
     params: uuidParam,
     body: createInvitationSchema,
-    responses: { 201: invitationCreateResponse, 403: apiError, 409: apiError, 422: apiError },
+    responses: {
+      201: res(
+        invitationCreateResponse,
+        "The invitation, created — or, if this agent already has a prior accepted invitation with this human and no revoked trust since, auto-accepted immediately (`autoAccepted: true`, `status: \"accepted\"`).",
+      ),
+      403: res(apiError, "The authenticated agent is not a participant in this conversation."),
+      409: res(apiError, "A pending invitation to this email already exists for this conversation."),
+      422: res(apiError, "The request body failed validation."),
+    },
     idempotent: true,
   },
   idempotency(),
@@ -68,7 +77,10 @@ app.get(
   {
     summary: "List invitations for a conversation",
     params: uuidParam,
-    responses: { 200: invitationListResponse, 403: apiError },
+    responses: {
+      200: res(invitationListResponse, "Invitations sent for this conversation, in any status."),
+      403: res(apiError, "The authenticated agent is not a participant in this conversation."),
+    },
   },
   async (c) => {
     const conversationId = c.req.param("id");
@@ -89,7 +101,11 @@ app.delete(
     summary: "Revoke a pending invitation",
     description: "id here is the invitation id, not a conversation id.",
     params: uuidParam,
-    responses: { 200: invitationRevokeResponse, 403: apiError, 404: apiError },
+    responses: {
+      200: res(invitationRevokeResponse, "The invitation, revoked."),
+      403: res(apiError, "Only a pending invitation can be revoked."),
+      404: res(apiError, "No such invitation, or it wasn't created by the authenticated agent."),
+    },
   },
   async (c) => {
     const invitationId = c.req.param("id");

@@ -1,5 +1,10 @@
+// Must be imported before the .openapi() call below runs, and this module's
+// own top-level code is exactly where it runs — see the note in
+// src/openapi/document.ts.
+import "zod-openapi/extend";
 import { z } from "zod";
 import { ok } from "./response.helpers";
+import { WEBHOOK_EVENT_NAMES } from "./webhook-delivery.responses";
 
 /**
  * Read off PublicWebhook / publicColumns in src/services/webhook.service.ts —
@@ -11,7 +16,10 @@ export const webhookObject = z.object({
   id: z.string().uuid(),
   agentId: z.string().uuid(),
   url: z.string(),
-  events: z.array(z.string()),
+  events: z.array(z.string()).openapi({
+    description:
+      `The events this webhook is subscribed to: any of ${WEBHOOK_EVENT_NAMES.map((e) => `\`${e}\``).join(", ")}, or \`"*"\` for all of them.`,
+  }),
   isActive: z.boolean(),
   failureCount: z.number().int(),
   lastDeliveryAt: z.string().datetime().nullable(),

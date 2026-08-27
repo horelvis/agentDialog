@@ -4,6 +4,7 @@ import { updateAgent } from "../../services/agent.service";
 import { agentUpdateSchema } from "../../validators/agent.validators";
 import { validateBody } from "../../middleware/validate";
 import { documented } from "../../openapi/documented";
+import { res } from "../../openapi/types";
 import { agentProfileResponse, agentProfileUpdateResponse } from "../../validators/agent.responses";
 import { apiError } from "../../validators/response.helpers";
 
@@ -14,7 +15,7 @@ app.get(
   "/me",
   {
     summary: "Get the authenticated agent's profile",
-    responses: { 200: agentProfileResponse },
+    responses: { 200: res(agentProfileResponse, "The authenticated agent's own profile.") },
   },
   async (c) => {
   const agent = c.get("agent");
@@ -48,7 +49,11 @@ app.patch(
   {
     summary: "Update the authenticated agent's profile",
     body: agentUpdateSchema,
-    responses: { 200: agentProfileUpdateResponse, 404: apiError, 422: apiError },
+    responses: {
+      200: res(agentProfileUpdateResponse, "The profile, updated."),
+      404: res(apiError, "The authenticated agent no longer exists."),
+      422: res(apiError, "The request body failed validation."),
+    },
   },
   validateBody(agentUpdateSchema),
   async (c) => {

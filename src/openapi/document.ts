@@ -1,3 +1,11 @@
+// Side-effect import, and it must land before any schema calls .openapi() at
+// its own module's top level (src/routes/agent/upload.ts,
+// src/routes/agent/webhooks.ts, src/validators/webhook.responses.ts) — those
+// files carry their own copy of this same import so evaluation order can't
+// strand them without it; zod-openapi 4 otherwise emits no schema-level
+// description at all, silently dropping every .describe() this document
+// relied on to explain the multipart fields and the webhook event names.
+import "zod-openapi/extend";
 import { createDocument } from "zod-openapi";
 import { appVersion } from "../lib/app-version";
 import { registeredRoutes } from "./documented";
@@ -14,11 +22,12 @@ const IDEMPOTENCY_HEADER = {
 };
 
 /**
- * The three responses no handler ever returns because middleware answers
- * before a handler runs: the auth wall, the rate limiter and the idempotency
- * middleware on a reused key. Defined once here, referenced by every
- * operation the rule below applies to, so the body exists once and every
- * operation gains three lines of $ref rather than a copy of the response.
+ * Responses no handler ever returns because something upstream of it answers
+ * first: the auth wall, the rate limiter, the idempotency middleware on a
+ * reused key, the body-size limit, and the error handler's own fallback.
+ * Defined once here, referenced by every operation the rule below applies to,
+ * so the body exists once and every operation gains a line of $ref rather
+ * than a copy of the response.
  */
 const MIDDLEWARE_RESPONSES = {
   Unauthorized: {
@@ -35,23 +44,34 @@ const MIDDLEWARE_RESPONSES = {
       "The Idempotency-Key header was reused, either by a request still in flight or by one whose original request had a different body.",
     content: { "application/json": { schema: apiError } },
   },
+  PayloadTooLarge: {
+    description: "The request body exceeded the server's configured maximum size (see app.ts's bodyLimit).",
+    content: { "application/json": { schema: apiError } },
+  },
+  InternalError: {
+    description: "An unexpected error. The error envelope carries no further detail than `message`.",
+    content: { "application/json": { schema: apiError } },
+  },
 };
 
 /**
  * When a status code above collides with one a handler already documents —
  * today that is only 409, and only on POST /:id/invitations, which both
  * requires an Idempotency-Key and throws its own domain 409 for a duplicate
- * invite — the handler's response wins the merge (see the loop below) but its
- * description was empty, silently hiding the other meaning. This is what gets
- * appended in that case, keyed by the same name as MIDDLEWARE_RESPONSES so
- * the next route that grows a second meaning for one of these codes inherits
- * a note for free instead of the reader having to already know to branch on
- * `error.code`.
+ * invite — the handler's response wins the merge (see the loop below): its
+ * schema and description both stand, and this note is appended to that
+ * description rather than replacing it, so the primary meaning (a duplicate
+ * invitation) and the secondary one (a reused Idempotency-Key) are both on
+ * the page. Keyed by the same name as MIDDLEWARE_RESPONSES so the next route
+ * that grows a second meaning for one of these codes inherits a note for free
+ * instead of the reader having to already know to branch on `error.code`.
  */
 const MIDDLEWARE_COLLISION_NOTES: Record<keyof typeof MIDDLEWARE_RESPONSES, string> = {
   Unauthorized: "May also indicate a missing or invalid bearer token; the `code` field distinguishes them.",
   RateLimited: "May also indicate the request was rate limited; the `code` field distinguishes them.",
   IdempotencyKeyReused: "May also indicate a reused `Idempotency-Key`; the `code` field distinguishes them.",
+  PayloadTooLarge: "May also indicate the request body was too large; the `code` field distinguishes them.",
+  InternalError: "May also indicate an unexpected server error; the `code` field distinguishes them.",
 };
 
 /** One entry per resource, so a generated client groups its methods recognisably. */
@@ -72,32 +92,36 @@ export function buildDocument(env: Record<string, string | undefined> = process.
 
   for (const route of registeredRoutes()) {
     const { doc } = route;
-    // Mechanical, from flags the RouteDoc already carries: 429 on every route
-    // (globalRateLimit runs before all of them), 401 on every route but the
-    // one with security: "none", 409 on the seven idempotent POSTs.
+    // Mechanical, from flags the RouteDoc already carries: 429 and 500 on
+    // every route (globalRateLimit and the error handler's fallback both run
+    // for all of them), 401 on every route but the one with security:
+    // "none", 409 on the seven idempotent POSTs, 413 on every route with a
+    // body (app.ts's bodyLimit runs ahead of all of them too).
     const middlewareEntries: Array<[number, keyof typeof MIDDLEWARE_RESPONSES]> = [
       [429, "RateLimited"],
+      [500, "InternalError"],
     ];
     if (doc.security !== "none") middlewareEntries.push([401, "Unauthorized"]);
     if (doc.idempotent) middlewareEntries.push([409, "IdempotencyKeyReused"]);
+    if (doc.body) middlewareEntries.push([413, "PayloadTooLarge"]);
 
     const responses: Record<string, { description: string; content?: unknown }> =
       Object.fromEntries(
-        Object.entries(doc.responses).map(([status, schema]) => [
+        Object.entries(doc.responses).map(([status, r]) => [
           status,
-          { description: "", content: { "application/json": { schema } } },
+          { description: r.description, content: { "application/json": { schema: r.schema } } },
         ]),
       );
 
     // A status the handler itself documents wins the slot — a duplicate-invite
-    // 409 is not the idempotency middleware's 409 — but its own description
-    // was blank, which silently hid that the same code has a second, unrelated
-    // meaning here. Append a note instead of overwriting.
+    // 409 is not the idempotency middleware's 409 — so its description is
+    // appended to, not replaced: the primary meaning the handler wrote stays
+    // on the page alongside the secondary one this loop adds.
     for (const [status, name] of middlewareEntries) {
       const key = String(status);
       const existing = responses[key];
       if (existing) {
-        existing.description = MIDDLEWARE_COLLISION_NOTES[name];
+        existing.description = `${existing.description} ${MIDDLEWARE_COLLISION_NOTES[name]}`;
       } else {
         responses[key] = { $ref: `#/components/responses/${name}` } as unknown as {
           description: string;
@@ -114,7 +138,15 @@ export function buildDocument(env: Record<string, string | undefined> = process.
 
     if (doc.body) {
       const contentType = doc.bodyContentType ?? "application/json";
-      operation.requestBody = { content: { [contentType]: { schema: doc.body } } };
+      // OpenAPI defaults requestBody.required to false. Every route on this
+      // surface that declares a body requires one — validateBody (or, for
+      // the two multipart routes, a manual c.req.formData() check) rejects a
+      // missing body with 422 — so leaving this unset would tell a generated
+      // client the body is optional.
+      operation.requestBody = {
+        required: true,
+        content: { [contentType]: { schema: doc.body } },
+      };
     }
     // zod-openapi's own special key, not a raw OpenAPI `parameters` entry: handed
     // an object schema under `path`/`query`, it expands each property into its
@@ -173,7 +205,7 @@ export function buildDocument(env: Record<string, string | undefined> = process.
           tags: ["webhooks"],
           summary: "A delivery to the URL you registered",
           description:
-            "Signed per Standard Webhooks. The signed content covers the timestamp, so a captured delivery cannot be replayed. Verify with verifyWebhook from @agentdialog/sdk/webhooks, or any off-the-shelf implementation.",
+            "Signed per Standard Webhooks. The signature covering the timestamp makes the timestamp trustworthy, not replay-proof by itself — it's the verifier rejecting a timestamp outside its tolerance window that stops a captured delivery from being replayed. verifyWebhook from @agentdialog/sdk/webhooks checks both; an off-the-shelf implementation needs a tolerance window of its own to do the same.",
           parameters: [
             {
               name: "webhook-id",

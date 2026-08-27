@@ -1,4 +1,8 @@
 import { Hono } from "hono";
+// Must be imported before the .openapi() calls below run, and this module's
+// own top-level code is exactly where they run — see the note in
+// src/openapi/document.ts.
+import "zod-openapi/extend";
 import { z } from "zod";
 import type { AppEnv } from "../../types/hono";
 import { uploadFile, getPresignedUploadUrl } from "../../services/file.service";
@@ -9,7 +13,10 @@ import { getLimitsConfig } from "../../config/limits";
 import { getRedis } from "../../lib/redis";
 import { dispatchWebhooks } from "../../services/webhook.service";
 import { documented } from "../../openapi/documented";
+import { res } from "../../openapi/types";
+import { validateBody } from "../../middleware/validate";
 import { uuidParam } from "../../validators/common.validators";
+import { presignedUploadRequestSchema } from "../../validators/upload.validators";
 import { uploadedMessageResponse, presignedUploadResponse } from "../../validators/upload.responses";
 import { apiError } from "../../validators/response.helpers";
 
@@ -19,13 +26,30 @@ const app = documented(hono, { basePath: "/api/v1/agent/conversations", tag: "up
 // Documentation-only approximations of the multipart fields these two routes
 // read by hand via c.req.formData() — there is no validateBody schema behind
 // them to reuse, unlike every JSON route in this API.
+//
+// .openapi(), not .describe(): zod-openapi 4 emits no schema-level
+// description from .describe() at all, so text attached that way reaches no
+// reader — what a generator would see for `file` without this is a bare
+// `{ "type": "string" }`, indistinguishable from a text field. `type` and
+// `format` here are what tells a generator to emit a file upload control
+// instead.
 const uploadFileRequest = z.object({
-  file: z.string().describe("The file to attach, as a binary multipart/form-data field named `file`."),
+  file: z.string().openapi({
+    type: "string",
+    format: "binary",
+    description: "The file to attach, as a binary multipart/form-data field named `file`.",
+  }),
 });
 
 const voiceNoteRequest = z.object({
-  audio: z.string().describe("The recording, as a binary multipart/form-data field named `audio` (must be audio/*)."),
-  durationMs: z.string().optional().describe("Optional recording duration, as a numeric form field."),
+  audio: z.string().openapi({
+    type: "string",
+    format: "binary",
+    description: "The recording, as a binary multipart/form-data field named `audio` (must be audio/*).",
+  }),
+  durationMs: z.string().optional().openapi({
+    description: "Optional recording duration, as a numeric form field.",
+  }),
 });
 
 app.post(
@@ -36,7 +60,11 @@ app.post(
     params: uuidParam,
     body: uploadFileRequest,
     bodyContentType: "multipart/form-data",
-    responses: { 201: uploadedMessageResponse, 403: apiError, 422: apiError },
+    responses: {
+      201: res(uploadedMessageResponse, "The file, attached to a new message of type \"file\"."),
+      403: res(apiError, "The authenticated agent is not a participant in this conversation."),
+      422: res(apiError, "No `file` field was sent, or it exceeds the configured maximum file size."),
+    },
   },
   async (c) => {
     const conversationId = c.req.param("id");
@@ -101,7 +129,14 @@ app.post(
     params: uuidParam,
     body: voiceNoteRequest,
     bodyContentType: "multipart/form-data",
-    responses: { 201: uploadedMessageResponse, 403: apiError, 422: apiError },
+    responses: {
+      201: res(uploadedMessageResponse, "The recording, attached to a new message of type \"voice_note\"."),
+      403: res(apiError, "The authenticated agent is not a participant in this conversation."),
+      422: res(
+        apiError,
+        "No `audio` field was sent, it isn't an audio/* type, it exceeds the configured maximum file size, or `durationMs` isn't a positive number.",
+      ),
+    },
   },
   async (c) => {
     const conversationId = c.req.param("id");
@@ -174,9 +209,14 @@ app.post(
   {
     summary: "Get a presigned URL to upload a file directly to storage",
     params: uuidParam,
-    body: z.object({ fileName: z.string() }),
-    responses: { 200: presignedUploadResponse, 403: apiError, 422: apiError },
+    body: presignedUploadRequestSchema,
+    responses: {
+      200: res(presignedUploadResponse, "A URL to PUT the file to directly, and the storage key it will be stored under."),
+      403: res(apiError, "The authenticated agent is not a participant in this conversation."),
+      422: res(apiError, "The request body failed validation."),
+    },
   },
+  validateBody(presignedUploadRequestSchema),
   async (c) => {
     const conversationId = c.req.param("id");
     const agentId = c.get("agentId");
@@ -185,9 +225,7 @@ app.post(
       throw new ForbiddenError("Not a participant in this conversation");
     }
 
-    const body = await c.req.json();
-    const { fileName } = body;
-    if (!fileName) throw new ValidationError("fileName is required");
+    const { fileName } = c.get("validatedBody") as { fileName: string };
 
     const result = await getPresignedUploadUrl(fileName);
     return c.json({ data: result });
