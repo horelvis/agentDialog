@@ -13,7 +13,7 @@ reutilizan tal cual; los de respuesta se escriben ahora y se usan **dos veces**:
 emitir el documento con `zod-openapi`, y para afirmar en los tests de integración que
 existen que la respuesta real los cumple.
 
-**Tech Stack:** Bun, Hono 4.13, zod 3.25.76, `zod-openapi@5`, Drizzle. Sin tocar el
+**Tech Stack:** Bun, Hono 4.13, zod 3.25.76 (API clásica v3), `zod-openapi@4`, Drizzle. Sin tocar el
 `overrides` de zod.
 
 **Spec:** `docs/superpowers/specs/2026-08-27-openapi-contract-design.md`
@@ -22,8 +22,11 @@ existen que la respuesta real los cumple.
 
 - **Código, comentarios y mensajes de commit en inglés.** Los specs y planes de este
   repo van en español; el código no.
-- **`zod-openapi@5.4.6` o superior de la línea 5.** Declara `zod: "^3.25.74 || ^4.0.0"`
-  y el zod resuelto aquí es **3.25.76**. Entra por dos parches. **No toques el
+- **`zod-openapi@^4.2.4`, NO la línea 5.** La 5 declara `zod: "^3.25.74 || ^4.0.0"`,
+  que parece aceptar el zod 3.25.76 de este repo y no lo hace: exige esquemas
+  construidos con el subpath `zod/v4` (objetos marcados `_zod`), y los validadores de
+  aquí usan la API clásica v3 (objetos con `_def`). La 4.2.4 declara `zod: "^3.21.4"` y
+  trabaja con los esquemas tal como están. **No toques el
   `"overrides": {"zod": "$zod"}` de `package.json`**: existe porque el SDK de MCP
   importa `zod/v3` y `zod/v4-mini`, y quitarlo mete dos instancias de zod en el
   proceso.
@@ -87,7 +90,7 @@ maquinaria.
 - [ ] **Paso 1: instala la dependencia**
 
 ```bash
-bun add zod-openapi@^5.4.6
+bun add zod-openapi@^4.2.4
 ```
 
 Comprueba que **no** ha tocado la versión de zod:

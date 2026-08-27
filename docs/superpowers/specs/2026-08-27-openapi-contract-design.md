@@ -99,12 +99,29 @@ caro. Y trae su propio middleware de validación, que aquí o duplica o sustituy
 Lo que ganaría a cambio, sobre todo el `describeRoute` ya escrito, son cuarenta
 líneas.
 
-**Las versiones encajan sin tocar nada, y esto se comprobó antes de decidir.** Todas
-las librerías OpenAPI actuales piden zod `^4`, y este repo está fijado a zod 3 por
-el `overrides` que `CLAUDE.md` prohíbe tocar, porque el SDK de MCP importa `zod/v3`
-y `zod/v4-mini`. Pero `zod-openapi@5.4.6` declara `^3.25.74 || ^4.0.0`, y el zod
-resuelto aquí es **3.25.76**. Entra por 0.0.2. Conviene dejarlo escrito: si alguien
-baja zod por debajo de 3.25.74, esta dependencia deja de instalarse.
+**La versión es `zod-openapi@4`, y la razón importa.** Todas las librerías OpenAPI
+actuales piden zod `^4`, y este repo está fijado a zod 3 por el `overrides` que
+`CLAUDE.md` prohíbe tocar, porque el SDK de MCP importa `zod/v3` y `zod/v4-mini`.
+
+`zod-openapi@5.4.6` declara `zod: "^3.25.74 || ^4.0.0"`, y el zod resuelto aquí es
+3.25.76 — pero **ese rango no significa lo que parece.** zod 3.25 expone un subpath
+`zod/v4` además del clásico, y la versión 5 acepta `^3.25.74` porque necesita esquemas
+construidos *con ese subpath*: su detector solo reconoce objetos marcados `_zod`. Los
+validadores de este repo se construyen con `import { z } from "zod"`, que resuelve a la
+API clásica v3 y produce objetos con `_def`. La versión 5 los rechaza, y no se arregla
+moviendo dónde se llama al conversor: los objetos tienen la forma equivocada.
+
+Se usa **`zod-openapi@^4.2.4`**, que declara `zod: "^3.21.4"` y trabaja con los
+esquemas que el repo ya tiene, sin migrar ninguno.
+
+La alternativa —migrar a `zod/v4` los esquemas que se documentan— se descarta porque
+rompe la premisa del diseño. El valor de esto es que el esquema documentado **es** el
+que valida la petición; una copia en otra API es exactamente la copia que puede
+divergir, y arrastraría también a `src/middleware/validate.ts`, que los consume.
+
+Esto se descubrió ejecutando, no leyendo: el rango de peers se comprobó al escribir el
+spec y se leyó mal. Queda escrito para que nadie vuelva a subir la mayor creyendo que
+`^3.25.74` significa «acepta zod 3».
 
 ## Las respuestas son el trabajo
 
