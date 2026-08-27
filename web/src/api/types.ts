@@ -159,10 +159,10 @@ export interface PaginatedResponse<T> {
     limit: number;
     cursor?: string;
     // The message-listing endpoints (human and agent) return this instead of
-    // `cursor` — see src/services/message.service.ts. Both are read as
-    // fallbacks of each other rather than picking one, since this type is
-    // shared with endpoints that use only `cursor`.
-    nextCursor?: string;
+    // `cursor` — see src/services/message.service.ts, which sends `null` on
+    // the last page rather than omitting the field. `| null`, not just `?`,
+    // so a strict `!== undefined` check doesn't loop forever there.
+    nextCursor?: string | null;
     hasMore: boolean;
   };
 }
