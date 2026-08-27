@@ -1,3 +1,4 @@
+import { LanguageSelector } from "@/components/i18n/LanguageSelector";
 import { Logo } from "@/components/ui/Logo";
 
 interface FooterProps {
@@ -21,6 +22,11 @@ export function Footer({ minimal = false }: FooterProps) {
             <span className="text-sm font-semibold text-gray-100">AgentDialog</span>
           </div>
           <div className="flex items-center gap-6">
+            {/* Kept in minimal mode. That flag drops links which invite
+                somebody away from the one decision the page exists for; a
+                language picker does the opposite — it is what lets them read
+                the decision at all. */}
+            <LanguageSelector />
             <p className="text-sm text-gray-400">
               Agent-first messaging platform. Built for the AI era.
             </p>

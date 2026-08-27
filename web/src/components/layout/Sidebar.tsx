@@ -4,6 +4,7 @@ import { useInvitationStore } from "@/stores/invitationStore";
 import { useQueryStore } from "@/stores/queryStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useAuthStore } from "@/stores/authStore";
+import { LanguageSelector } from "@/components/i18n/LanguageSelector";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
@@ -122,6 +123,9 @@ export function Sidebar() {
         </nav>
 
         <div className="border-t border-surface-border p-3">
+          <div className="mb-3">
+            <LanguageSelector className="w-full [&>select]:w-full" />
+          </div>
           <div className="flex items-center gap-3">
             <Avatar name={human?.displayName ?? human?.email ?? "User"} size="sm" />
             <div className="min-w-0 flex-1">
