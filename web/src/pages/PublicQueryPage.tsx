@@ -75,6 +75,13 @@ export function PublicQueryPage() {
         if (!res.ok) return setState({ status: "gone" });
 
         const body = await res.json();
+        // res.json() is a second suspension point after the `cancelled` check
+        // above: someone can navigate away while it awaits. setState on an
+        // unmounted component is a harmless no-op, but changeLanguage mutates
+        // i18next's global state outside React — unguarded, a slow response
+        // to a query this person left would switch the language of whatever
+        // page they're looking at now.
+        if (cancelled) return;
         setState({ status: "ready", query: body.data });
 
         // Precedence, and the one place all three sources meet. `persist:

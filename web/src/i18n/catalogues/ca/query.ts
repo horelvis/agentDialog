@@ -2,7 +2,7 @@ export default {
   page: {
     gone: {
       title: "Aquest enllaç ja no funciona",
-      body: "Pot ser que ja s'hagi fet servir, o que la pregunta s'hagi tancat. Inicia sessió a l'app per veure què encara espera la teva resposta.",
+      body: "Pot ser que ja s'hagi fet servir, o que la pregunta s'hagi tancat. Inicia sessió a l'app per veure tot allò que encara espera resposta.",
     },
     answered: {
       title: "Resposta enviada",
@@ -14,18 +14,18 @@ export default {
     },
     asking: "t'està fent una pregunta",
     contextLabel: "Context",
-    send: "Enviar resposta",
+    send: "Envia la resposta",
     cantAnswer: "No puc respondre això",
-    sendBack: "Retornar-la",
+    sendBack: "Retorna-la",
     sendFailed: "No s'ha pogut enviar. Torna-ho a provar.",
   },
   context: {
     about: "Sobre això",
     priorDecision: "Vas decidir sobre això el {{date}}.",
     selfContained: "Autocontingut — no hi ha res més a consultar.",
-    openLink: "Obrir l'enllaç referenciat",
-    showReferent: "Mostrar el referent",
-    hideReferent: "Amagar el referent",
+    openLink: "Obre l'enllaç referenciat",
+    showReferent: "Mostra el referent",
+    hideReferent: "Amaga el referent",
     whatChanged: "Què ha canviat",
     material: "important",
   },
@@ -33,7 +33,7 @@ export default {
     unknown_subject: "No sé de què va això",
     missing_delta: "No sé què ha canviat des de l'última vegada",
     unclear_consequences: "No sé què faria cada opció",
-    referent_unreachable: "No puc veure allò sobre el qual es pregunta",
+    referent_unreachable: "No puc accedir a allò que s'esmenta",
     not_my_decision: "Això no és una decisió meva",
   },
   answer: {
@@ -56,7 +56,7 @@ export default {
       trigger: "No tinc prou context per respondre això",
       heading: "Què falta?",
       notePlaceholder: "Alguna cosa més que l'agent hagi de saber? (opcional)",
-      submit: "Retornar a l'agent",
+      submit: "Retorna-la a l'agent",
       reasons: {
         unknown_subject: {
           label: "No sé de què va això",
@@ -100,6 +100,6 @@ export default {
     commentLabel: "Comentari (opcional)",
     commentPlaceholder: "Notes addicionals...",
     yourConfidence: "La teva confiança: {{percent}}%",
-    respond: "Respondre",
+    respond: "Respon",
   },
 } as const;

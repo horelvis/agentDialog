@@ -33,7 +33,7 @@ export default {
     unknown_subject: "No sé de qué trata esto",
     missing_delta: "No sé qué ha cambiado desde la última vez",
     unclear_consequences: "No sé qué haría cada opción",
-    referent_unreachable: "No puedo ver aquello sobre lo que se pregunta",
+    referent_unreachable: "No tengo acceso a lo que se menciona",
     not_my_decision: "Esto no es una decisión mía",
   },
   answer: {
@@ -46,7 +46,7 @@ export default {
     },
     scalar: {
       between: "Entre {{min}} y {{max}} {{unit}}",
-      atLeast: "Al menos {{min}} {{unit}}",
+      atLeast: "Como mínimo {{min}} {{unit}}",
       atMost: "Como máximo {{max}} {{unit}}",
     },
     text: {
