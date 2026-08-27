@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { Message, FormData as FormDataType } from "@/api/types";
+import type { Message, FormData as FormDataType, FormResponseData } from "@/api/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -21,7 +21,7 @@ export function FormMessage({ message }: FormMessageProps) {
   const existingResponse = messages.find(
     (m) =>
       m.type === "form_response" &&
-      (m.structuredData as any)?.formId === data.formId,
+      (m.structuredData as FormResponseData | undefined)?.formId === data.formId,
   );
 
   const [values, setValues] = useState<Record<string, unknown>>(() => {
@@ -51,7 +51,7 @@ export function FormMessage({ message }: FormMessageProps) {
 
   if (existingResponse) {
     const responses =
-      (existingResponse.structuredData as any)?.responses ?? {};
+      (existingResponse.structuredData as FormResponseData | undefined)?.responses ?? {};
     return (
       <Card className="overflow-hidden" borderColor="border-l-brand-500">
         <div className="border-b border-surface-border bg-surface-tertiary px-4 py-3">

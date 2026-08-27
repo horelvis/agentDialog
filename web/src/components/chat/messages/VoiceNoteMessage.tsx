@@ -40,7 +40,6 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(durationMs / 1000);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [dragging, setDragging] = useState(false);
   const waveformRef = useRef<HTMLDivElement>(null);
@@ -52,12 +51,15 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     ? `/human/conversations/${message.conversationId}/files/${attachment.id}/download`
     : null;
 
+  // In flight for as long as there's a download to make and neither an
+  // audio URL nor an error has landed yet — not its own state, so there's
+  // nothing here to fall out of sync with audioUrl/error.
+  const loading = !!downloadPath && !audioUrl && !error;
+
   // Load audio blob
   useEffect(() => {
     if (!downloadPath) return;
     let cancelled = false;
-    setLoading(true);
-    setError(false);
 
     const token = localStorage.getItem("token");
     fetch(`${API_BASE}${downloadPath}`, {
@@ -72,13 +74,11 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
       .then((blob) => {
         if (!cancelled) {
           setAudioUrl(URL.createObjectURL(blob));
-          setLoading(false);
         }
       })
       .catch((err) => {
         if (!cancelled) {
           console.error("[VoiceNote] Failed to load audio:", err);
-          setLoading(false);
           setError(true);
         }
       });

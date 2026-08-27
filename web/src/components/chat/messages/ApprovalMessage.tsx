@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Message, ApprovalData } from "@/api/types";
+import type { Message, ApprovalData, ApprovalResponseData } from "@/api/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -27,7 +27,7 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
   const existingResponse = messages.find(
     (m) =>
       m.type === "approval_response" &&
-      (m.structuredData as any)?.approvalId === data.approvalId,
+      (m.structuredData as ApprovalResponseData | undefined)?.approvalId === data.approvalId,
   );
 
   const [loading, setLoading] = useState(false);
@@ -49,7 +49,7 @@ export function ApprovalMessage({ message }: ApprovalMessageProps) {
 
   const responded = !!existingResponse;
   const decision = responded
-    ? (existingResponse.structuredData as any)?.decision
+    ? (existingResponse.structuredData as ApprovalResponseData | undefined)?.decision
     : null;
 
   return (

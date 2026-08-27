@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { AnswerSpaceInput, isAnswerComplete } from "@/components/answer/AnswerSpaceInput";
+import { AnswerSpaceInput } from "@/components/answer/AnswerSpaceInput";
+import { isAnswerComplete } from "@/components/answer/isAnswerComplete";
 import { QueryContextHeader } from "@/components/queries/QueryContextHeader";
 import { InsufficientContextControl } from "@/components/queries/InsufficientContextControl";
+import { useNow } from "@/hooks/useNow";
 import type { Answer, HumanQuery, InsufficientReason, QueryType } from "@/api/types";
 import type { RespondInput } from "@/api/queries";
 
@@ -37,7 +39,9 @@ export function QueryCard({
   const [insufficientSubmitting, setInsufficientSubmitting] = useState(false);
 
   const badge = queryTypeBadge[query.queryType];
-  const expiresIn = Math.max(0, Math.round((new Date(query.expiresAt).getTime() - Date.now()) / 60000));
+  const now = useNow();
+  const expiresIn =
+    now == null ? null : Math.max(0, Math.round((new Date(query.expiresAt).getTime() - now) / 60000));
   const ready = isAnswerComplete(query.answerSpace, answer);
 
   const handleSubmit = async () => {
@@ -84,7 +88,9 @@ export function QueryCard({
               {t("card.confidence", { percent: Math.round(query.confidence * 100) })}
             </p>
           )}
-          <p className="mt-1 text-xs text-gray-500">{t("card.expiresIn", { minutes: expiresIn })}</p>
+          {expiresIn != null && (
+            <p className="mt-1 text-xs text-gray-500">{t("card.expiresIn", { minutes: expiresIn })}</p>
+          )}
         </div>
       </div>
 

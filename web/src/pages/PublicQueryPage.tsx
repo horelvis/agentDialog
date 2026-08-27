@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { AnswerSpaceInput, isAnswerComplete } from "@/components/answer/AnswerSpaceInput";
+import { AnswerSpaceInput } from "@/components/answer/AnswerSpaceInput";
+import { isAnswerComplete } from "@/components/answer/isAnswerComplete";
 import { Button } from "@/components/ui/Button";
 import { API_BASE } from "@/lib/constants";
 import { answerToWire } from "@/api/queries";

@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { useQueryStore } from "@/stores/queryStore";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { useNow } from "@/hooks/useNow";
 import type { HumanQuery, QueryType } from "@/api/types";
 
 /**
@@ -28,10 +29,11 @@ const queryTypeColor: Record<QueryType, string> = {
 function QueryRow({ query }: { query: HumanQuery }) {
   const { t } = useTranslation("chat");
   const { t: tQuery } = useTranslation("query");
-  const expiresIn = Math.max(
-    0,
-    Math.round((new Date(query.expiresAt).getTime() - Date.now()) / 60000),
-  );
+  const now = useNow();
+  const expiresIn =
+    now == null
+      ? null
+      : Math.max(0, Math.round((new Date(query.expiresAt).getTime() - now) / 60000));
 
   return (
     <Link
@@ -52,7 +54,7 @@ function QueryRow({ query }: { query: HumanQuery }) {
           <p className="mt-1 text-xs text-gray-500">
             {query.status === "needs_context"
               ? t("queries.waitingOnAgent")
-              : tQuery("card.expiresIn", { minutes: expiresIn })}
+              : expiresIn != null && tQuery("card.expiresIn", { minutes: expiresIn })}
           </p>
         </div>
         <span className="shrink-0 self-center text-xs text-brand-400">{t("queries.answerCta")}</span>

@@ -158,6 +158,11 @@ export interface PaginatedResponse<T> {
     total?: number;
     limit: number;
     cursor?: string;
+    // The message-listing endpoints (human and agent) return this instead of
+    // `cursor` — see src/services/message.service.ts. Both are read as
+    // fallbacks of each other rather than picking one, since this type is
+    // shared with endpoints that use only `cursor`.
+    nextCursor?: string;
     hasMore: boolean;
   };
 }
