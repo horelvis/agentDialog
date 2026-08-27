@@ -623,10 +623,13 @@ porque cada una la ejecuta alguien que solo lee la suya.**
   que ya cubre ese recurso, igual que el paso 10 de la tarea 1:
 
   ```ts
-  expect(() => <esquema>.parse(await res.clone().json())).not.toThrow();
+  const body = await res.clone().json();
+  expect(() => <esquema>.parse(body)).not.toThrow();
   ```
 
-  El `clone()` importa: el cuerpo suele consumirse más abajo en esos tests. **Si no hay
+  Dos cosas, y las dos han mordido ya. El `clone()` importa porque el cuerpo suele
+  consumirse más abajo en esos tests. Y el `await` va **fuera** de la flecha: meterlo
+  dentro de `expect(() => …)` no compila, porque esa flecha no es `async`. **Si no hay
   test de integración para un endpoint, no inventes uno** — dilo en el informe, que es
   una laguna real y conviene conocerla.
 
@@ -704,10 +707,13 @@ porque cada una la ejecuta alguien que solo lee la suya.**
   que ya cubre ese recurso, igual que el paso 10 de la tarea 1:
 
   ```ts
-  expect(() => <esquema>.parse(await res.clone().json())).not.toThrow();
+  const body = await res.clone().json();
+  expect(() => <esquema>.parse(body)).not.toThrow();
   ```
 
-  El `clone()` importa: el cuerpo suele consumirse más abajo en esos tests. **Si no hay
+  Dos cosas, y las dos han mordido ya. El `clone()` importa porque el cuerpo suele
+  consumirse más abajo en esos tests. Y el `await` va **fuera** de la flecha: meterlo
+  dentro de `expect(() => …)` no compila, porque esa flecha no es `async`. **Si no hay
   test de integración para un endpoint, no inventes uno** — dilo en el informe, que es
   una laguna real y conviene conocerla.
 
@@ -786,10 +792,13 @@ porque cada una la ejecuta alguien que solo lee la suya.**
   que ya cubre ese recurso, igual que el paso 10 de la tarea 1:
 
   ```ts
-  expect(() => <esquema>.parse(await res.clone().json())).not.toThrow();
+  const body = await res.clone().json();
+  expect(() => <esquema>.parse(body)).not.toThrow();
   ```
 
-  El `clone()` importa: el cuerpo suele consumirse más abajo en esos tests. **Si no hay
+  Dos cosas, y las dos han mordido ya. El `clone()` importa porque el cuerpo suele
+  consumirse más abajo en esos tests. Y el `await` va **fuera** de la flecha: meterlo
+  dentro de `expect(() => …)` no compila, porque esa flecha no es `async`. **Si no hay
   test de integración para un endpoint, no inventes uno** — dilo en el informe, que es
   una laguna real y conviene conocerla.
 
