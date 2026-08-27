@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { QuerySubject, QueryChange } from "@/api/types";
 import { isHttpUrl } from "@/lib/url";
 import { cn } from "@/lib/cn";
+import { useLanguage } from "@/i18n";
+import { localeTag } from "@/i18n/languages";
 
 interface QueryContextHeaderProps {
   subject: QuerySubject;
@@ -15,16 +18,21 @@ interface QueryContextHeaderProps {
  * the material changes called out from the merely cosmetic ones.
  */
 export function QueryContextHeader({ subject, changes, priorDecisionAt }: QueryContextHeaderProps) {
+  const { t } = useTranslation("query");
+  const language = useLanguage();
+
   return (
     <div className="space-y-3 rounded-lg border border-surface-border bg-surface-primary p-4">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">About</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t("context.about")}</p>
         <p className="mt-0.5 text-sm font-semibold text-gray-100">{subject.label}</p>
       </div>
 
       {priorDecisionAt && (
         <p className="text-xs text-amber-400">
-          You decided about this on {new Date(priorDecisionAt).toLocaleDateString()}.
+          {t("context.priorDecision", {
+            date: new Date(priorDecisionAt).toLocaleDateString(localeTag(language)),
+          })}
         </p>
       )}
 
@@ -36,6 +44,7 @@ export function QueryContextHeader({ subject, changes, priorDecisionAt }: QueryC
 }
 
 function Referent({ subject }: { subject: QuerySubject }) {
+  const { t } = useTranslation("query");
   const [showBody, setShowBody] = useState(false);
 
   // Checked again here, not just at the door. The validator narrows `uri` to
@@ -48,7 +57,7 @@ function Referent({ subject }: { subject: QuerySubject }) {
   if (!hasAny) {
     // Either the query really is self-contained, or its `uri` was refused
     // above. Saying so is better than rendering a dead link.
-    return <p className="text-xs text-gray-500">Self-contained — nothing else to look at.</p>;
+    return <p className="text-xs text-gray-500">{t("context.selfContained")}</p>;
   }
 
   return (
@@ -60,7 +69,7 @@ function Referent({ subject }: { subject: QuerySubject }) {
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"
         >
-          Open referenced link &#8599;
+          {t("context.openLink")} <span aria-hidden="true">&#8599;</span>
         </a>
       )}
 
@@ -71,7 +80,7 @@ function Referent({ subject }: { subject: QuerySubject }) {
             onClick={() => setShowBody((s) => !s)}
             className="text-xs text-brand-400 hover:text-brand-300"
           >
-            {showBody ? "Hide referent" : "Show referent"}
+            {showBody ? t("context.hideReferent") : t("context.showReferent")}
           </button>
           {showBody && (
             <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-secondary p-3 text-xs text-gray-300">
@@ -85,9 +94,10 @@ function Referent({ subject }: { subject: QuerySubject }) {
 }
 
 function ChangesTable({ changes }: { changes: QueryChange[] }) {
+  const { t } = useTranslation("query");
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">What changed</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t("context.whatChanged")}</p>
       <div className="mt-1 space-y-1">
         {changes.map((c, i) => (
           <div
@@ -103,7 +113,7 @@ function ChangesTable({ changes }: { changes: QueryChange[] }) {
               <span className="font-medium text-gray-200">{c.path}</span>
               {c.materiality === "material" && (
                 <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-400">
-                  material
+                  {t("context.material")}
                 </span>
               )}
             </div>

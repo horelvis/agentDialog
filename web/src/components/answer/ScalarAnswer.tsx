@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { AnswerSpace, Answer } from "@/api/types";
 
 type ScalarSpace = Extract<AnswerSpace, { kind: "scalar" }>;
@@ -10,13 +11,14 @@ interface ScalarAnswerProps {
 }
 
 export function ScalarAnswer({ space, value, onChange }: ScalarAnswerProps) {
+  const { t } = useTranslation("query");
   const range =
     space.min !== undefined && space.max !== undefined
-      ? `Between ${space.min} and ${space.max} ${space.unit}`
+      ? t("answer.scalar.between", { min: space.min, max: space.max, unit: space.unit })
       : space.min !== undefined
-        ? `At least ${space.min} ${space.unit}`
+        ? t("answer.scalar.atLeast", { min: space.min, unit: space.unit })
         : space.max !== undefined
-          ? `At most ${space.max} ${space.unit}`
+          ? t("answer.scalar.atMost", { max: space.max, unit: space.unit })
           : null;
 
   return (

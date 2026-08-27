@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AnswerSpace, Answer, AnswerSlot } from "@/api/types";
 import { cn } from "@/lib/cn";
 
@@ -26,6 +27,7 @@ function proposedValues(fields: AnswerSlot[]): Record<string, unknown> {
  * marks it "corrected" so it stands out from what came pre-filled.
  */
 export function FieldsAnswer({ space, value, onChange }: FieldsAnswerProps) {
+  const { t } = useTranslation("query");
   const [values, setValues] = useState<Record<string, unknown>>(
     () => value?.values ?? proposedValues(space.fields),
   );
@@ -62,7 +64,7 @@ export function FieldsAnswer({ space, value, onChange }: FieldsAnswerProps) {
                     isTouched ? "bg-amber-500/20 text-amber-400" : "bg-surface-tertiary text-gray-500",
                   )}
                 >
-                  {isTouched ? "corrected" : "proposed"}
+                  {isTouched ? t("answer.fields.corrected") : t("answer.fields.proposed")}
                 </span>
               )}
             </div>
@@ -83,6 +85,8 @@ function FieldSlotInput({
   value: unknown;
   onChange: (value: unknown) => void;
 }) {
+  const { t } = useTranslation("query");
+
   switch (field.kind) {
     case "boolean":
       return (
@@ -116,7 +120,7 @@ function FieldSlotInput({
           className="w-full rounded-lg border border-surface-border bg-surface-primary px-3 py-2 text-sm text-gray-100 focus:border-brand-500 focus:outline-none"
         >
           <option value="" disabled>
-            Select…
+            {t("answer.fields.select")}
           </option>
           {field.options.map((o) => (
             <option key={o.id} value={o.id}>

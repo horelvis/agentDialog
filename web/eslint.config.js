@@ -31,6 +31,9 @@ export default defineConfig([
       'src/pages/NotFoundPage.tsx',
       'src/components/layout/Navbar.tsx',
       'src/components/layout/Footer.tsx',
+      'src/pages/PublicQueryPage.tsx',
+      'src/components/queries/**/*.tsx',
+      'src/components/answer/**/*.tsx',
     ],
     plugins: { i18next },
     rules: {

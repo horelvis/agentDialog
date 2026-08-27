@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { AnswerSpace, Answer } from "@/api/types";
 import { BooleanAnswer } from "./BooleanAnswer";
 import { ChoiceAnswer } from "./ChoiceAnswer";
@@ -14,6 +15,8 @@ interface AnswerSpaceInputProps {
 
 /** Dispatches to one renderer per answer shape, by `space.kind`. */
 export function AnswerSpaceInput({ space, value, onChange }: AnswerSpaceInputProps) {
+  const { t } = useTranslation("query");
+
   switch (space.kind) {
     case "boolean":
       return (
@@ -43,10 +46,7 @@ export function AnswerSpaceInput({ space, value, onChange }: AnswerSpaceInputPro
       // the one surface with no automated tests to catch it.
       return (
         <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300">
-          This question asks for an answer of a kind this app doesn&apos;t recognise
-          ({String((space as { kind?: unknown }).kind)}). Reload to pick up the
-          latest version; if it persists, the agent needs to ask again in a shape
-          this app supports.
+          {t("answer.unsupportedKind", { kind: String((space as { kind?: unknown }).kind) })}
         </p>
       );
   }

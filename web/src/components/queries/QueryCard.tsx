@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { AnswerSpaceInput, isAnswerComplete } from "@/components/answer/AnswerSpaceInput";
@@ -14,12 +15,12 @@ import type { RespondInput } from "@/api/queries";
  * conversation it belongs to. One question, one place to answer it.
  */
 
-const queryTypeBadge: Record<QueryType, { label: string; color: string }> = {
-  validation: { label: "Validation", color: "bg-blue-600" },
-  interpretation: { label: "Interpretation", color: "bg-purple-600" },
-  expert_query: { label: "Expert", color: "bg-amber-600" },
-  labeling: { label: "Labeling", color: "bg-green-600" },
-};
+const queryTypeBadge = {
+  validation: { key: "card.type.validation", color: "bg-blue-600" },
+  interpretation: { key: "card.type.interpretation", color: "bg-purple-600" },
+  expert_query: { key: "card.type.expert_query", color: "bg-amber-600" },
+  labeling: { key: "card.type.labeling", color: "bg-green-600" },
+} as const satisfies Record<QueryType, { key: string; color: string }>;
 
 export function QueryCard({
   query,
@@ -28,6 +29,7 @@ export function QueryCard({
   query: HumanQuery;
   onRespond: (id: string, input: RespondInput) => Promise<void>;
 }) {
+  const { t } = useTranslation("query");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [comment, setComment] = useState("");
   const [confidence, setConfidence] = useState(0.8);
@@ -70,19 +72,19 @@ export function QueryCard({
     <div className="rounded-lg border border-surface-border bg-surface-secondary p-5">
       <div className="flex items-start gap-3">
         <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium text-white ${badge.color}`}>
-          {badge.label}
+          {t(badge.key)}
         </span>
         <Badge variant="risk" risk={query.risk}>
-          {query.risk}
+          {t(`card.risk.${query.risk}`)}
         </Badge>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-gray-100">{query.question}</p>
           {query.confidence != null && (
             <p className="mt-1 text-xs text-gray-400">
-              Agent confidence: {Math.round(query.confidence * 100)}%
+              {t("card.confidence", { percent: Math.round(query.confidence * 100) })}
             </p>
           )}
-          <p className="mt-1 text-xs text-gray-500">Expires in {expiresIn} min</p>
+          <p className="mt-1 text-xs text-gray-500">{t("card.expiresIn", { minutes: expiresIn })}</p>
         </div>
       </div>
 
@@ -97,7 +99,7 @@ export function QueryCard({
       {query.context && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs text-brand-400 hover:text-brand-300">
-            Additional context
+            {t("card.additionalContext")}
           </summary>
           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface-primary p-3 text-xs text-gray-300">
             {query.context}
@@ -109,18 +111,18 @@ export function QueryCard({
         <AnswerSpaceInput space={query.answerSpace} value={answer} onChange={setAnswer} />
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-400">Comment (optional)</label>
+          <label className="mb-1 block text-xs font-medium text-gray-400">{t("card.commentLabel")}</label>
           <input
             type="text"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Additional notes..."
+            placeholder={t("card.commentPlaceholder")}
             className="w-full rounded-lg border border-surface-border bg-surface-primary px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:outline-none"
           />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-400">
-            Your confidence: {Math.round(confidence * 100)}%
+            {t("card.yourConfidence", { percent: Math.round(confidence * 100) })}
           </label>
           <input
             type="range"
@@ -137,7 +139,7 @@ export function QueryCard({
 
         <div className="flex justify-end">
           <Button size="sm" loading={submitting} disabled={!ready} onClick={handleSubmit}>
-            Respond
+            {t("card.respond")}
           </Button>
         </div>
       </div>
