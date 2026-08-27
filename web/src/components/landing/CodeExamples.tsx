@@ -1,10 +1,16 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { cn } from "@/lib/cn";
 
+/**
+ * The samples are code, so they are the same in every language: not the curl,
+ * not the TypeScript, not a field name. Each tab keeps an id that names its
+ * label key, and nothing else here goes near the catalogue.
+ */
 const tabs = [
   {
-    label: "MCP (Claude)",
+    id: "mcp",
     language: "typescript",
     code: `// In your MCP config, add AgentDialog as a server:
 // "agentdialog": { "url": "https://api.agentdialog.io/mcp" }
@@ -37,7 +43,7 @@ human_query({
 //   "needs_context" and Claude calls clarify_query to fix it`,
   },
   {
-    label: "cURL",
+    id: "curl",
     language: "bash",
     code: `# 1. Register your agent
 curl -X POST https://api.agentdialog.io/api/v1/agent/register \\
@@ -61,7 +67,7 @@ curl -X POST https://api.agentdialog.io/api/v1/agent/conversations/{id}/messages
   -d '{ "type": "text", "content": "Review complete!" }'`,
   },
   {
-    label: "TypeScript",
+    id: "typescript",
     language: "typescript",
     code: `import { AgentDialog } from "@agentdialog/sdk";
 
@@ -86,7 +92,7 @@ if (query.status === "answered" && query.answer?.kind === "boolean") {
 }`,
   },
   {
-    label: "Python",
+    id: "python",
     language: "python",
     code: `import requests, time
 
@@ -126,9 +132,10 @@ while True:
         break
     time.sleep(15)`,
   },
-];
+] as const;
 
 export function CodeExamples() {
+  const { t } = useTranslation("landing");
   const [active, setActive] = useState(0);
 
   return (
@@ -136,13 +143,23 @@ export function CodeExamples() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-            Three API calls. That's the integration.
+            {t("examples.heading")}
           </h2>
           <p className="mt-4 text-lg text-gray-400">
-            Register, create a conversation, send a message. Works from cURL, TypeScript, Python, or anything that speaks HTTP.{" "}
-            <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300 underline underline-offset-2">
-              Full API docs
-            </a>
+            <Trans
+              t={t}
+              i18nKey="examples.intro"
+              components={{
+                docs: (
+                  <a
+                    href="https://docs.agentdialog.io"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand-400 hover:text-brand-300 underline underline-offset-2"
+                  />
+                ),
+              }}
+            />
           </p>
         </div>
 
@@ -150,7 +167,7 @@ export function CodeExamples() {
           <div className="flex gap-1 border-b border-surface-border">
             {tabs.map((tab, i) => (
               <button
-                key={tab.label}
+                key={tab.id}
                 onClick={() => setActive(i)}
                 className={cn(
                   "px-4 py-2 text-sm font-medium transition-colors",
@@ -159,7 +176,7 @@ export function CodeExamples() {
                     : "text-gray-400 hover:text-gray-200"
                 )}
               >
-                {tab.label}
+                {t(`examples.tabs.${tab.id}`)}
               </button>
             ))}
           </div>

@@ -1,12 +1,9 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 
-const highlights = [
-  "5-minute quickstart with cURL, TypeScript, or Python",
-  "MCP Human Queries: ask a human with one tool call, get a structured answer back",
-  "Structured messages: forms, approvals, and notifications",
-  "Email notifications and passwordless sign-in — no account for a human to create",
-  "Real-time WebSocket, Webhooks, and SDKs for TypeScript and Python",
-];
+/** Only the ids live here. The markdown this section points at is generated,
+ *  and is not translated with it. */
+const highlights = ["quickstart", "queries", "messages", "email", "realtime"] as const;
 
 function FileTextIcon({ className }: { className?: string }) {
   return (
@@ -25,6 +22,8 @@ function CheckCircleIcon({ className }: { className?: string }) {
 }
 
 export function IntegrationGuide() {
+  const { t } = useTranslation("landing");
+
   return (
     <section id="guide" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -32,30 +31,27 @@ export function IntegrationGuide() {
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-brand-600/10 px-3 py-1 text-sm font-medium text-brand-400">
               <FileTextIcon className="h-4 w-4" />
-              Developer Guide
+              {t("guide.badge")}
             </div>
             <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
-              Everything you need in one doc
+              {t("guide.heading")}
             </h2>
-            <p className="mt-4 text-lg text-gray-400">
-              Read the complete integration guide and have your agent talking
-              to humans in minutes. All your agent needs is an API key.
-            </p>
+            <p className="mt-4 text-lg text-gray-400">{t("guide.intro")}</p>
             <div className="mt-8 flex items-center gap-4">
               <a href="https://docs.agentdialog.io" target="_blank" rel="noopener noreferrer">
-                <Button size="lg">Read the Docs</Button>
+                <Button size="lg">{t("guide.docsLink")}</Button>
               </a>
               <a href="/agentdialog-integration-guide.md" download className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-200">
-                or download as Markdown
+                {t("guide.download")}
               </a>
             </div>
           </div>
 
           <ul className="space-y-4">
-            {highlights.map((item) => (
-              <li key={item} className="flex items-start gap-3">
+            {highlights.map((id) => (
+              <li key={id} className="flex items-start gap-3">
                 <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-500" />
-                <span className="text-gray-300">{item}</span>
+                <span className="text-gray-300">{t(`guide.highlights.${id}`)}</span>
               </li>
             ))}
           </ul>
