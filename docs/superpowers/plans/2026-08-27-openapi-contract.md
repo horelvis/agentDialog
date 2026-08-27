@@ -881,6 +881,37 @@ OpenAPI 3.1 tiene una sección propia para esto, y meterlo en `paths` diría que
 Dilo en la descripción de esa cabecera. Es la propiedad que permite deduplicar, está
 decidida en el diseño de firma, y quien la lea al revés construirá mal su lado.
 
+- [ ] **Paso 3b: las tres respuestas que produce el middleware, no el handler**
+
+El documento solo lista los errores que lanza cada handler. Nunca describe el **401**
+del muro de autenticación, el **429** del limitador ni el **409** que devuelve el
+middleware de idempotencia ante una clave reutilizada — porque ninguno sale del
+handler. Se decidió sin decidirlo en la tarea 1 y las cuatro siguientes lo heredaron.
+
+Un cliente generado que no ve el 401 ni el 429 es un cliente que no maneja los dos
+primeros fallos que se encuentra un integrador, y el 429 lleva `retryAfter`, que es
+justo el campo que dice qué hacer al respecto.
+
+No se toca ninguno de los 26 `RouteDoc`. La regla es mecánica y `document.ts` ya tiene
+en la mano todo lo que necesita:
+
+- **429** en las 26. `app.use("*", globalRateLimit())` corre antes de todas, incluida
+  la de `security: "none"`.
+- **401** en todas menos esa: `doc.security !== "none"`, 25 de 26.
+- **409** exactamente en las siete con `doc.idempotent`.
+
+Y no hace falta esquema nuevo: `apiError` ya cubre los tres, porque
+`src/middleware/error-handler.ts` pinta todo `AppError` por el mismo sobre, y
+`retryAfter` ya está en él.
+
+Define las tres una sola vez en `components.responses` —`Unauthorized`, `RateLimited`,
+`IdempotencyKeyReused`, compartiendo `apiError` como esquema y diferenciándose en la
+descripción— y en el mismo bucle que ya construye `operation.responses`, mezcla los
+`$ref`. Cada operación gana tres líneas de referencia; los tres cuerpos existen una vez.
+
+Es la misma forma que el arreglo de los parámetros: calcular en el centro a partir de
+banderas que el `RouteDoc` ya lleva, en vez de repetir en 26 sitios.
+
 - [ ] **Paso 4: etiquetas con descripción**
 
 Añade `tags` al documento —una entrada por recurso, con una frase— para que un
@@ -992,6 +1023,21 @@ test("every path template declares its parameter", () => {
 Ajusta la lectura de `declared` a la forma que emita de verdad `zod-openapi` para un
 objeto de parámetros — míralo con `curl` antes de dar el test por bueno, en vez de
 confiar en esta suposición.
+
+- [ ] **Paso 2c: guarda las tres respuestas del middleware**
+
+En `tests/unit/openapi-document.test.ts`: toda operación con `security !== "none"`
+declara 401, las 26 declaran 429, y las siete idempotentes declaran 409. Es lo que
+impide que la tarea 5 se deshaga en silencio.
+
+- [ ] **Paso 2d: las dos afirmaciones que faltan, sin dar de alta un agente**
+
+`PATCH /me` y `POST /key/rotate` se quedaron sin comprobar su esquema contra una
+respuesta real, porque añadir un alta de agente empuja el contador compartido de Redis
+y rompe otros ficheros. No hace falta un alta nueva: `conversation-flow.test.ts` ya
+registra un agente y puede llamar a `PATCH /me` con él antes de seguir, y
+`agent-register.test.ts` ya registra por caso y puede llamar a `POST /key/rotate` con
+la credencial recién emitida. Añade las dos afirmaciones ahí.
 
 - [ ] **Paso 3: la copia commiteada**
 
