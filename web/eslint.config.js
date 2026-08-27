@@ -32,14 +32,15 @@ export default defineConfig([
     rules: {
       // jsx-text-only: bare JSX text nodes only — the most common way a
       // hard-coded string slips in, and the one a key-parity test can't see.
-      // Not because attribute-checking would "drown in className and
-      // viewBox": the plugin already excludes className, style, id, width
-      // and height by default (see its jsx-attributes.exclude), so that
-      // specific fear doesn't hold. The real cost of widening this mode is
-      // that it's a bigger call than this comment should make on its own —
-      // it would also flag title/aria-label/placeholder/alt, which are
-      // exactly the interface text this mode currently misses, but touching
-      // it is a separate decision from this task.
+      // Widening this mode is a separate decision from this task, not
+      // something to change here — measuring it found ~105 errors, almost
+      // all of them `size="lg"` / `variant="risk"` on this codebase's own
+      // components (Button, Badge, ...) rather than noise on host elements:
+      // isAllowedDOMAttr in the plugin's own helper allows any attribute on
+      // an SVG tag, allows an attribute on a native DOM tag unless it's one
+      // of five (placeholder, alt, aria-label, value, title), and never
+      // allows one on anything else — so a custom component's props are
+      // flagged categorically, not filtered by name.
       'i18next/no-literal-string': ['error', { mode: 'jsx-text-only' }],
     },
   },

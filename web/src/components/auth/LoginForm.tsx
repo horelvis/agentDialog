@@ -149,6 +149,16 @@ export function LoginForm() {
         </div>
         <h3 className="text-lg font-semibold text-gray-100">{t("auth.checkEmail")}</h3>
         <p className="mt-2 text-sm text-gray-400">
+          {/* Unescaped interpolation into <Trans> — see InvitationCard.tsx for
+              why that needs care. Safe here, but not because this is merely
+              what the person typed: `email` is seeded above from `?email=` in
+              the URL (a mailed link), which is attacker-supplied. What
+              actually keeps `<`, `>` and `"` out is that this render is only
+              reached at step "code", which requires a prior successful submit
+              through <Input type="email" required> below plus the server's
+              own validation. Relax that field to type="text", or add a
+              username sign-in path, and this needs the same
+              shouldUnescape/escapeValue:true treatment. */}
           <Trans t={t} i18nKey="auth.codeSentTo" values={{ email }} components={{ email: <strong /> }} />
         </p>
 
