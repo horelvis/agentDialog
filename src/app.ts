@@ -40,6 +40,7 @@ import humanTrustedAgentsRoutes from "./routes/human/trusted-agents";
 import humanQueryRoutes from "./routes/human/queries";
 import mcpRoutes from "./routes/mcp";
 import emailInboundRoutes from "./routes/webhooks/email-inbound";
+import { buildDocument } from "./openapi/document";
 import {
   getProtectedResourceMetadata,
   getAuthServerMetadata,
@@ -69,6 +70,10 @@ export function createApp() {
 
   // Health & root
   app.route("/", healthRoutes);
+
+  // The contract, from the running service: what somebody reads is the version
+  // that is answering them, not what is on main.
+  app.get("/openapi.json", (c) => c.json(buildDocument()));
 
   // Webhook routes (public, verified by provider signature)
   app.route("/api/v1/webhooks/email", emailInboundRoutes);

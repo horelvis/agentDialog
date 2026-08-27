@@ -4,6 +4,7 @@ import { readyInNeedsContext } from "../helpers/queries";
 import { getDb } from "../../src/db";
 import { humanQueries } from "../../src/db/schema/human-queries";
 import { eq } from "drizzle-orm";
+import { createQueryResponse } from "../../src/validators/query.responses";
 
 describe("Agent queries REST API", () => {
   const app = createTestApp();
@@ -24,6 +25,13 @@ describe("Agent queries REST API", () => {
       }),
     });
     expect(createRes.status).toBe(201);
+    // The documented shape has to be the real one. If a field is added, renamed
+    // or dropped in createQuery's return, this fails here rather than silently
+    // making openapi.json a lie. Uses createQueryResponse, not queryResponse:
+    // this route's 201 is createQuery's own small receipt, not shapeHumanQuery's
+    // full record — see the report for why the two must not be conflated.
+    const createResBody = await createRes.clone().json();
+    expect(() => createQueryResponse.parse(createResBody)).not.toThrow();
     const { data: created } = await createRes.json();
     expect(created.query_id).toBeString();
     expect(created.status).toBe("pending");
