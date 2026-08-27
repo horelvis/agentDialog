@@ -4,6 +4,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import { useUiStore } from "@/stores/uiStore";
+import { useLanguage } from "@/i18n";
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -13,6 +14,7 @@ interface ConversationItemProps {
 export function ConversationItem({ conversation, isActive }: ConversationItemProps) {
   const isMobile = useUiStore((s) => s.isMobile);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
+  const language = useLanguage();
 
   return (
     <Link
@@ -29,7 +31,7 @@ export function ConversationItem({ conversation, isActive }: ConversationItemPro
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{conversation.title ?? "Untitled"}</p>
         <p className="truncate text-xs text-gray-500">
-          {formatRelativeTime(conversation.updatedAt)}
+          {formatRelativeTime(conversation.updatedAt, language)}
         </p>
       </div>
     </Link>

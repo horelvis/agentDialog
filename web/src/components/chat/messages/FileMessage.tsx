@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import type { Message } from "@/api/types";
 import { formatFileSize } from "@/lib/formatters";
 import { API_BASE } from "@/lib/constants";
+import { useLanguage } from "@/i18n";
 
 interface FileMessageProps {
   message: Message;
 }
 
 export function FileMessage({ message }: FileMessageProps) {
+  const language = useLanguage();
   const attachment = message.attachments?.[0];
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -83,7 +85,7 @@ export function FileMessage({ message }: FileMessageProps) {
           </div>
         )}
         <p className="text-xs text-gray-500">
-          {attachment.fileName} ({formatFileSize(attachment.sizeBytes)})
+          {attachment.fileName} ({formatFileSize(attachment.sizeBytes, language)})
         </p>
       </button>
     );
@@ -101,7 +103,7 @@ export function FileMessage({ message }: FileMessageProps) {
       <div className="text-left">
         <p className="text-sm font-medium text-gray-100">{attachment.fileName}</p>
         <p className="text-xs text-gray-400">
-          {downloading ? "Downloading..." : formatFileSize(attachment.sizeBytes)}
+          {downloading ? "Downloading..." : formatFileSize(attachment.sizeBytes, language)}
         </p>
       </div>
     </button>

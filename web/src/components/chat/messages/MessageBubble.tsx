@@ -3,6 +3,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { formatTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import type { Message } from "@/api/types";
+import { useLanguage } from "@/i18n";
 
 interface MessageBubbleProps {
   message: Message;
@@ -11,6 +12,7 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, children }: MessageBubbleProps) {
   const isHuman = message.senderType === "human";
+  const language = useLanguage();
 
   return (
     <div className={cn("flex gap-3", isHuman && "flex-row-reverse")}>
@@ -36,7 +38,7 @@ export function MessageBubble({ message, children }: MessageBubbleProps) {
             isHuman && "text-right"
           )}
         >
-          {formatTime(message.createdAt)}
+          {formatTime(message.createdAt, language)}
         </p>
       </div>
     </div>

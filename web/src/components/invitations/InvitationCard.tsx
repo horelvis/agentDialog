@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatRelativeTime } from "@/lib/formatters";
+import { useLanguage } from "@/i18n";
 
 interface InvitationCardProps {
   invitation: Invitation;
@@ -15,6 +16,7 @@ interface InvitationCardProps {
 export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCardProps) {
   const [loading, setLoading] = useState<"accept" | "decline" | null>(null);
   const navigate = useNavigate();
+  const language = useLanguage();
 
   const handleAccept = async () => {
     setLoading("accept");
@@ -54,7 +56,7 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
           <p className="mt-1 truncate text-sm text-gray-500">{invitation.message}</p>
         )}
         <p className="mt-1 text-xs text-gray-600">
-          {formatRelativeTime(invitation.createdAt)}
+          {formatRelativeTime(invitation.createdAt, language)}
         </p>
       </div>
       <div className="flex shrink-0 gap-2">

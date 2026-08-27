@@ -3,6 +3,7 @@ import type { Message, ToolResultData } from "@/api/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { formatDuration } from "@/lib/formatters";
+import { useLanguage } from "@/i18n";
 
 interface ToolResultMessageProps {
   message: Message;
@@ -10,6 +11,7 @@ interface ToolResultMessageProps {
 
 export function ToolResultMessage({ message }: ToolResultMessageProps) {
   const [expanded, setExpanded] = useState(false);
+  const language = useLanguage();
   const data = message.structuredData as ToolResultData;
 
   return (
@@ -17,7 +19,7 @@ export function ToolResultMessage({ message }: ToolResultMessageProps) {
       <div className="flex items-center gap-3 p-3">
         <Badge className="bg-green-900/30 text-green-400">Result</Badge>
         {data.durationMs && (
-          <span className="text-xs text-gray-400">{formatDuration(data.durationMs)}</span>
+          <span className="text-xs text-gray-400">{formatDuration(data.durationMs, language)}</span>
         )}
       </div>
       {message.content && (

@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/ui/Logo";
+import { useLanguage } from "@/i18n";
 
 export function Sidebar() {
   const { id: activeId } = useParams();
@@ -18,6 +19,7 @@ export function Sidebar() {
   const { sidebarOpen, isMobile, setSidebarOpen } = useUiStore();
   const human = useAuthStore((s) => s.human);
   const logout = useAuthStore((s) => s.logout);
+  const language = useLanguage();
 
   if (!sidebarOpen && isMobile) return null;
 
@@ -109,7 +111,7 @@ export function Sidebar() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{conv.title ?? "Untitled"}</p>
                 <p className="truncate text-xs text-gray-400">
-                  {formatRelativeTime(conv.updatedAt)}
+                  {formatRelativeTime(conv.updatedAt, language)}
                 </p>
               </div>
             </Link>
