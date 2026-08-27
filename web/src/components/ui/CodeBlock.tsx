@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 
 interface CodeBlockProps {
@@ -8,6 +9,10 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ code, language, className }: CodeBlockProps) {
+  // Shared with the chat, so the two words come from `common`. The landing
+  // renders this component, and it was the one thing on the page still in
+  // English once everything around it had been translated.
+  const { t } = useTranslation("common");
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -24,7 +29,7 @@ export function CodeBlock({ code, language, className }: CodeBlockProps) {
           onClick={copy}
           className="text-xs text-gray-400 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
         >
-          {copied ? "Copied!" : "Copy"}
+          {copied ? t("action.copied") : t("action.copy")}
         </button>
       </div>
       <pre className="overflow-x-auto p-4">

@@ -43,11 +43,13 @@ export default {
       closed: "cerrado",
       running: "en marcha",
     },
+    // The unit is joined to its number with a non-breaking space: the chip is
+    // narrow enough that a plain space drops the "s" onto a line of its own.
     node: {
       start: "el agente invoca su grafo",
-      gatherContext: "lee 4 fuentes · 8 s",
+      gatherContext: "lee 4 fuentes · 8 s",
       askHuman: "cede la decisión",
-      applyDecision: "escribe la respuesta · 0,4 s",
+      applyDecision: "escribe la respuesta · 0,4 s",
       end: "el agente cierra la operación",
       untaken: "no se tomó en esta ejecución",
       escalateHeld: "en revisión · no se escribe nada",
@@ -211,7 +213,7 @@ export default {
       webhookSignature: {
         question: "¿Cómo sé que una entrega viene de verdad de vosotros?",
         answer:
-          "Cada entrega de webhook va firmada siguiendo <link>Standard Webhooks</link>, así que la verificas con una librería de las de siempre en lugar de fiarte de un fragmento nuestro. Lo firmado incluye la marca de tiempo, de modo que una entrega capturada no se puede reproducir más tarde, y una rotación firma a la vez con la clave vieja y la nueva para que no se pierda nada mientras cambias.",
+          "Cada entrega de webhook va firmada siguiendo <spec>Standard Webhooks</spec>, así que la verificas con una librería de las de siempre en lugar de fiarte de un fragmento nuestro. Lo firmado incluye la marca de tiempo, de modo que una entrega capturada no se puede reproducir más tarde, y una rotación firma a la vez con la clave vieja y la nueva para que no se pierda nada mientras cambias.",
       },
     },
   },

@@ -220,9 +220,11 @@ export default {
       },
       webhookSignature: {
         question: "How do I know a delivery really came from you?",
-        // <link> is the standardwebhooks.com anchor.
+        // <spec> is the standardwebhooks.com anchor. Deliberately not <link>:
+        // that is a void HTML element, so the parser <Trans> uses closes it
+        // on sight and the words spill out beside an empty anchor.
         answer:
-          "Every webhook delivery is signed following <link>Standard Webhooks</link>, so you verify it with an off-the-shelf library instead of trusting a snippet of ours. The signed content covers the timestamp, so a captured delivery cannot be replayed later, and a rotation signs with the old key and the new one at once so nothing is dropped while you switch.",
+          "Every webhook delivery is signed following <spec>Standard Webhooks</spec>, so you verify it with an off-the-shelf library instead of trusting a snippet of ours. The signed content covers the timestamp, so a captured delivery cannot be replayed later, and a rotation signs with the old key and the new one at once so nothing is dropped while you switch.",
       },
     },
   },

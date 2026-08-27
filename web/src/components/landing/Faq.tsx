@@ -9,7 +9,7 @@ import { Trans, useTranslation } from "react-i18next";
  *
  * Only the ids are here now — every word is in the catalogue, under
  * landing:faq.items.<id>. An answer carries <code> around the literals it
- * names, and one of them a <link>; both are mapped to components below, so a
+ * names, and one of them a <spec>; both are mapped to components below, so a
  * translator moves the markup with the words instead of around them.
  *
  * Built on <details>, not React state — it opens with a keyboard and reads
@@ -74,7 +74,7 @@ export function Faq() {
                   i18nKey={`faq.items.${id}.answer`}
                   components={{
                     code: <Code />,
-                    link: (
+                    spec: (
                       <a
                         href="https://www.standardwebhooks.com"
                         target="_blank"

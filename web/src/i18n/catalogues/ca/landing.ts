@@ -43,11 +43,13 @@ export default {
       closed: "tancat",
       running: "en marxa",
     },
+    // The unit is joined to its number with a non-breaking space: the chip is
+    // narrow enough that a plain space drops the "s" onto a line of its own.
     node: {
       start: "l'agent invoca el seu graf",
-      gatherContext: "llegeix 4 fonts · 8 s",
+      gatherContext: "llegeix 4 fonts · 8 s",
       askHuman: "cedeix la decisió",
-      applyDecision: "escriu la resposta · 0,4 s",
+      applyDecision: "escriu la resposta · 0,4 s",
       end: "l'agent tanca l'operació",
       untaken: "no s'ha pres en aquesta execució",
       escalateHeld: "en revisió · no s'escriu res",
@@ -211,7 +213,7 @@ export default {
       webhookSignature: {
         question: "Com sé que un lliurament ve de debò de vosaltres?",
         answer:
-          "Cada lliurament de webhook va signat seguint <link>Standard Webhooks</link>, així que el verifiques amb una llibreria de les de sempre en lloc de refiar-te d'un fragment nostre. El que se signa inclou la marca de temps, de manera que un lliurament capturat no es pot reproduir més tard, i una rotació signa alhora amb la clau vella i la nova perquè no es perdi res mentre canvies.",
+          "Cada lliurament de webhook va signat seguint <spec>Standard Webhooks</spec>, així que el verifiques amb una llibreria de les de sempre en lloc de refiar-te d'un fragment nostre. El que se signa inclou la marca de temps, de manera que un lliurament capturat no es pot reproduir més tard, i una rotació signa alhora amb la clau vella i la nova perquè no es perdi res mentre canvies.",
       },
     },
   },
