@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Message, ToolCallData } from "@/api/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -10,6 +11,7 @@ interface ToolCallMessageProps {
 }
 
 export function ToolCallMessage({ message }: ToolCallMessageProps) {
+  const { t } = useTranslation("chat");
   const [expanded, setExpanded] = useState(false);
   const data = (message.structuredData ?? {}) as Partial<ToolCallData>;
 
@@ -27,7 +29,7 @@ export function ToolCallMessage({ message }: ToolCallMessageProps) {
           </div>
         )}
         <span className="font-mono text-sm font-medium">{data.toolName ?? "unknown"}</span>
-        <Badge>{data.status ?? "pending"}</Badge>
+        <Badge>{t(`messages.toolCall.status.${data.status ?? "pending"}`)}</Badge>
         {data.toolServer && (
           <span className="text-xs text-gray-500">{data.toolServer}</span>
         )}
@@ -49,7 +51,7 @@ export function ToolCallMessage({ message }: ToolCallMessageProps) {
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Input
+            {t("messages.toolCall.input")}
           </button>
           {expanded && (
             <pre className="overflow-x-auto bg-surface-tertiary p-3 text-xs text-gray-300">

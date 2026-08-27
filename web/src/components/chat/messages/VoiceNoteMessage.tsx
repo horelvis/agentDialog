@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { Message, VoiceNoteData } from "@/api/types";
 import { API_BASE } from "@/lib/constants";
 
@@ -29,6 +30,7 @@ function generateBars(messageId: string, count: number): number[] {
 }
 
 export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
+  const { t } = useTranslation("chat");
   const attachment = message.attachments?.[0];
   const voiceData = message.structuredData as VoiceNoteData | undefined;
   const durationMs = voiceData?.durationMs ?? 0;
@@ -188,7 +190,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
     : formatMmSs(durationMs || duration * 1000);
 
   if (!attachment) {
-    return <p className="text-sm text-gray-400">Voice note not available</p>;
+    return <p className="text-sm text-gray-400">{t("messages.voiceNote.unavailable")}</p>;
   }
 
   return (
@@ -244,7 +246,7 @@ export function VoiceNoteMessage({ message }: VoiceNoteMessageProps) {
           })}
         </div>
         <p className="text-xs text-gray-400 mt-0.5">
-          {error ? "Error" : displayTime}
+          {error ? t("messages.voiceNote.error") : displayTime}
         </p>
       </div>
     </div>

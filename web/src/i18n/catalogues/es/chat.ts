@@ -41,6 +41,7 @@ export default {
     toolCall: {
       input: "Entrada",
       status: {
+        pending: "pendiente",
         running: "en curso",
         completed: "completado",
         failed: "fallido",

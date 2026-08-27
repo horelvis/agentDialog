@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { Conversation } from "@/api/types";
 import { Badge } from "@/components/ui/Badge";
 import { useUiStore } from "@/stores/uiStore";
@@ -7,6 +8,7 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ conversation }: ChatHeaderProps) {
+  const { t } = useTranslation("chat");
   const { isMobile, toggleSidebar } = useUiStore();
 
   return (
@@ -19,15 +21,19 @@ export function ChatHeader({ conversation }: ChatHeaderProps) {
         </button>
       )}
       <div className="min-w-0 flex-1">
-        <h2 className="truncate font-semibold text-gray-100">{conversation.title ?? "Untitled"}</h2>
+        <h2 className="truncate font-semibold text-gray-100">
+          {conversation.title ?? t("shared.untitledConversation")}
+        </h2>
         {conversation.description && (
           <p className="truncate text-sm text-gray-400">{conversation.description}</p>
         )}
       </div>
       <div className="flex items-center gap-2">
-        <Badge>{conversation.status}</Badge>
+        <Badge>{t(`header.status.${conversation.status}`)}</Badge>
         {conversation.participants && (
-          <span className="text-xs text-gray-500">{conversation.participants.length} participants</span>
+          <span className="text-xs text-gray-500">
+            {t("header.participants", { count: conversation.participants.length })}
+          </span>
         )}
       </div>
     </header>

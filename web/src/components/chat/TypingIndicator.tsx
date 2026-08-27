@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useWsStore } from "@/stores/wsStore";
 
@@ -6,6 +7,7 @@ interface TypingIndicatorProps {
 }
 
 export function TypingIndicator({ conversationId }: TypingIndicatorProps) {
+  const { t } = useTranslation("chat");
   const typing = useWsStore(
     useShallow((s) => s.typingMap[conversationId] ?? [])
   );
@@ -20,7 +22,7 @@ export function TypingIndicator({ conversationId }: TypingIndicatorProps) {
         <span className="h-2 w-2 animate-bounce rounded-full bg-gray-500" style={{ animationDelay: "300ms" }} />
       </div>
       <span className="text-xs text-gray-500">
-        {typing.length === 1 ? "Agent is typing..." : "Multiple are typing..."}
+        {typing.length === 1 ? t("typing.one") : t("typing.many")}
       </span>
     </div>
   );

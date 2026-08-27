@@ -1,8 +1,10 @@
+import { useTranslation } from "react-i18next";
 import { useConversationStore } from "@/stores/conversationStore";
 import { ConversationItem } from "./ConversationItem";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function ConversationList() {
+  const { t } = useTranslation("chat");
   const conversations = useConversationStore((s) => s.conversations);
   const loading = useConversationStore((s) => s.loadingConversations);
   const activeId = useConversationStore((s) => s.activeId);
@@ -18,7 +20,7 @@ export function ConversationList() {
   if (conversations.length === 0) {
     return (
       <p className="px-3 py-4 text-center text-sm text-gray-400">
-        No conversations yet
+        {t("list.empty")}
       </p>
     );
   }

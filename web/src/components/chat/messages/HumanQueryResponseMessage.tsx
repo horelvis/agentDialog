@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { Answer, Message } from "@/api/types";
 
 interface HumanQueryResponseMessageProps {
@@ -25,9 +27,10 @@ interface ResponseData {
  * the answer object stands in if an older message has no content.
  */
 export function HumanQueryResponseMessage({ message }: HumanQueryResponseMessageProps) {
+  const { t } = useTranslation("chat");
   const data = (message.structuredData ?? {}) as ResponseData;
 
-  const label = message.content?.trim() || fallbackLabel(data.answer);
+  const label = message.content?.trim() || fallbackLabel(data.answer, t);
 
   return (
     <div>
@@ -35,19 +38,23 @@ export function HumanQueryResponseMessage({ message }: HumanQueryResponseMessage
       {data.comment && <p className="mt-1 text-sm text-gray-300">{data.comment}</p>}
       {data.confidence != null && (
         <p className="mt-1 text-xs text-gray-400">
-          Confidence: {Math.round(data.confidence * 100)}%
+          {t("messages.humanQueryResponse.confidence", { percent: Math.round(data.confidence * 100) })}
         </p>
       )}
     </div>
   );
 }
 
-/** Only for a message written without content. Unlabelled by necessity. */
-function fallbackLabel(answer: Answer | undefined): string {
+/**
+ * Only for a message written without content. Unlabelled by necessity —
+ * "Yes"/"No" are this fallback's own words, not the human's, so they're
+ * translated like any other interface state rather than left as content.
+ */
+function fallbackLabel(answer: Answer | undefined, t: TFunction<"chat">): string {
   if (!answer) return "";
   switch (answer.kind) {
     case "boolean":
-      return answer.value ? "Yes" : "No";
+      return answer.value ? t("messages.humanQueryResponse.yes") : t("messages.humanQueryResponse.no");
     case "choice":
       return answer.optionIds.join(", ");
     case "scalar":

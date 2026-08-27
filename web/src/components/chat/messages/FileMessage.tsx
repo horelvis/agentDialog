@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { Message } from "@/api/types";
 import { formatFileSize } from "@/lib/formatters";
 import { API_BASE } from "@/lib/constants";
@@ -9,6 +10,7 @@ interface FileMessageProps {
 }
 
 export function FileMessage({ message }: FileMessageProps) {
+  const { t } = useTranslation("chat");
   const language = useLanguage();
   const attachment = message.attachments?.[0];
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function FileMessage({ message }: FileMessageProps) {
     }
   };
 
-  if (!attachment) return <p className="text-sm text-gray-400">File not available</p>;
+  if (!attachment) return <p className="text-sm text-gray-400">{t("messages.file.unavailable")}</p>;
 
   if (isImage) {
     return (
@@ -103,7 +105,7 @@ export function FileMessage({ message }: FileMessageProps) {
       <div className="text-left">
         <p className="text-sm font-medium text-gray-100">{attachment.fileName}</p>
         <p className="text-xs text-gray-400">
-          {downloading ? "Downloading..." : formatFileSize(attachment.sizeBytes, language)}
+          {downloading ? t("messages.file.downloading") : formatFileSize(attachment.sizeBytes, language)}
         </p>
       </div>
     </button>
