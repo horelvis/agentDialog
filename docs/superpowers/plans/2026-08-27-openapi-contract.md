@@ -364,7 +364,16 @@ export function buildDocument(env: Record<string, string | undefined> = process.
     if (doc.body) {
       operation.requestBody = { content: { "application/json": { schema: doc.body } } };
     }
-    if (doc.idempotent) operation.parameters = [IDEMPOTENCY_HEADER];
+
+    // OpenAPI 3.1 requires every {template} in a path to have a matching
+    // parameter entry, so a route with :id and no `params` produces a document
+    // a strict validator rejects. createDocument does not check this.
+    const parameters: unknown[] = [];
+    if (doc.params) parameters.push({ in: "path", schema: doc.params });
+    if (doc.query) parameters.push({ in: "query", schema: doc.query });
+    if (doc.idempotent) parameters.push(IDEMPOTENCY_HEADER);
+    if (parameters.length) operation.parameters = parameters;
+
     if (doc.security === "none") operation.security = [];
 
     paths[route.path] ??= {};
@@ -942,6 +951,42 @@ contra el meta-esquema. Si traer el meta-esquema resulta ser una dependencia pes
 haz las comprobaciones estructurales a mano —`openapi`, `info.title`, `info.version`,
 que toda operación tenga `responses` no vacío y que todo `$ref` resuelva— y **dilo en
 el informe**, en vez de instalar un validador de JSON Schema entero por un test.
+
+- [ ] **Paso 2b: comprueba que cada `{parámetro}` está declarado**
+
+Esto se escapó una vez y ninguna de las otras comprobaciones lo veía: `createDocument`
+no valida que una plantilla de ruta tenga su entrada en `parameters`, la prueba de
+cobertura solo mira qué rutas existen, y un `curl | len(paths)` cuenta rutas, no
+parámetros. Añade a `tests/unit/openapi-document.test.ts`:
+
+```ts
+test("every path template declares its parameter", () => {
+  const doc = buildDocument({});
+  const missing: string[] = [];
+
+  for (const [path, item] of Object.entries<any>(doc.paths)) {
+    const templated = [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
+    if (!templated.length) continue;
+
+    for (const [method, op] of Object.entries<any>(item)) {
+      const declared = new Set(
+        (op.parameters ?? [])
+          .filter((p: any) => p.in === "path")
+          .flatMap((p: any) => Object.keys(p.schema?.properties ?? { [p.name]: true })),
+      );
+      for (const name of templated) {
+        if (!declared.has(name)) missing.push(`${method.toUpperCase()} ${path} → ${name}`);
+      }
+    }
+  }
+
+  expect(missing).toEqual([]);
+});
+```
+
+Ajusta la lectura de `declared` a la forma que emita de verdad `zod-openapi` para un
+objeto de parámetros — míralo con `curl` antes de dar el test por bueno, en vez de
+confiar en esta suposición.
 
 - [ ] **Paso 3: la copia commiteada**
 
