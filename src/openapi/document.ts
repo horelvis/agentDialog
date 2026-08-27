@@ -37,6 +37,23 @@ const MIDDLEWARE_RESPONSES = {
   },
 };
 
+/**
+ * When a status code above collides with one a handler already documents —
+ * today that is only 409, and only on POST /:id/invitations, which both
+ * requires an Idempotency-Key and throws its own domain 409 for a duplicate
+ * invite — the handler's response wins the merge (see the loop below) but its
+ * description was empty, silently hiding the other meaning. This is what gets
+ * appended in that case, keyed by the same name as MIDDLEWARE_RESPONSES so
+ * the next route that grows a second meaning for one of these codes inherits
+ * a note for free instead of the reader having to already know to branch on
+ * `error.code`.
+ */
+const MIDDLEWARE_COLLISION_NOTES: Record<keyof typeof MIDDLEWARE_RESPONSES, string> = {
+  Unauthorized: "May also indicate a missing or invalid bearer token; the `code` field distinguishes them.",
+  RateLimited: "May also indicate the request was rate limited; the `code` field distinguishes them.",
+  IdempotencyKeyReused: "May also indicate a reused `Idempotency-Key`; the `code` field distinguishes them.",
+};
+
 /** One entry per resource, so a generated client groups its methods recognisably. */
 const TAGS = [
   { name: "register", description: "Registering a new agent and obtaining its API key." },
@@ -57,30 +74,42 @@ export function buildDocument(env: Record<string, string | undefined> = process.
     const { doc } = route;
     // Mechanical, from flags the RouteDoc already carries: 429 on every route
     // (globalRateLimit runs before all of them), 401 on every route but the
-    // one with security: "none", 409 on the seven idempotent POSTs. Spread
-    // first so a status code the handler itself documents (e.g. invitations'
-    // own 409 conflict) wins the collision instead of being overwritten.
-    const middlewareRefs: Record<string, unknown> = {
-      429: { $ref: "#/components/responses/RateLimited" },
-      ...(doc.security !== "none"
-        ? { 401: { $ref: "#/components/responses/Unauthorized" } }
-        : {}),
-      ...(doc.idempotent ? { 409: { $ref: "#/components/responses/IdempotencyKeyReused" } } : {}),
-    };
+    // one with security: "none", 409 on the seven idempotent POSTs.
+    const middlewareEntries: Array<[number, keyof typeof MIDDLEWARE_RESPONSES]> = [
+      [429, "RateLimited"],
+    ];
+    if (doc.security !== "none") middlewareEntries.push([401, "Unauthorized"]);
+    if (doc.idempotent) middlewareEntries.push([409, "IdempotencyKeyReused"]);
+
+    const responses: Record<string, { description: string; content?: unknown }> =
+      Object.fromEntries(
+        Object.entries(doc.responses).map(([status, schema]) => [
+          status,
+          { description: "", content: { "application/json": { schema } } },
+        ]),
+      );
+
+    // A status the handler itself documents wins the slot — a duplicate-invite
+    // 409 is not the idempotency middleware's 409 — but its own description
+    // was blank, which silently hid that the same code has a second, unrelated
+    // meaning here. Append a note instead of overwriting.
+    for (const [status, name] of middlewareEntries) {
+      const key = String(status);
+      const existing = responses[key];
+      if (existing) {
+        existing.description = MIDDLEWARE_COLLISION_NOTES[name];
+      } else {
+        responses[key] = { $ref: `#/components/responses/${name}` } as unknown as {
+          description: string;
+        };
+      }
+    }
 
     const operation: Record<string, unknown> = {
       tags: [route.tag],
       summary: doc.summary,
       ...(doc.description ? { description: doc.description } : {}),
-      responses: {
-        ...middlewareRefs,
-        ...Object.fromEntries(
-          Object.entries(doc.responses).map(([status, schema]) => [
-            status,
-            { description: "", content: { "application/json": { schema } } },
-          ]),
-        ),
-      },
+      responses,
     };
 
     if (doc.body) {
@@ -151,7 +180,7 @@ export function buildDocument(env: Record<string, string | undefined> = process.
               in: "header",
               required: true,
               description:
-                "Identifies the message, not the delivery attempt: a retry of the same event reuses this id, which is what makes deduplication on it possible.",
+                "Identifies the message rather than the delivery attempt, so a redelivery would carry the same id.",
               schema: { type: "string" },
             },
             {
