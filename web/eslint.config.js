@@ -25,16 +25,7 @@ export default defineConfig([
     // Turned on directory by directory as each surface is translated. A literal
     // left in the JSX is the one failure mode a key-parity test cannot see:
     // the catalogues agree perfectly and the string was never in them.
-    files: [
-      'src/components/landing/**/*.tsx',
-      'src/pages/LandingPage.tsx',
-      'src/pages/NotFoundPage.tsx',
-      'src/components/layout/Navbar.tsx',
-      'src/components/layout/Footer.tsx',
-      'src/pages/PublicQueryPage.tsx',
-      'src/components/queries/**/*.tsx',
-      'src/components/answer/**/*.tsx',
-    ],
+    files: ['src/**/*.tsx'],
     plugins: { i18next },
     rules: {
       // jsx-text-only: only text nodes. Checking attributes as well drowns the
