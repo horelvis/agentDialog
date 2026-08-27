@@ -30,11 +30,16 @@ export function Footer({ minimal = false }: FooterProps) {
             <span className="text-sm font-semibold text-gray-100">AgentDialog</span>
           </div>
           <div className="flex items-center gap-6">
-            {/* Kept in minimal mode. That flag drops links which invite
-                somebody away from the one decision the page exists for; a
-                language picker does the opposite — it is what lets them read
-                the decision at all. */}
-            <LanguageSelector />
+            {/* Only in minimal mode, which is the inverse of everything else
+                this flag governs — and deliberately so. Minimal means
+                /q/:token, the page reached from an email, which has no navbar
+                and is the one surface where the language was chosen by
+                somebody else: the agent declared it, and agents get it wrong.
+                Without this the reader has no way to correct it.
+
+                The landing has the picker in its navbar instead, so repeating
+                it here would be two controls for one setting. */}
+            {minimal && <LanguageSelector />}
             <p className="text-sm text-gray-400">{t("footer.tagline")}</p>
             {!minimal && (
               <>

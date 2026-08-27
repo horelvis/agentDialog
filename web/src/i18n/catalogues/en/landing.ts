@@ -5,7 +5,6 @@ export default {
     code: "Code",
     // The docs site is branded "Docs" in every language, like GitHub.
     docs: "Docs",
-    github: "GitHub",
     toggleMenu: "Toggle menu",
     dashboard: "Dashboard",
     login: "Login",
