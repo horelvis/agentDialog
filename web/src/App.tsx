@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router";
+import { Spinner } from "@/components/ui/Spinner";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { BareLayout } from "@/components/layout/BareLayout";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -16,31 +18,39 @@ import { NotFoundPage } from "@/pages/NotFoundPage";
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Public routes */}
-        <Route element={<PublicLayout />}>
-          <Route index element={<LandingPage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-
-        {/* Answering from an email link: footer only, no navigation. */}
-        <Route element={<BareLayout />}>
-          <Route path="q/:token" element={<PublicQueryPage />} />
-        </Route>
-
-        {/* Protected routes */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="app" element={<DashboardLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="c/:id" element={<DashboardPage />} />
-            <Route path="invitations" element={<InvitationsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="queries" element={<QueriesPage />} />
-            <Route path="trusted-agents" element={<TrustedAgentsPage />} />
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center">
+            <Spinner />
+          </div>
+        }
+      >
+        <Routes>
+          {/* Public routes */}
+          <Route element={<PublicLayout />}>
+            <Route index element={<LandingPage />} />
+            <Route path="login" element={<LoginPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
-        </Route>
-      </Routes>
+
+          {/* Answering from an email link: footer only, no navigation. */}
+          <Route element={<BareLayout />}>
+            <Route path="q/:token" element={<PublicQueryPage />} />
+          </Route>
+
+          {/* Protected routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="app" element={<DashboardLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="c/:id" element={<DashboardPage />} />
+              <Route path="invitations" element={<InvitationsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="queries" element={<QueriesPage />} />
+              <Route path="trusted-agents" element={<TrustedAgentsPage />} />
+            </Route>
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
