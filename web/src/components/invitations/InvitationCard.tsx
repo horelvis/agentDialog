@@ -54,9 +54,24 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
             {/* One node, not a preposition and a name as separate siblings —
                 Catalan elides "de" before a vowel (d'Ana, not de Ana), which
                 no catalogue value could fix once the two are split apart. */}
+            {/* agentDisplayName is agent-controlled, and this app sets
+                `interpolation.escapeValue: false` globally (React already
+                escapes plain text, and double-escaping would mangle every
+                apostrophe in Spanish and Catalan). For <Trans>, though,
+                react-i18next substitutes `values` into the string *before*
+                parsing it for component tags — with escaping off, a display
+                name like `<name style="x">Ops</name>` closes the real `name`
+                tag early and opens a fake one with attacker-controlled
+                attributes, which threw during render (invalid `style` value)
+                and would otherwise let arbitrary attributes reach the DOM.
+                shouldUnescape + a local escapeValue:true re-enables escaping
+                for this one call, then un-escapes the entities afterwards so
+                accented names and "&" still render as themselves. */}
             <Trans
               t={t}
               i18nKey="invitations.from"
+              shouldUnescape
+              tOptions={{ interpolation: { escapeValue: true } }}
               values={{ name: invitation.agentDisplayName }}
               components={{ name: <span className="text-gray-300" /> }}
             />

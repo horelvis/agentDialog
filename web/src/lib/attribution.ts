@@ -117,6 +117,15 @@ export function randomSuffix(rand: () => number = Math.random): string {
  * A slug nobody else has taken. `my-agent` is gone the moment this form is
  * public, and the API answers a taken slug with a 409, so we never offer the
  * bare one.
+ *
+ * Load-bearing beyond that: the result is always `[a-z0-9-]` — `slugify`
+ * restricts `name` to that set and `suffix` only ever comes from
+ * `randomSuffix`'s `SUFFIX_ALPHABET`, itself `[a-z0-9]`. GetKeyForm.tsx hands
+ * this string straight to `<Trans values={{ slug }}>`, where react-i18next
+ * substitutes it before parsing markup — safe here only because the result
+ * can never contain a `<`, `>` or `"`. Widen this alphabet and that call site
+ * needs the same `shouldUnescape` treatment InvitationCard.tsx uses for a
+ * value it doesn't control.
  */
 export function buildSlug(name: string, suffix: string): string {
   const room = MAX_SLUG_LENGTH - suffix.length - 1;

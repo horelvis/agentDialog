@@ -143,6 +143,8 @@ export function GetKeyForm() {
       </div>
 
       <p className="mt-2 text-xs text-gray-500">
+        {/* Safe to interpolate unescaped only because buildSlug guarantees
+            `[a-z0-9-]` — see the comment on its definition. */}
         <Trans
           t={t}
           i18nKey="form.preview"
@@ -193,6 +195,8 @@ function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
   return (
     <div className="mx-auto w-full max-w-xl rounded-xl border border-surface-border bg-surface-secondary p-5 text-left">
       <p className="text-sm font-semibold text-gray-100">
+        {/* slug here is body.data.slug, the server's echo of the same
+            buildSlug output that was submitted — same `[a-z0-9-]` guarantee. */}
         <Trans
           t={t}
           i18nKey="form.issued.title"
