@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import type { Invitation } from "@/api/types";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +15,7 @@ interface InvitationCardProps {
 }
 
 export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCardProps) {
+  const { t } = useTranslation("chat");
   const [loading, setLoading] = useState<"accept" | "decline" | null>(null);
   const navigate = useNavigate();
   const language = useLanguage();
@@ -39,17 +41,17 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
 
   return (
     <div className="flex items-center gap-4 rounded-xl border border-surface-border bg-surface-secondary p-4 transition-colors hover:bg-surface-tertiary">
-      <Avatar name={invitation.agentDisplayName ?? "Agent"} size="md" />
+      <Avatar name={invitation.agentDisplayName ?? t("shared.agent")} size="md" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h3 className="truncate font-medium text-gray-100">
-            {invitation.conversationTitle ?? "Conversation Invitation"}
+            {invitation.conversationTitle ?? t("invitations.untitled")}
           </h3>
-          <Badge>{invitation.status}</Badge>
+          <Badge>{t(`invitations.status.${invitation.status}`)}</Badge>
         </div>
         {invitation.agentDisplayName && (
           <p className="text-sm text-gray-400">
-            from <span className="text-gray-300">{invitation.agentDisplayName}</span>
+            {t("invitations.from")} <span className="text-gray-300">{invitation.agentDisplayName}</span>
           </p>
         )}
         {invitation.message && (
@@ -66,7 +68,7 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
           loading={loading === "accept"}
           disabled={loading !== null}
         >
-          Accept
+          {t("invitations.accept")}
         </Button>
         <Button
           size="sm"
@@ -75,7 +77,7 @@ export function InvitationCard({ invitation, onAccept, onDecline }: InvitationCa
           loading={loading === "decline"}
           disabled={loading !== null}
         >
-          Decline
+          {t("invitations.decline")}
         </Button>
       </div>
     </div>
