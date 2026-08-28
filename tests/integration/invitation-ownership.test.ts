@@ -5,7 +5,7 @@ import { getDb } from "../../src/db";
 import { humanQueries } from "../../src/db/schema/human-queries";
 import { invitations } from "../../src/db/schema/invitations";
 import { conversationParticipants } from "../../src/db/schema/participants";
-import { acceptInvitation } from "../../src/services/invitation.service";
+import { acceptInvitation, declineInvitation } from "../../src/services/invitation.service";
 
 /**
  * I4. Holding the token used to be enough to become a participant, and from
@@ -116,6 +116,48 @@ describe("acceptInvitation ownership", () => {
         eq(conversationParticipants.humanId, human.human.id),
       ));
     expect(participants).toHaveLength(1);
+  });
+});
+
+describe("declineInvitation ownership", () => {
+  /**
+   * The same rule as accept, on the door nobody guarded. Accept has carried an
+   * email check since I4; decline took the token alone and asked nothing, so
+   * anyone who could sign in and had seen a forwarded invitation could refuse a
+   * decision addressed to somebody else. The invited person is then waiting for
+   * a link that no longer works, and the agent is told they said no.
+   */
+  it("refuses a human whose address is not the one the invitation was sent to", async () => {
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const target = `decline-owner-${stamp}@example.com`;
+    const { token } = await queryWithInvitation(target);
+
+    const otherStamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const otherTarget = `decline-stranger-${otherStamp}@example.com`;
+    await queryWithInvitation(otherTarget);
+    const stranger = await createTestHuman(otherTarget);
+
+    await expect(declineInvitation(token, stranger.human.id)).rejects.toThrow(
+      /sent to a different address/i,
+    );
+
+    // Still open, and still theirs to answer.
+    const db = getDb();
+    const [invitation] = await db.select().from(invitations).where(eq(invitations.token, token));
+    expect(invitation.status).toBe("pending");
+  });
+
+  it("still lets the person it was addressed to decline it", async () => {
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const target = `decline-ok-${stamp}@example.com`;
+    const { token } = await queryWithInvitation(target);
+    const human = await createTestHuman(target);
+
+    await declineInvitation(token, human.human.id);
+
+    const db = getDb();
+    const [invitation] = await db.select().from(invitations).where(eq(invitations.token, token));
+    expect(invitation.status).toBe("declined");
   });
 });
 
