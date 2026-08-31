@@ -83,10 +83,19 @@ en `snake_case`.
 
 ## Audio y accesibilidad
 
-La narración será en español, con ritmo calmado y frases cortas. Cada escena
-tendrá una locución independiente para facilitar cambios y sincronización. Los
-subtítulos SRT reproducirán el sentido completo de la narración y se entregarán
-junto al vídeo.
+La narración se generará con ElevenLabs en español, con ritmo calmado y frases
+cortas. Para mantener continuidad con el vídeo «Hola mundo», se usará la voz
+**David Martin — Clear, Calm and Elegant** con el modelo **Eleven Multilingual
+v2**. Cada escena tendrá una locución MP3 independiente para facilitar cambios
+y sincronización.
+
+La generación leerá la credencial de ElevenLabs desde una variable de entorno;
+la clave no se guardará en el repositorio ni aparecerá en comandos, registros o
+artefactos. Una vez generados los MP3, la regeneración local del vídeo no hará
+llamadas a ElevenLabs.
+
+Los subtítulos SRT reproducirán el sentido completo de la narración y se
+entregarán junto al vídeo.
 
 El contraste, el tamaño de texto y el tiempo en pantalla deben permitir leer el
 contenido sin depender de la narración. El vídeo no dependerá exclusivamente
