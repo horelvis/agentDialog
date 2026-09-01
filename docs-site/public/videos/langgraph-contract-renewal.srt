@@ -1,31 +1,39 @@
 1
-00:00:00,450 --> 00:00:08,574
-CloudDesk renovará automáticamente el contrato en diez días. El agente detecta una condición que requiere decisión humana.
+00:00:00,450 --> 00:00:15,261
+Una empresa utiliza un agente con LangGraph para preparar la renovación de sus contratos. El agente puede analizar cláusulas y políticas, pero no debe decidir por sí solo cuando una condición supera el límite autorizado.
 
 2
-00:00:09,574 --> 00:00:18,299
-El agente extrae los términos: duración de doce meses, incremento del ocho por ciento y una ventana de solo diez días para actuar.
+00:00:16,261 --> 00:00:30,289
+AgentDialog conecta ese agente con la persona adecuada dentro del mismo flujo. Envía una pregunta estructurada, notifica al responsable y devuelve su respuesta a LangGraph para continuar de forma segura.
 
 3
-00:00:19,299 --> 00:00:29,513
-La política comercial permite como máximo un cinco por ciento. Al comparar ambos valores, el aumento detectado supera el límite y activa una consulta.
+00:00:31,289 --> 00:00:39,413
+CloudDesk renovará automáticamente el contrato en diez días. El agente detecta una condición que requiere decisión humana.
 
 4
-00:00:30,513 --> 00:00:40,779
-El flujo crea una consulta de AgentDialog con el contexto del contrato, tres alternativas claras y el correo de la responsable del acuerdo.
+00:00:40,413 --> 00:00:49,138
+El agente extrae los términos: duración de doce meses, incremento del ocho por ciento y una ventana de solo diez días para actuar.
 
 5
-00:00:41,779 --> 00:00:53,508
-La responsable recibe una tarjeta de AgentDialog. Puede aprobar, renegociar o cancelar. Elige renegociar para proteger el margen acordado.
+00:00:50,138 --> 00:01:00,352
+La política comercial permite como máximo un cinco por ciento. Al comparar ambos valores, el aumento detectado supera el límite y activa una consulta.
 
 6
-00:00:54,508 --> 00:01:04,670
-La respuesta vuelve al agente como JSON estructurado. La opción elegida es renegotiate, sin ambigüedad ni interpretación manual.
+00:01:01,352 --> 00:01:11,618
+El flujo crea una consulta de AgentDialog con el contexto del contrato, tres alternativas claras y el correo de la responsable del acuerdo.
 
 7
-00:01:05,670 --> 00:01:14,995
-LangGraph continúa por la rama de renegociación: prepara un borrador limitado al cinco por ciento y crea la tarea con fecha límite.
+00:01:12,618 --> 00:01:24,347
+La responsable recibe una tarjeta de AgentDialog. Puede aprobar, renegociar o cancelar. Elige renegociar para proteger el margen acordado.
 
 8
-00:01:15,995 --> 00:01:27,463
+00:01:25,347 --> 00:01:35,509
+La respuesta vuelve al agente como JSON estructurado. La opción elegida es renegotiate, sin ambigüedad ni interpretación manual.
+
+9
+00:01:36,509 --> 00:01:45,834
+LangGraph continúa por la rama de renegociación: prepara un borrador limitado al cinco por ciento y crea la tarea con fecha límite.
+
+10
+00:01:46,834 --> 00:01:58,302
 Automatiza las reglas. Consulta las decisiones. AgentDialog conecta el criterio del agente con la decisión humana y deja el proceso listo para avanzar.

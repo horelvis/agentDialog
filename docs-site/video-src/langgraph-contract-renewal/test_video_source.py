@@ -371,12 +371,28 @@ class SceneManifestTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.scenes = json.loads((ROOT / "scenes.json").read_text())
 
-    def test_has_eight_unique_ordered_scenes(self) -> None:
-        self.assertEqual(len(self.scenes), 8)
+    def test_has_ten_unique_ordered_scenes(self) -> None:
+        self.assertEqual(len(self.scenes), 10)
         ids = [scene["id"] for scene in self.scenes]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual(ids[0], "00-contract")
+        self.assertEqual(
+            ids[:3],
+            ["intro-use-case", "intro-agentdialog", "00-contract"],
+        )
         self.assertEqual(ids[-1], "07-outro")
+
+    def test_intro_explains_the_use_case_and_agentdialog_role(self) -> None:
+        use_case, agentdialog = self.scenes[:2]
+
+        self.assertEqual(use_case["visual"], "use_case")
+        self.assertIn("LangGraph", use_case["narration"])
+        self.assertIn("no debe decidir por sí solo", use_case["narration"])
+        self.assertIn("límite autorizado", use_case["narration"])
+
+        self.assertEqual(agentdialog["visual"], "agentdialog")
+        self.assertIn("persona adecuada", agentdialog["narration"])
+        self.assertIn("pregunta estructurada", agentdialog["narration"])
+        self.assertIn("devuelve su respuesta a LangGraph", agentdialog["narration"])
 
     def test_each_scene_has_the_render_contract(self) -> None:
         required = {"id", "eyebrow", "title", "caption", "narration", "visual"}
@@ -472,11 +488,11 @@ class SceneManifestTests(unittest.TestCase):
             "Aprobar · Renegociar · Cancelar · Renegociar seleccionado",
         )
 
-    def test_narration_budget_leaves_room_for_eight_one_second_holds(self) -> None:
+    def test_narration_budget_covers_the_expanded_story(self) -> None:
         words = sum(len(scene["narration"].split()) for scene in self.scenes)
         estimated_runtime = words * 0.47 + len(self.scenes)
-        self.assertGreaterEqual(estimated_runtime, 87)
-        self.assertLessEqual(estimated_runtime, 88)
+        self.assertGreaterEqual(estimated_runtime, 110)
+        self.assertLessEqual(estimated_runtime, 120)
 
 
 class RenderTests(unittest.TestCase):
@@ -503,14 +519,6 @@ class RenderTests(unittest.TestCase):
         self.assertIn("`python3`", readme)
         self.assertIn("PYTHON_BIN=/path/to/python3", readme)
         self.assertIn("docs-site/public/videos/langgraph-contract-renewal.srt", readme)
-
-    def test_readme_explains_the_measured_narration_exception(self) -> None:
-        readme = (ROOT / "README.md").read_text()
-
-        self.assertIn("169", readme)
-        self.assertIn("175–205", readme)
-        self.assertIn("88.013062", readme)
-        self.assertIn("90", readme)
 
     def test_pillow_dependency_is_pinned_to_the_rendered_asset_version(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text().splitlines()
@@ -540,8 +548,8 @@ class RenderTests(unittest.TestCase):
 
     def test_every_visual_type_has_a_renderer(self) -> None:
         expected = {
-            "contract", "extraction", "threshold", "code",
-            "decision", "json", "graph", "outro",
+            "use_case", "agentdialog", "contract", "extraction", "threshold",
+            "code", "decision", "json", "graph", "outro",
         }
         self.assertEqual(set(render_slides.VISUAL_RENDERERS), expected)
 
@@ -685,13 +693,13 @@ class RenderTests(unittest.TestCase):
             ):
                 total = render_slides.build()
 
-            self.assertEqual(total, 84.0)
+            self.assertEqual(total, 105.0)
             timeline = json.loads((generated / "timeline.json").read_text())
-            self.assertEqual(len(timeline), 8)
+            self.assertEqual(len(timeline), 10)
             self.assertTrue(all(item["audioOffset"] == 0.45 for item in timeline))
             self.assertTrue(all(item["duration"] == 10.5 for item in timeline))
             srt = (generated / "langgraph-contract-renewal.srt").read_text()
-            self.assertEqual(srt.count("-->"), 8)
+            self.assertEqual(srt.count("-->"), 10)
             self.assertIn(SceneManifestTests.scenes[-1]["narration"], srt)
 
 if __name__ == "__main__":

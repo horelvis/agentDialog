@@ -1,6 +1,6 @@
 # LangGraph contract-renewal video
 
-`scenes.json` is the approved source for the eight scenes.
+`scenes.json` is the approved source for the ten scenes.
 
 ## Fresh setup
 
@@ -40,10 +40,10 @@ To regenerate one scene, use `--scene <scene-id>`; it leaves unrelated clips and
 cached audio untouched. Add `--force` only when that selected MP3 must be
 regenerated, because it consumes ElevenLabs credits again.
 
-The approved narration intentionally contains 169 words instead of the earlier
-175–205-word planning estimate. The measured ElevenLabs clips plus the eight
-one-second holds produce 88.013062 seconds; adding words risks exceeding the
-90-second limit. Keep the approved narration and audio unchanged unless the
+The expanded narration contains 234 words across ten scenes. The measured
+ElevenLabs clips total 108.852246 seconds; adding the ten one-second holds
+produces a 118.852246-second timeline, inside the approved 105–125-second
+target. Keep the approved narration and cached audio unchanged unless the
 whole timing budget is reviewed again.
 
 ## Render the finished video

@@ -158,6 +158,79 @@ def draw_caption(canvas: Image.Image, scene: dict) -> None:
     canvas.alpha_composite(overlay)
 
 
+def draw_use_case(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
+    """Show the business inputs that force LangGraph to pause for judgment."""
+    contract = (150, 410, 585, 650)
+    policy = (150, 690, 585, 850)
+    graph = (750, 515, 1170, 745)
+    decision = (1335, 470, 1745, 790)
+
+    panel(draw, contract, fill=(247, 244, 255), outline=BRAND_LIGHT, radius=28, width=3)
+    draw.text((190, 445), "CONTRATO", font=font(19, True), fill=(91, 64, 136))
+    draw.text((190, 495), "Renovación", font=font(35, True), fill=(40, 31, 56))
+    draw.text((190, 548), "Cláusulas · fechas", font=font(24), fill=(91, 80, 108))
+    draw.rounded_rectangle((190, 595, 515, 620), 12, fill=(224, 203, 255))
+
+    panel(draw, policy, fill=(28, 50, 40), outline=SUCCESS, radius=28, width=3)
+    draw.text((190, 722), "POLÍTICA INTERNA", font=font(18, True), fill=(185, 255, 211))
+    draw.text((190, 765), "Límite autorizado", font=font(27, True), fill=INK)
+    draw.text((190, 808), "máximo 5 %", font=font(24), fill=(185, 255, 211))
+
+    panel(draw, graph, fill=(35, 27, 49), outline=BRAND_LIGHT, radius=40, width=4)
+    draw.text((800, 560), "AGENTE", font=font(19, True), fill=MUTED)
+    draw.text((800, 605), "LangGraph", font=font(45, True), fill=INK)
+    draw.text((800, 673), "analiza y compara", font=font(24), fill=BRAND_LIGHT)
+
+    draw_arrow(draw, (585, 535), (715, 605), BRAND_LIGHT)
+    draw_arrow(draw, (585, 765), (715, 675), SUCCESS)
+    draw_arrow(draw, (1170, 630), (1300, 630), WARNING)
+
+    panel(draw, decision, fill=(52, 35, 42), outline=WARNING, radius=36, width=4)
+    centered_text(draw, (1380, 500, 1700, 635), "?", font(96, True), (255, 225, 145))
+    centered_text(draw, (1370, 635, 1710, 690), "FUERA DEL LÍMITE", font(20, True), WARNING)
+    centered_text(draw, (1370, 695, 1710, 760), "Requiere criterio humano", font(22, True), INK)
+
+
+def draw_agentdialog_intro(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
+    """Show AgentDialog bridging the paused graph and the responsible human."""
+    agent = (125, 455, 545, 745)
+    bridge = (705, 390, 1215, 810)
+    human = (1375, 455, 1795, 745)
+
+    panel(draw, agent, fill=(32, 27, 45), outline=BORDER, radius=34, width=3)
+    draw.text((175, 500), "AGENTE", font=font(19, True), fill=MUTED)
+    draw.text((175, 552), "LangGraph", font=font(39, True), fill=INK)
+    draw.rounded_rectangle((175, 635, 490, 685), 18, fill=(65, 48, 87))
+    centered_text(draw, (175, 635, 490, 685), "flujo en pausa", font(21, True), BRAND_LIGHT)
+
+    panel(draw, bridge, fill=(46, 29, 67), outline=BRAND_LIGHT, radius=42, width=4)
+    draw.rounded_rectangle((810, 430, 1110, 484), 24, fill=BRAND)
+    centered_text(draw, (810, 430, 1110, 484), "AgentDialog", font(25, True), INK)
+    steps = [
+        ("1", "Pregunta estructurada"),
+        ("2", "Notificación"),
+        ("3", "Respuesta trazable"),
+    ]
+    y = 535
+    for number, label in steps:
+        draw.ellipse((785, y - 5, 837, y + 47), fill=(80, 49, 112), outline=BRAND_LIGHT, width=2)
+        centered_text(draw, (785, y - 5, 837, y + 47), number, font(19, True), INK)
+        draw.text((865, y + 4), label, font=font(24, True), fill=INK)
+        y += 78
+
+    panel(draw, human, fill=(247, 244, 255), outline=BRAND_LIGHT, radius=34, width=3)
+    draw.text((1425, 500), "RESPONSABLE", font=font(19, True), fill=(96, 76, 123))
+    draw.ellipse((1520, 555, 1650, 685), fill=(222, 208, 244))
+    draw.ellipse((1557, 573, 1613, 629), fill=(88, 61, 131))
+    draw.pieslice((1538, 620, 1632, 704), 180, 360, fill=(88, 61, 131))
+
+    draw_arrow(draw, (545, 585), (670, 585), BRAND_LIGHT)
+    draw_arrow(draw, (1215, 585), (1340, 585), BRAND_LIGHT)
+    draw_arrow(draw, (1375, 705), (1245, 705), SUCCESS)
+    draw_arrow(draw, (705, 705), (575, 705), SUCCESS)
+    draw.text((780, 842), "La decisión vuelve al grafo y el proceso continúa", font=font(23, True), fill=(190, 255, 213))
+
+
 def draw_contract(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
     doc_box = (190, 370, 1210, 848)
     panel(draw, doc_box, fill=(247, 244, 255), outline=BRAND_LIGHT, radius=32, width=3)
@@ -494,6 +567,8 @@ def draw_outro(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> N
 
 
 VISUAL_RENDERERS: dict[str, Callable[[Image.Image, ImageDraw.ImageDraw, dict], None]] = {
+    "use_case": draw_use_case,
+    "agentdialog": draw_agentdialog_intro,
     "contract": draw_contract,
     "extraction": draw_extraction,
     "threshold": draw_threshold,
@@ -562,19 +637,20 @@ def build() -> float:
             f"{index}\n{srt_time(cursor + 0.45)} --> {srt_time(cursor + spoken + 0.45)}\n{scene['narration']}\n"
         )
         cursor += duration
-    if not 80 <= cursor <= 90:
-        raise RuntimeError(f"Video duration {cursor:.1f}s is outside the 80–90 second target")
+    if not 105 <= cursor <= 125:
+        raise RuntimeError(f"Video duration {cursor:.1f}s is outside the 105–125 second target")
     GENERATED.mkdir(parents=True, exist_ok=True)
     (GENERATED / "timeline.json").write_text(json.dumps(timeline, indent=2) + "\n")
     (GENERATED / "langgraph-contract-renewal.srt").write_text("\n".join(subtitles))
-    with Image.open(SLIDES / "00-contract.png") as first_slide:
+    with Image.open(SLIDES / f"{scenes[0]['id']}.png") as first_slide:
         first_slide.save(POSTER)
     return cursor
 
 
 def main() -> None:
     total = build()
-    print(f"Built 8 slides; duration {total:.1f}s")
+    scene_count = len(json.loads((ROOT / "scenes.json").read_text()))
+    print(f"Built {scene_count} slides; duration {total:.1f}s")
 
 
 if __name__ == "__main__":

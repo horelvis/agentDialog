@@ -1,5 +1,21 @@
 [
   {
+    "id": "intro-use-case",
+    "eyebrow": "Caso de uso · LangGraph",
+    "title": "Un agente revisa la renovación",
+    "caption": "Contrato + política interna · decisión fuera del límite",
+    "narration": "Una empresa utiliza un agente con LangGraph para preparar la renovación de sus contratos. El agente puede analizar cláusulas y políticas, pero no debe decidir por sí solo cuando una condición supera el límite autorizado.",
+    "visual": "use_case"
+  },
+  {
+    "id": "intro-agentdialog",
+    "eyebrow": "Human-in-the-loop",
+    "title": "AgentDialog incorpora el criterio humano",
+    "caption": "Pregunta estructurada · notificación · respuesta al grafo",
+    "narration": "AgentDialog conecta ese agente con la persona adecuada dentro del mismo flujo. Envía una pregunta estructurada, notifica al responsable y devuelve su respuesta a LangGraph para continuar de forma segura.",
+    "visual": "agentdialog"
+  },
+  {
     "id": "00-contract",
     "eyebrow": "CloudDesk · Renovación",
     "title": "El contrato se renueva pronto",
