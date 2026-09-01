@@ -627,6 +627,15 @@ class RenderTests(unittest.TestCase):
         self.assertIn(("PRECIO ACTUAL", "111 €/año", render_slides.MUTED), rows)
         self.assertIn(("PROPUESTA", "222 €/año · +99 %", render_slides.WARNING), rows)
 
+        payload["context"] = payload["context"].replace(
+            "Recomendación del agente: renegociar hasta un máximo de 126.000 €/año.",
+            "Recomendación del agente: cancelar ahora.",
+        )
+        self.assertEqual(
+            render_slides.recommendation_label(payload),
+            "Recomendación · cancelar",
+        )
+
     def test_decision_card_text_is_derived_from_the_payload(self) -> None:
         payload = copy.deepcopy(render_slides.query_payload())
         payload["changes"][0]["before"] = "111 €/año"

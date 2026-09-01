@@ -302,6 +302,15 @@ def context_fact_rows(
         ("FECHAS", f"Renueva {renewal} · cancelar {cancellation}", BRAND_LIGHT),
     ]
 
+
+def recommendation_label(payload: dict | None = None) -> str:
+    """Derive the compact recommendation badge from the request context."""
+    request = payload or query_payload()
+    recommendation = context_fields(request)["Recomendación del agente"]
+    action = recommendation.split(maxsplit=1)[0].rstrip(".")
+    return f"Recomendación · {action}"
+
+
 def code_tab_label() -> str:
     """Return the accurate filename displayed above the REST request."""
     return CODE_TAB_LABEL
@@ -362,7 +371,13 @@ def draw_code(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> No
         draw.text((1150, y + 25), value, font=font(23, True), fill=color)
         y += 77
     draw.rounded_rectangle((1140, 785, 1740, 827), 16, fill=(65, 39, 93))
-    centered_text(draw, (1140, 785, 1740, 827), "Recomendación · renegociar", font(19, True), INK)
+    centered_text(
+        draw,
+        (1140, 785, 1740, 827),
+        recommendation_label(payload),
+        font(19, True),
+        INK,
+    )
 
 
 def draw_decision(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
