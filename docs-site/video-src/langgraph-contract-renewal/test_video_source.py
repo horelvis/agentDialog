@@ -1,3 +1,4 @@
+import copy
 import importlib.util
 import io
 import json
@@ -556,7 +557,7 @@ class RenderTests(unittest.TestCase):
         )
         manifest_payload = json.loads(query_scene["caption"].split(" ", 2)[2])
         self.assertEqual(payload, manifest_payload)
-        self.assertEqual(render_slides.code_tab_label(), "agentdialog-request.json")
+        self.assertEqual(render_slides.code_tab_label(), "agentdialog-request")
 
     def test_code_choices_match_the_decision_card(self) -> None:
         payload = json.loads(
@@ -570,7 +571,8 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(render_slides.SELECTED_OPTION_ID, "renegotiate")
 
     def test_decision_card_shows_the_context_and_consequences_sent_by_the_agent(self) -> None:
-        visible = render_slides.decision_card_text()
+        query_payload = render_slides.query_payload()
+        visible = render_slides.decision_card_text(query_payload)
 
         self.assertEqual(
             visible["facts"],
@@ -584,13 +586,11 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(
             visible["consequences"],
             {
-                "approve": "129.600 € · 12 meses",
-                "renegotiate": "Máximo 126.000 € · antes del 20 sep",
-                "cancel": "Sin renovación · preparar migración",
+                option["id"]: option["consequence"]
+                for option in query_payload["answer_space"]["options"]
             },
         )
 
-        query_payload = render_slides.query_payload()
         self.assertEqual(
             render_slides.decision_options(),
             query_payload["answer_space"]["options"],
@@ -598,6 +598,54 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(
             query_payload["context"].splitlines()[1],
             "Precio actual: 120.000 €/año",
+        )
+
+    def test_visible_request_summary_is_derived_from_the_payload(self) -> None:
+        payload = copy.deepcopy(render_slides.query_payload())
+        payload["risk"] = "high"
+        payload["subject"]["body"] = "CLÁUSULA DE PRUEBA"
+        payload["changes"][0]["before"] = "111 €/año"
+        payload["changes"][0]["after"] = "222 €/año"
+        payload["answer_space"]["options"][0]["label"] = "Aceptar prueba"
+        payload["target_human_email"] = "test@example.com"
+
+        preview = "\n".join(
+            line for line, _ in render_slides.code_preview_lines(payload)
+        )
+
+        self.assertIn('"risk": "high"', preview)
+        self.assertIn("CLÁUSULA DE PRUEBA", preview)
+        self.assertIn("111 €/año → 222 €/año", preview)
+        self.assertIn("Aceptar prueba", preview)
+        self.assertIn("test@example.com", preview)
+
+        payload["context"] = payload["context"].replace(
+            "Renovación propuesta: 129.600 €/año (+8 %)",
+            "Renovación propuesta: 222 €/año (+99 %)",
+        )
+        rows = render_slides.context_fact_rows(payload)
+        self.assertIn(("PRECIO ACTUAL", "111 €/año", render_slides.MUTED), rows)
+        self.assertIn(("PROPUESTA", "222 €/año · +99 %", render_slides.WARNING), rows)
+
+    def test_decision_card_text_is_derived_from_the_payload(self) -> None:
+        payload = copy.deepcopy(render_slides.query_payload())
+        payload["changes"][0]["before"] = "111 €/año"
+        payload["changes"][0]["after"] = "222 €/año"
+        payload["context"] = payload["context"].replace(
+            "Renovación propuesta: 129.600 €/año (+8 %)",
+            "Renovación propuesta: 222 €/año (+99 %)",
+        )
+        payload["answer_space"]["options"][0]["consequence"] = (
+            "Consecuencia de prueba."
+        )
+
+        visible = render_slides.decision_card_text(payload)
+
+        self.assertIn("Actual · 111 €/año", visible["facts"])
+        self.assertIn("Propuesta · 222 €/año (+99 %)", visible["facts"])
+        self.assertEqual(
+            visible["consequences"]["approve"],
+            "Consecuencia de prueba.",
         )
 
     def test_generated_slides_are_full_hd(self) -> None:

@@ -49,7 +49,7 @@ CHOICE_OPTIONS = (
     },
 )
 SELECTED_OPTION_ID = "renegotiate"
-CODE_TAB_LABEL = "agentdialog-request.json"
+CODE_TAB_LABEL = "agentdialog-request"
 QUERY_SUBJECT_BODY = (
     "CLÁUSULA 12 · RENOVACIÓN: renovación automática por 12 meses "
     "salvo cancelación con 10 días de antelación."
@@ -63,19 +63,6 @@ QUERY_CONTEXT_LINES = (
     "Fecha límite de cancelación: 20 de septiembre",
     "Recomendación del agente: renegociar hasta un máximo de 126.000 €/año.",
 )
-DECISION_FACTS = (
-    "Actual · 120.000 €/año",
-    "Propuesta · 129.600 €/año (+8 %)",
-    "Límite · 126.000 €/año (+5 %)",
-    "Renueva 30 sep · cancelar antes del 20 sep",
-)
-DECISION_CONSEQUENCES = {
-    "approve": "129.600 € · 12 meses",
-    "renegotiate": "Máximo 126.000 € · antes del 20 sep",
-    "cancel": "Sin renovación · preparar migración",
-}
-
-
 def font(size: int, rounded: bool = False) -> ImageFont.FreeTypeFont:
     """Load the macOS system face used by the first AgentDialog video."""
     return ImageFont.truetype(FONT_ROUNDED if rounded else FONT_REGULAR, size)
@@ -262,13 +249,58 @@ def query_payload() -> dict:
     }
 
 
-def decision_card_text() -> dict[str, list[str] | dict[str, str]]:
-    """Return the context and outcomes visible before the human chooses."""
+def context_fields(payload: dict) -> dict[str, str]:
+    """Index the newline-delimited context sent to AgentDialog."""
     return {
-        "facts": list(DECISION_FACTS),
-        "consequences": dict(DECISION_CONSEQUENCES),
+        label: value
+        for line in payload["context"].splitlines()
+        for label, value in [line.split(": ", 1)]
     }
 
+
+def compact_date(value: str) -> str:
+    """Shorten Spanish September dates for the decision-card layout."""
+    return value.replace(" de septiembre", " sep")
+
+
+def decision_card_text(payload: dict | None = None) -> dict[str, list[str] | dict[str, str]]:
+    """Derive the reviewer's visible context and outcomes from the request."""
+    request = payload or query_payload()
+    fields = context_fields(request)
+    change = request["changes"][0]
+    return {
+        "facts": [
+            f"Actual · {change['before']}",
+            f"Propuesta · {fields['Renovación propuesta']}",
+            f"Límite · {fields['Límite interno']}",
+            (
+                f"Renueva {compact_date(fields['Fecha de renovación'])} · "
+                f"cancelar antes del "
+                f"{compact_date(fields['Fecha límite de cancelación'])}"
+            ),
+        ],
+        "consequences": {
+            option["id"]: option["consequence"]
+            for option in request["answer_space"]["options"]
+        },
+    }
+
+
+def context_fact_rows(
+    payload: dict | None = None,
+) -> list[tuple[str, str, tuple[int, int, int]]]:
+    """Derive the visible context panel from the exact AgentDialog request."""
+    request = payload or query_payload()
+    fields = context_fields(request)
+    change = request["changes"][0]
+    renewal = compact_date(fields["Fecha de renovación"])
+    cancellation = compact_date(fields["Fecha límite de cancelación"])
+    return [
+        ("PRECIO ACTUAL", change["before"], MUTED),
+        ("PROPUESTA", fields["Renovación propuesta"].replace(" (", " · ").rstrip(")"), WARNING),
+        ("LÍMITE INTERNO", fields["Límite interno"].replace(" (", " · ").rstrip(")"), SUCCESS),
+        ("FECHAS", f"Renueva {renewal} · cancelar {cancellation}", BRAND_LIGHT),
+    ]
 
 def code_tab_label() -> str:
     """Return the accurate filename displayed above the REST request."""
@@ -283,40 +315,47 @@ def code_lines() -> list[tuple[str, tuple[int, int, int]]]:
     ]
 
 
-def code_preview_lines() -> list[tuple[str, tuple[int, int, int]]]:
-    """Keep the on-screen request legible while the manifest retains full JSON."""
+def code_preview_lines(
+    payload: dict | None = None,
+) -> list[tuple[str, tuple[int, int, int]]]:
+    """Derive a legible on-screen summary from the exact request payload."""
+    request = payload or query_payload()
+    body = request["subject"]["body"]
+    body_preview = body.split(":", 1)[0] + "…" if ":" in body else body
+    change = request["changes"][0]
+    space = request["answer_space"]
+    labels = " · ".join(option["label"] for option in space["options"])
     return [
         ("POST https://api.agentdialog.io/api/v1/agent/queries", BRAND_LIGHT),
-        ('"risk": "medium"', INK),
-        ('"subject.body": "CLÁUSULA 12 · RENOVACIÓN…"', INK),
-        ('"changes": "120.000 € → 129.600 € · material"', WARNING),
-        ('"answer_space": "choice · select one"', INK),
-        ('"options": "Aprobar · Renegociar · Cancelar"', BRAND_LIGHT),
-        ('  "target_human_email": "responsable@example.com"', INK),
+        (f'"risk": "{request["risk"]}"', INK),
+        (f'"subject.body": "{body_preview}"', INK),
+        (
+            f'"changes": "{change["before"]} → {change["after"]} · '
+            f'{change["materiality"]}"',
+            WARNING,
+        ),
+        (f'"answer_space": "{space["kind"]} · select {space["select"]}"', INK),
+        (f'"options": "{labels}"', BRAND_LIGHT),
+        (f'  "target_human_email": "{request["target_human_email"]}"', INK),
     ]
 
-
 def draw_code(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
+    payload = query_payload()
     code_box = (120, 365, 1065, 850)
     panel(draw, code_box, fill=(19, 19, 25), outline=(106, 87, 151), radius=28, width=3)
     draw.rounded_rectangle((120, 365, 1065, 423), 28, fill=(41, 34, 55))
     for x, color in ((157, (245, 113, 113)), (187, WARNING), (217, SUCCESS)):
         draw.ellipse((x, 384, x + 16, 400), fill=color)
-    draw.text((270, 378), f"{code_tab_label()} · resumen visual", font=font(20, True), fill=MUTED)
+    draw.text((270, 378), code_tab_label(), font=font(20, True), fill=MUTED)
     y = 450
-    for line, color in code_preview_lines():
+    for line, color in code_preview_lines(payload):
         draw.text((160, y), line, font=font(20), fill=color)
         y += 49
 
     context_box = (1105, 365, 1780, 850)
     panel(draw, context_box, fill=(33, 25, 47), outline=BRAND_LIGHT, radius=28, width=3)
     draw.text((1150, 405), "Contexto enviado", font=font(28, True), fill=INK)
-    fact_rows = [
-        ("PRECIO ACTUAL", "120.000 €/año", MUTED),
-        ("PROPUESTA", "129.600 €/año · +8 %", WARNING),
-        ("LÍMITE INTERNO", "126.000 €/año · +5 %", SUCCESS),
-        ("FECHAS", "Renueva 30 sep · cancelar 20 sep", BRAND_LIGHT),
-    ]
+    fact_rows = context_fact_rows(payload)
     y = 475
     for label, value, color in fact_rows:
         draw.text((1150, y), label, font=font(17, True), fill=MUTED)
@@ -327,7 +366,8 @@ def draw_code(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> No
 
 
 def draw_decision(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
-    visible = decision_card_text()
+    payload = query_payload()
+    visible = decision_card_text(payload)
     card = (240, 335, 1680, 855)
     panel(draw, card, fill=(250, 248, 255), outline=BRAND_LIGHT, radius=34, width=4)
     draw.text((295, 370), "Renovación CloudDesk", font=font(36, True), fill=(40, 31, 56))
@@ -346,7 +386,7 @@ def draw_decision(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -
         "renegotiate": (750, 625, 1170, 760),
         "cancel": (1220, 625, 1640, 760),
     }
-    for option in decision_options():
+    for option in payload["answer_space"]["options"]:
         option_id = option["id"]
         selected = option_id == SELECTED_OPTION_ID
         box = boxes[option_id]
@@ -357,12 +397,22 @@ def draw_decision(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -
         draw.rounded_rectangle(box, 22, fill=fill, outline=outline, width=4 if selected else 2)
         centered_text(draw, (box[0], box[1] + 10, box[2], box[1] + 66), label, font(25, True), text_fill)
         consequence = visible["consequences"][option_id]
-        consequence_font = font(16, True)
-        consequence_lines = wrapped_lines(draw, consequence, consequence_font, box[2] - box[0] - 36)
-        for index, line in enumerate(consequence_lines[:2]):
+        consequence_font = font(14, True)
+        consequence_lines = wrapped_lines(
+            draw,
+            consequence,
+            consequence_font,
+            box[2] - box[0] - 36,
+        )
+        for index, line in enumerate(consequence_lines[:3]):
             centered_text(
                 draw,
-                (box[0] + 14, box[1] + 68 + index * 24, box[2] - 14, box[1] + 94 + index * 24),
+                (
+                    box[0] + 14,
+                    box[1] + 66 + index * 20,
+                    box[2] - 14,
+                    box[1] + 88 + index * 20,
+                ),
                 line,
                 consequence_font,
                 text_fill,
