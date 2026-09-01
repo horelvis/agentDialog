@@ -86,11 +86,11 @@ en `snake_case`.
 La narración se generará con ElevenLabs en español, con ritmo calmado y frases
 cortas. Para mantener continuidad con el vídeo «Hola mundo», se usará la voz
 **David Martin — Clear, Calm and Elegant** con el modelo **Eleven Multilingual
-v2**. Cada escena tendrá una locución MP3 independiente para facilitar cambios
-y sincronización.
+v2**. Cada escena tendrá una locución
+MP3 independiente para facilitar cambios y sincronización.
 
-La generación leerá la credencial de ElevenLabs desde una variable de entorno;
-la clave no se guardará en el repositorio ni aparecerá en comandos, registros o
+La generación leerá la clave API y el ID de voz desde variables de entorno;
+ninguno se guardará en el repositorio ni aparecerá en comandos, registros o
 artefactos. Una vez generados los MP3, la regeneración local del vídeo no hará
 llamadas a ElevenLabs.
 

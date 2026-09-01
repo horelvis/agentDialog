@@ -1,0 +1,66 @@
+[
+  {
+    "id": "00-contract",
+    "eyebrow": "CloudDesk · Renovación",
+    "title": "El contrato se renueva pronto",
+    "caption": "Renovación automática en 10 días",
+    "narration": "CloudDesk renovará automáticamente el contrato en diez días. El agente detecta una condición que requiere decisión humana.",
+    "visual": "contract"
+  },
+  {
+    "id": "01-extract",
+    "eyebrow": "Extracción de términos",
+    "title": "Los datos relevantes, listos",
+    "caption": "12 meses · aumento 8 % · plazo 10 días",
+    "narration": "El agente extrae los términos: duración de doce meses, incremento del ocho por ciento y una ventana de solo diez días para actuar.",
+    "visual": "extraction"
+  },
+  {
+    "id": "02-policy",
+    "eyebrow": "Comprobación de política",
+    "title": "El aumento supera el límite",
+    "caption": "Política: máximo 5 % · detectado: 8 %",
+    "narration": "La política comercial permite como máximo un cinco por ciento. Al comparar ambos valores, el aumento detectado supera el límite y activa una consulta.",
+    "visual": "threshold"
+  },
+  {
+    "id": "03-query",
+    "eyebrow": "Consulta al responsable",
+    "title": "Una decisión con contexto",
+    "caption": "POST https://api.agentdialog.io/api/v1/agent/queries {\"query_type\":\"expert_query\",\"subject\":{\"id\":\"clouddesk-contract\",\"label\":\"Contrato CloudDesk\",\"body\":\"12 meses; aumento 8 %; vence en 10 días.\"},\"answer_space\":{\"kind\":\"choice\",\"select\":\"one\",\"options\":[{\"id\":\"approve\",\"label\":\"Aprobar\"},{\"id\":\"renegotiate\",\"label\":\"Renegociar\"},{\"id\":\"cancel\",\"label\":\"Cancelar\"}]},\"question\":\"¿Cómo procedemos con la renovación de CloudDesk?\",\"target_human_email\":\"responsable@example.com\"}",
+    "narration": "El flujo crea una consulta de AgentDialog con el contexto del contrato, tres alternativas claras y el correo de la responsable del acuerdo.",
+    "visual": "code"
+  },
+  {
+    "id": "04-human",
+    "eyebrow": "Decisión humana",
+    "title": "Elige Renegociar",
+    "caption": "Aprobar · Renegociar · Cancelar · Renegociar seleccionado",
+    "narration": "La responsable recibe una tarjeta de AgentDialog. Puede aprobar, renegociar o cancelar. Elige renegociar para proteger el margen acordado.",
+    "visual": "decision"
+  },
+  {
+    "id": "05-answer",
+    "eyebrow": "Respuesta estructurada",
+    "title": "La decisión vuelve al flujo",
+    "caption": "{\"kind\":\"choice\",\"option_ids\":[\"renegotiate\"]}",
+    "narration": "La respuesta vuelve al agente como JSON estructurado. La opción elegida es renegotiate, sin ambigüedad ni interpretación manual.",
+    "visual": "json"
+  },
+  {
+    "id": "06-continue",
+    "eyebrow": "LangGraph continúa",
+    "title": "La rama de renegociación avanza",
+    "caption": "Borrador limitado a 5 % · tarea antes de la renovación",
+    "narration": "LangGraph continúa por la rama de renegociación: prepara un borrador limitado al cinco por ciento y crea la tarea con fecha límite.",
+    "visual": "graph"
+  },
+  {
+    "id": "07-outro",
+    "eyebrow": "AgentDialog",
+    "title": "Decide con las personas adecuadas",
+    "caption": "Automatiza las reglas. Consulta las decisiones. · docs.agentdialog.io",
+    "narration": "Automatiza las reglas. Consulta las decisiones. AgentDialog conecta el criterio del agente con la decisión humana y deja el proceso listo para avanzar.",
+    "visual": "outro"
+  }
+]

@@ -1,0 +1,31 @@
+1
+00:00:00,450 --> 00:00:08,574
+CloudDesk renovará automáticamente el contrato en diez días. El agente detecta una condición que requiere decisión humana.
+
+2
+00:00:09,574 --> 00:00:18,299
+El agente extrae los términos: duración de doce meses, incremento del ocho por ciento y una ventana de solo diez días para actuar.
+
+3
+00:00:19,299 --> 00:00:29,513
+La política comercial permite como máximo un cinco por ciento. Al comparar ambos valores, el aumento detectado supera el límite y activa una consulta.
+
+4
+00:00:30,513 --> 00:00:40,779
+El flujo crea una consulta de AgentDialog con el contexto del contrato, tres alternativas claras y el correo de la responsable del acuerdo.
+
+5
+00:00:41,779 --> 00:00:53,508
+La responsable recibe una tarjeta de AgentDialog. Puede aprobar, renegociar o cancelar. Elige renegociar para proteger el margen acordado.
+
+6
+00:00:54,508 --> 00:01:04,670
+La respuesta vuelve al agente como JSON estructurado. La opción elegida es renegotiate, sin ambigüedad ni interpretación manual.
+
+7
+00:01:05,670 --> 00:01:14,995
+LangGraph continúa por la rama de renegociación: prepara un borrador limitado al cinco por ciento y crea la tarea con fecha límite.
+
+8
+00:01:15,995 --> 00:01:27,463
+Automatiza las reglas. Consulta las decisiones. AgentDialog conecta el criterio del agente con la decisión humana y deja el proceso listo para avanzar.

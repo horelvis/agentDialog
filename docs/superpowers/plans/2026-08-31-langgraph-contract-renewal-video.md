@@ -302,7 +302,7 @@ export ELEVENLABS_VOICE_ID="<David Martin voice ID>"
 python3 docs-site/video-src/langgraph-contract-renewal/generate_voiceover.py
 ```
 
-Explain that `--force` consumes credits again, the voice ID must refer to “David Martin — Clear, Calm and Elegant,” and ordinary video regeneration uses existing MP3s without contacting ElevenLabs.
+Explain that `--force` consumes credits again, the voice ID must refer to David Martin, `--scene <scene-id>` limits regeneration to one clip, and ordinary video regeneration uses existing MP3s without contacting ElevenLabs.
 
 - [ ] **Step 6: Generate and inspect the eight MP3 files**
 
