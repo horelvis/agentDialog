@@ -381,18 +381,24 @@ class SceneManifestTests(unittest.TestCase):
         )
         self.assertEqual(ids[-1], "07-outro")
 
-    def test_intro_explains_the_use_case_and_agentdialog_role(self) -> None:
+    def test_intro_uses_the_approved_narration(self) -> None:
         use_case, agentdialog = self.scenes[:2]
 
         self.assertEqual(use_case["visual"], "use_case")
-        self.assertIn("LangGraph", use_case["narration"])
-        self.assertIn("no debe decidir por sí solo", use_case["narration"])
-        self.assertIn("límite autorizado", use_case["narration"])
+        self.assertEqual(
+            use_case["narration"],
+            "Una empresa utiliza un agente con LangGraph para preparar la renovación "
+            "de sus contratos. El agente puede analizar cláusulas y políticas, pero no "
+            "debe decidir por sí solo cuando una condición supera el límite autorizado.",
+        )
 
         self.assertEqual(agentdialog["visual"], "agentdialog")
-        self.assertIn("persona adecuada", agentdialog["narration"])
-        self.assertIn("pregunta estructurada", agentdialog["narration"])
-        self.assertIn("devuelve su respuesta a LangGraph", agentdialog["narration"])
+        self.assertEqual(
+            agentdialog["narration"],
+            "AgentDialog conecta ese agente con la persona adecuada dentro del mismo "
+            "flujo. Envía una pregunta estructurada, notifica al responsable y devuelve "
+            "su respuesta a LangGraph para continuar de forma segura.",
+        )
 
     def test_each_scene_has_the_render_contract(self) -> None:
         required = {"id", "eyebrow", "title", "caption", "narration", "visual"}
@@ -664,6 +670,11 @@ class RenderTests(unittest.TestCase):
             visible["consequences"]["approve"],
             "Consecuencia de prueba.",
         )
+
+    def test_every_manifest_scene_has_a_nonempty_voiceover(self) -> None:
+        for scene in SceneManifestTests.scenes:
+            audio = render_slides.voiceover_audio(scene["id"])
+            self.assertGreater(render_slides.audio_duration(audio), 0)
 
     def test_generated_slides_are_full_hd(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -48,8 +48,8 @@ whole timing budget is reviewed again.
 
 ## Render the finished video
 
-Once the eight MP3 clips exist, render the final video without contacting
-ElevenLabs:
+Once all ten MP3 clips exist — including `intro-use-case.mp3` and
+`intro-agentdialog.mp3` — render the final video without contacting ElevenLabs:
 
 ```bash
 docs-site/video-src/langgraph-contract-renewal/render.sh
