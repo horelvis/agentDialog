@@ -407,23 +407,59 @@ class SceneManifestTests(unittest.TestCase):
         self.assertEqual(endpoint, "https://api.agentdialog.io/api/v1/agent/queries")
         self.assertEqual(
             set(payload),
-            {"query_type", "subject", "answer_space", "question", "target_human_email"},
+            {
+                "query_type", "risk", "subject", "context", "changes",
+                "answer_space", "question", "target_human_email",
+            },
         )
         self.assertEqual(payload["query_type"], "expert_query")
         self.assertEqual(
-            payload["answer_space"],
-            {
-                "kind": "choice",
-                "select": "one",
-                "options": [
-                    {"id": "approve", "label": "Aprobar"},
-                    {"id": "renegotiate", "label": "Renegociar"},
-                    {"id": "cancel", "label": "Cancelar"},
-                ],
-            },
+            [option["id"] for option in payload["answer_space"]["options"]],
+            ["approve", "renegotiate", "cancel"],
+        )
+        self.assertEqual(
+            [option["label"] for option in payload["answer_space"]["options"]],
+            ["Aprobar", "Renegociar", "Cancelar"],
         )
         self.assertEqual(payload["target_human_email"], "responsable@example.com")
         self.assertNotIn("options", payload)
+
+    def test_rest_scene_gives_the_reviewer_decision_grade_context(self) -> None:
+        query_scene = next(scene for scene in self.scenes if scene["id"] == "03-query")
+        payload = json.loads(query_scene["caption"].split(" ", 2)[2])
+
+        self.assertIn("risk", payload)
+        self.assertEqual(payload["risk"], "medium")
+        self.assertEqual(
+            payload["subject"]["body"],
+            "CLÁUSULA 12 · RENOVACIÓN: renovación automática por 12 meses "
+            "salvo cancelación con 10 días de antelación.",
+        )
+        self.assertEqual(
+            payload["context"].splitlines(),
+            [
+                "Proveedor: CloudDesk",
+                "Precio actual: 120.000 €/año",
+                "Renovación propuesta: 129.600 €/año (+8 %)",
+                "Límite interno: 126.000 €/año (+5 %)",
+                "Fecha de renovación: 30 de septiembre",
+                "Fecha límite de cancelación: 20 de septiembre",
+                "Recomendación del agente: renegociar hasta un máximo de 126.000 €/año.",
+            ],
+        )
+        self.assertEqual(
+            payload["changes"],
+            [{
+                "path": "precio_anual",
+                "before": "120.000 €/año",
+                "after": "129.600 €/año",
+                "materiality": "material",
+            }],
+        )
+        self.assertTrue(all(
+            option.get("consequence")
+            for option in payload["answer_space"]["options"]
+        ))
 
     def test_decision_scene_caption_matches_the_rendered_choices(self) -> None:
         decision_scene = next(
@@ -515,28 +551,11 @@ class RenderTests(unittest.TestCase):
 
         self.assertEqual(method, "POST")
         self.assertEqual(endpoint, "https://api.agentdialog.io/api/v1/agent/queries")
-        self.assertEqual(
-            payload,
-            {
-                "query_type": "expert_query",
-                "subject": {
-                    "id": "clouddesk-contract",
-                    "label": "Contrato CloudDesk",
-                    "body": "12 meses; aumento 8 %",
-                },
-                "answer_space": {
-                    "kind": "choice",
-                    "select": "one",
-                    "options": [
-                        {"id": "approve", "label": "Aprobar"},
-                        {"id": "renegotiate", "label": "Renegociar"},
-                        {"id": "cancel", "label": "Cancelar"},
-                    ],
-                },
-                "question": "¿Cómo procedemos?",
-                "target_human_email": "responsable@example.com",
-            },
+        query_scene = next(
+            scene for scene in SceneManifestTests.scenes if scene["id"] == "03-query"
         )
+        manifest_payload = json.loads(query_scene["caption"].split(" ", 2)[2])
+        self.assertEqual(payload, manifest_payload)
         self.assertEqual(render_slides.code_tab_label(), "agentdialog-request.json")
 
     def test_code_choices_match_the_decision_card(self) -> None:
@@ -549,6 +568,37 @@ class RenderTests(unittest.TestCase):
             payload["answer_space"]["options"],
         )
         self.assertEqual(render_slides.SELECTED_OPTION_ID, "renegotiate")
+
+    def test_decision_card_shows_the_context_and_consequences_sent_by_the_agent(self) -> None:
+        visible = render_slides.decision_card_text()
+
+        self.assertEqual(
+            visible["facts"],
+            [
+                "Actual · 120.000 €/año",
+                "Propuesta · 129.600 €/año (+8 %)",
+                "Límite · 126.000 €/año (+5 %)",
+                "Renueva 30 sep · cancelar antes del 20 sep",
+            ],
+        )
+        self.assertEqual(
+            visible["consequences"],
+            {
+                "approve": "129.600 € · 12 meses",
+                "renegotiate": "Máximo 126.000 € · antes del 20 sep",
+                "cancel": "Sin renovación · preparar migración",
+            },
+        )
+
+        query_payload = render_slides.query_payload()
+        self.assertEqual(
+            render_slides.decision_options(),
+            query_payload["answer_space"]["options"],
+        )
+        self.assertEqual(
+            query_payload["context"].splitlines()[1],
+            "Precio actual: 120.000 €/año",
+        )
 
     def test_generated_slides_are_full_hd(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

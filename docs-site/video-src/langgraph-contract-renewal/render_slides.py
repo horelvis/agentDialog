@@ -32,12 +32,48 @@ FONT_REGULAR = "/System/Library/Fonts/SFNS.ttf"
 FONT_ROUNDED = "/System/Library/Fonts/SFNSRounded.ttf"
 
 CHOICE_OPTIONS = (
-    {"id": "approve", "label": "Aprobar"},
-    {"id": "renegotiate", "label": "Renegociar"},
-    {"id": "cancel", "label": "Cancelar"},
+    {
+        "id": "approve",
+        "label": "Aprobar",
+        "consequence": "Acepta 129.600 €/año durante 12 meses.",
+    },
+    {
+        "id": "renegotiate",
+        "label": "Renegociar",
+        "consequence": "Propone un máximo de 126.000 €/año antes del 20 de septiembre.",
+    },
+    {
+        "id": "cancel",
+        "label": "Cancelar",
+        "consequence": "Detiene la renovación y requiere preparar la migración del servicio.",
+    },
 )
 SELECTED_OPTION_ID = "renegotiate"
 CODE_TAB_LABEL = "agentdialog-request.json"
+QUERY_SUBJECT_BODY = (
+    "CLÁUSULA 12 · RENOVACIÓN: renovación automática por 12 meses "
+    "salvo cancelación con 10 días de antelación."
+)
+QUERY_CONTEXT_LINES = (
+    "Proveedor: CloudDesk",
+    "Precio actual: 120.000 €/año",
+    "Renovación propuesta: 129.600 €/año (+8 %)",
+    "Límite interno: 126.000 €/año (+5 %)",
+    "Fecha de renovación: 30 de septiembre",
+    "Fecha límite de cancelación: 20 de septiembre",
+    "Recomendación del agente: renegociar hasta un máximo de 126.000 €/año.",
+)
+DECISION_FACTS = (
+    "Actual · 120.000 €/año",
+    "Propuesta · 129.600 €/año (+8 %)",
+    "Límite · 126.000 €/año (+5 %)",
+    "Renueva 30 sep · cancelar antes del 20 sep",
+)
+DECISION_CONSEQUENCES = {
+    "approve": "129.600 € · 12 meses",
+    "renegotiate": "Máximo 126.000 € · antes del 20 sep",
+    "cancel": "Sin renovación · preparar migración",
+}
 
 
 def font(size: int, rounded: bool = False) -> ImageFont.FreeTypeFont:
@@ -199,59 +235,116 @@ def decision_options() -> list[dict[str, str]]:
     return [dict(option) for option in CHOICE_OPTIONS]
 
 
+def query_payload() -> dict:
+    """Return the complete decision-grade request shown by the tutorial."""
+    return {
+        "query_type": "expert_query",
+        "risk": "medium",
+        "subject": {
+            "id": "clouddesk-contract",
+            "label": "Contrato CloudDesk",
+            "body": QUERY_SUBJECT_BODY,
+        },
+        "context": "\n".join(QUERY_CONTEXT_LINES),
+        "changes": [{
+            "path": "precio_anual",
+            "before": "120.000 €/año",
+            "after": "129.600 €/año",
+            "materiality": "material",
+        }],
+        "answer_space": {
+            "kind": "choice",
+            "select": "one",
+            "options": decision_options(),
+        },
+        "question": "¿Aprobamos, renegociamos o cancelamos la renovación de CloudDesk?",
+        "target_human_email": "responsable@example.com",
+    }
+
+
+def decision_card_text() -> dict[str, list[str] | dict[str, str]]:
+    """Return the context and outcomes visible before the human chooses."""
+    return {
+        "facts": list(DECISION_FACTS),
+        "consequences": dict(DECISION_CONSEQUENCES),
+    }
+
+
 def code_tab_label() -> str:
     """Return the accurate filename displayed above the REST request."""
     return CODE_TAB_LABEL
 
 
 def code_lines() -> list[tuple[str, tuple[int, int, int]]]:
-    options = decision_options()
+    lines = json.dumps(query_payload(), ensure_ascii=False, indent=2).splitlines()
+    return [("POST https://api.agentdialog.io/api/v1/agent/queries", BRAND_LIGHT)] + [
+        (line, BRAND_LIGHT if '"consequence"' in line else INK)
+        for line in lines
+    ]
+
+
+def code_preview_lines() -> list[tuple[str, tuple[int, int, int]]]:
+    """Keep the on-screen request legible while the manifest retains full JSON."""
     return [
         ("POST https://api.agentdialog.io/api/v1/agent/queries", BRAND_LIGHT),
-        ("{", INK),
-        ('  "query_type": "expert_query",', INK),
-        ('  "subject": { "id": "clouddesk-contract",', INK),
-        ('               "label": "Contrato CloudDesk",', INK),
-        ('               "body": "12 meses; aumento 8 %" },', INK),
-        ('  "answer_space": {', INK),
-        ('    "kind": "choice", "select": "one",', INK),
-        ('    "options": [', INK),
-        (f"      {json.dumps(options[0], ensure_ascii=False)},", BRAND_LIGHT),
-        (f"      {json.dumps(options[1], ensure_ascii=False)},", BRAND_LIGHT),
-        (f"      {json.dumps(options[2], ensure_ascii=False)}", BRAND_LIGHT),
-        ('    ]', INK),
-        ("  },", INK),
-        ('  "question": "¿Cómo procedemos?",', INK),
+        ('"risk": "medium"', INK),
+        ('"subject.body": "CLÁUSULA 12 · RENOVACIÓN…"', INK),
+        ('"changes": "120.000 € → 129.600 € · material"', WARNING),
+        ('"answer_space": "choice · select one"', INK),
+        ('"options": "Aprobar · Renegociar · Cancelar"', BRAND_LIGHT),
         ('  "target_human_email": "responsable@example.com"', INK),
-        ("}", INK),
     ]
 
 
 def draw_code(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
-    box = (185, 365, 1735, 860)
-    panel(draw, box, fill=(19, 19, 25), outline=(106, 87, 151), radius=28, width=3)
-    draw.rounded_rectangle((185, 365, 1735, 423), 28, fill=(41, 34, 55))
-    for x, color in ((222, (245, 113, 113)), (252, WARNING), (282, SUCCESS)):
+    code_box = (120, 365, 1065, 850)
+    panel(draw, code_box, fill=(19, 19, 25), outline=(106, 87, 151), radius=28, width=3)
+    draw.rounded_rectangle((120, 365, 1065, 423), 28, fill=(41, 34, 55))
+    for x, color in ((157, (245, 113, 113)), (187, WARNING), (217, SUCCESS)):
         draw.ellipse((x, 384, x + 16, 400), fill=color)
-    draw.text((336, 378), code_tab_label(), font=font(21, True), fill=MUTED)
-    y = 431
-    for line, color in code_lines():
-        draw.text((238, y), line, font=font(21), fill=color)
-        y += 24
-    draw.rounded_rectangle((1265, 695, 1658, 772), 19, fill=(53, 38, 75), outline=BRAND_LIGHT, width=2)
-    centered_text(draw, (1265, 695, 1658, 772), "consulta a una persona", font(23, True), BRAND_LIGHT)
+    draw.text((270, 378), f"{code_tab_label()} · resumen visual", font=font(20, True), fill=MUTED)
+    y = 450
+    for line, color in code_preview_lines():
+        draw.text((160, y), line, font=font(20), fill=color)
+        y += 49
+
+    context_box = (1105, 365, 1780, 850)
+    panel(draw, context_box, fill=(33, 25, 47), outline=BRAND_LIGHT, radius=28, width=3)
+    draw.text((1150, 405), "Contexto enviado", font=font(28, True), fill=INK)
+    fact_rows = [
+        ("PRECIO ACTUAL", "120.000 €/año", MUTED),
+        ("PROPUESTA", "129.600 €/año · +8 %", WARNING),
+        ("LÍMITE INTERNO", "126.000 €/año · +5 %", SUCCESS),
+        ("FECHAS", "Renueva 30 sep · cancelar 20 sep", BRAND_LIGHT),
+    ]
+    y = 475
+    for label, value, color in fact_rows:
+        draw.text((1150, y), label, font=font(17, True), fill=MUTED)
+        draw.text((1150, y + 25), value, font=font(23, True), fill=color)
+        y += 77
+    draw.rounded_rectangle((1140, 785, 1740, 827), 16, fill=(65, 39, 93))
+    centered_text(draw, (1140, 785, 1740, 827), "Recomendación · renegociar", font(19, True), INK)
 
 
 def draw_decision(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
-    card = (390, 350, 1530, 840)
+    visible = decision_card_text()
+    card = (240, 335, 1680, 855)
     panel(draw, card, fill=(250, 248, 255), outline=BRAND_LIGHT, radius=34, width=4)
-    draw.text((455, 408), "Renovación CloudDesk", font=font(38, True), fill=(40, 31, 56))
-    draw.text((455, 465), "El aumento del 8 % supera nuestra política.", font=font(27), fill=(82, 72, 99))
-    draw.text((455, 508), "¿Cómo quieres proceder?", font=font(27), fill=(82, 72, 99))
+    draw.text((295, 370), "Renovación CloudDesk", font=font(36, True), fill=(40, 31, 56))
+    draw.text((295, 418), "Cláusula 12 · decisión antes del 20 de septiembre", font=font(23), fill=(82, 72, 99))
+    fact_boxes = [
+        (280, 465, 935, 525),
+        (985, 465, 1640, 525),
+        (280, 540, 935, 600),
+        (985, 540, 1640, 600),
+    ]
+    for box, fact in zip(fact_boxes, visible["facts"], strict=True):
+        draw.rounded_rectangle(box, 15, fill=(238, 233, 247), outline=(210, 199, 224), width=2)
+        centered_text(draw, box, fact, font(20, True), (64, 52, 82))
     boxes = {
-        "approve": (455, 600, 760, 702),
-        "renegotiate": (807, 600, 1178, 702),
-        "cancel": (1225, 600, 1465, 702),
+        "approve": (280, 625, 700, 760),
+        "renegotiate": (750, 625, 1170, 760),
+        "cancel": (1220, 625, 1640, 760),
     }
     for option in decision_options():
         option_id = option["id"]
@@ -262,8 +355,19 @@ def draw_decision(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -
         outline = (76, 43, 132) if selected else (207, 197, 220)
         label = f"✓  {option['label']}" if selected else option["label"]
         draw.rounded_rectangle(box, 22, fill=fill, outline=outline, width=4 if selected else 2)
-        centered_text(draw, box, label, font(28, True), text_fill)
-    draw.text((810, 736), "Seleccionado", font=font(22, True), fill=(82, 47, 138))
+        centered_text(draw, (box[0], box[1] + 10, box[2], box[1] + 66), label, font(25, True), text_fill)
+        consequence = visible["consequences"][option_id]
+        consequence_font = font(16, True)
+        consequence_lines = wrapped_lines(draw, consequence, consequence_font, box[2] - box[0] - 36)
+        for index, line in enumerate(consequence_lines[:2]):
+            centered_text(
+                draw,
+                (box[0] + 14, box[1] + 68 + index * 24, box[2] - 14, box[1] + 94 + index * 24),
+                line,
+                consequence_font,
+                text_fill,
+            )
+    draw.text((797, 785), "✓ Seleccionado por la responsable", font=font(19, True), fill=(82, 47, 138))
 
 
 def draw_json(canvas: Image.Image, draw: ImageDraw.ImageDraw, scene: dict) -> None:
