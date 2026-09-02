@@ -95,10 +95,19 @@ jobs:
       - name: Test
         run: bun test tests/unit tests/integration
 
-      # scripts/generate-openapi.ts runs with no APP_VERSION so the document
-      # reports "dev" and the committed file doesn't churn on every release —
-      # a real env here would make this fail on every PR that doesn't bump it.
+      # scripts/generate-openapi.ts calls buildDocument({}) with an empty env,
+      # so the document reports version "dev" and the committed file doesn't
+      # churn on every release — a real APP_VERSION here would make this fail
+      # on every PR that doesn't bump it.
+      #
+      # The two variables below never reach the document. They are there
+      # because the generator imports src/app to populate the route registry,
+      # and src/config/env.ts validates them at import time. Without them the
+      # step dies before writing a byte.
       - name: Check the committed contract is current
+        env:
+          DATABASE_URL: postgresql://agentdialog:agentdialog@localhost:5432/agentdialog_test
+          SESSION_SECRET: ci-openapi-generation-secret-not-used-for-anything
         run: |
           bun run openapi
           git diff --exit-code openapi.json
