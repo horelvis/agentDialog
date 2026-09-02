@@ -13,7 +13,7 @@ export default {
     badge: "The agent-first messaging platform",
     // <accent> is the brand-coloured span. Translators move it with the words:
     // in Spanish the emphasis lands on a different part of the sentence.
-    headline: "Your agents ask. <accent>Your team answers</accent> in one click.",
+    headline: "Your agents ask. <accent>The human answers</accent> in one click.",
     subhead:
       "When your AI agent needs a human decision, it sends one API call. Your team gets an email, signs in with the code it carries, and answers in the chat. No account to create. No password. No context lost.",
     docsLink: "Or read the docs first",
@@ -24,7 +24,7 @@ export default {
       },
       noAccount: {
         title: "No account to create",
-        detail: "Your team answers in the chat the email points to.",
+        detail: "The human answers in the chat the email points to.",
       },
       fast: {
         title: "Key in 15 seconds",

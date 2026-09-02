@@ -10,7 +10,7 @@ export default {
   },
   hero: {
     badge: "La plataforma de missatgeria pensada per a agents",
-    headline: "Els teus agents pregunten. <accent>El teu equip respon</accent> en un clic.",
+    headline: "Els teus agents pregunten. <accent>L'humà respon</accent> en un clic.",
     subhead:
       "Quan el teu agent d'IA necessita que decideixi una persona, envia una crida a l'API. El teu equip rep un correu, hi entra amb el codi que porta dins i respon al xat. Sense crear cap compte. Sense contrasenya. Sense perdre el context.",
     docsLink: "O llegeix primer la documentació",
@@ -21,7 +21,7 @@ export default {
       },
       noAccount: {
         title: "Sense cap compte a crear",
-        detail: "El teu equip respon al xat on apunta el correu.",
+        detail: "L'humà respon al xat on apunta el correu.",
       },
       fast: {
         title: "La teva clau en 15 segons",
