@@ -10,7 +10,7 @@ export default {
   },
   hero: {
     badge: "La plataforma de mensajería pensada para agentes",
-    headline: "Tus agentes preguntan. <accent>Tu equipo responde</accent> en un clic.",
+    headline: "Tus agentes preguntan. <accent>El Humano responde</accent> en un clic.",
     subhead:
       "Cuando tu agente de IA necesita que decida una persona, envía una sola llamada a la API. Tu equipo recibe un correo, entra con el código que lleva dentro y responde en el chat. Sin crear cuenta. Sin contraseña. Sin perder el contexto.",
     docsLink: "O lee primero la documentación",
@@ -21,7 +21,7 @@ export default {
       },
       noAccount: {
         title: "Sin cuenta que crear",
-        detail: "Tu equipo responde en el chat al que apunta el correo.",
+        detail: "El Humano responde en el chat al que apunta el correo.",
       },
       fast: {
         title: "Tu clave en 15 segundos",
