@@ -464,6 +464,9 @@ Also assert:
 - a fifteen-second Wait node;
 - a loop from nonterminal `pending`/`assigned` results back to the Wait node;
 - all other query states reach `Apply human decision`;
+- fixture parsing and `Reconcile batch` precede every registration node;
+- `401` and `403` query responses terminate further AgentDialog calls without approving;
+- per-invoice `422`, transport errors, and terminal non-answer states continue to the final report;
 - a final write path `/demo/output/reconciliation-report.json`;
 - `active: false` in the distributable JSON.
 
@@ -502,7 +505,7 @@ Use n8n built-in nodes only:
 - `n8n-nodes-base.httpRequest` for Qwen and AgentDialog;
 - `n8n-nodes-base.convertToFile` plus `readWriteFile` for the final report.
 
-Configure HTTP requests to return status and body without throwing on ordinary HTTP error statuses. Registration accepts only `201`; on `409`, build attempt `1` and retry once; all other registration results terminate with the response code and AgentDialog error message. Qwen failures continue through the fallback parser. AgentDialog query creation preserves `reason` and `remedy` from `422` in the reviewed-item result.
+Configure HTTP requests to return status and body without throwing on ordinary HTTP error statuses. Registration accepts only `201`; on `409`, build attempt `1` and retry once; all other registration results terminate with the response code and AgentDialog error message. Qwen failures continue through the fallback parser. AgentDialog query creation preserves `reason` and `remedy` from `422` in the reviewed-item result. Query `401` and `403` responses stop further AgentDialog requests and produce an authentication failure; transport errors and per-invoice `422` responses become safe error results so the remaining invoice items continue.
 
 The registration Authorization header is absent. Query creation and polling use this expression without ever hardcoding its value:
 
