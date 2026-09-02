@@ -3,6 +3,7 @@
   "title": "AgentDialog",
   "pages": [
     "index",
+    "hola-mundo-claude-mcp",
     "quickstart",
     "authentication",
     "---Concepts---",

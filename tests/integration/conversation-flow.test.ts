@@ -1,5 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { createTestApp } from "../helpers";
+import {
+  conversationResponse,
+  conversationListResponse,
+  conversationWithParticipantsResponse,
+} from "../../src/validators/conversation.responses";
+import { messageResponse, messageListResponse } from "../../src/validators/message.responses";
+import { invitationCreateResponse } from "../../src/validators/invitation.responses";
+import { agentProfileResponse, agentProfileUpdateResponse } from "../../src/validators/agent.responses";
 
 describe("Conversation Flow", () => {
   const app = createTestApp();
@@ -23,6 +31,26 @@ describe("Conversation Flow", () => {
       headers: { Authorization: agentAuth },
     });
     expect(meRes.status).toBe(200);
+    const meBody = await meRes.clone().json();
+    expect(() => agentProfileResponse.parse(meBody)).not.toThrow();
+
+    // 2b. Update agent profile — PATCH /me's schema is otherwise never
+    // checked against a real response (see tests/unit/openapi-document.test.ts
+    // for the contract side of this route). Reuses the agent this test
+    // already registered rather than registering a second one, since
+    // registration is rate-limited and the counter is shared across files.
+    const patchMeRes = await app.request("/api/v1/agent/me", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: agentAuth,
+      },
+      body: JSON.stringify({ displayName: "Flow Test Agent, Updated" }),
+    });
+    expect(patchMeRes.status).toBe(200);
+    const patchMeBody = await patchMeRes.clone().json();
+    expect(() => agentProfileUpdateResponse.parse(patchMeBody)).not.toThrow();
+    expect(patchMeBody.data.displayName).toBe("Flow Test Agent, Updated");
 
     // 3. Create conversation
     const convRes = await app.request("/api/v1/agent/conversations", {
@@ -38,8 +66,30 @@ describe("Conversation Flow", () => {
       }),
     });
     expect(convRes.status).toBe(201);
+    const convResBody = await convRes.clone().json();
+    expect(() => conversationResponse.parse(convResBody)).not.toThrow();
     const { data: conversation } = await convRes.json();
     expect(conversation.title).toBe("Test Conversation");
+
+    // 3b. List conversations, and get this one back with its participants —
+    // conversationListResponse and conversationWithParticipantsResponse are
+    // otherwise asserted by nothing; the latter is the most hand-derived
+    // shape in the document and the only written record of
+    // getConversationWithParticipants's output.
+    const listConvRes = await app.request("/api/v1/agent/conversations", {
+      headers: { Authorization: agentAuth },
+    });
+    expect(listConvRes.status).toBe(200);
+    const listConvBody = await listConvRes.clone().json();
+    expect(() => conversationListResponse.parse(listConvBody)).not.toThrow();
+
+    const getConvRes = await app.request(`/api/v1/agent/conversations/${conversation.id}`, {
+      headers: { Authorization: agentAuth },
+    });
+    expect(getConvRes.status).toBe(200);
+    const getConvBody = await getConvRes.clone().json();
+    expect(() => conversationWithParticipantsResponse.parse(getConvBody)).not.toThrow();
+    expect(getConvBody.data.participants.length).toBeGreaterThan(0);
 
     // 4. Send a message as agent
     const msgRes = await app.request(`/api/v1/agent/conversations/${conversation.id}/messages`, {
@@ -54,6 +104,8 @@ describe("Conversation Flow", () => {
       }),
     });
     expect(msgRes.status).toBe(201);
+    const msgResBody = await msgRes.clone().json();
+    expect(() => messageResponse.parse(msgResBody)).not.toThrow();
 
     // 5. Send a tool_call message
     const toolRes = await app.request(`/api/v1/agent/conversations/${conversation.id}/messages`, {
@@ -79,6 +131,8 @@ describe("Conversation Flow", () => {
       headers: { Authorization: agentAuth },
     });
     expect(listRes.status).toBe(200);
+    const listResBody = await listRes.clone().json();
+    expect(() => messageListResponse.parse(listResBody)).not.toThrow();
     const { data: messageList } = await listRes.json();
     expect(messageList.length).toBe(2);
 
@@ -95,6 +149,8 @@ describe("Conversation Flow", () => {
       }),
     });
     expect(invRes.status).toBe(201);
+    const invResBody = await invRes.clone().json();
+    expect(() => invitationCreateResponse.parse(invResBody)).not.toThrow();
 
     // 8. Send an approval request
     const approvalRes = await app.request(`/api/v1/agent/conversations/${conversation.id}/messages`, {

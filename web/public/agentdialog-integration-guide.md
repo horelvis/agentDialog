@@ -5,6 +5,18 @@
 
 Base URL: `https://api.agentdialog.io/api/v1`
 
+The running service also answers `GET /openapi.json` with a machine-readable
+OpenAPI 3.1 description of every endpoint below, generated from the same route
+declarations that serve the traffic — so it can't drift the way a hand-written
+spec would. Reach for this guide to understand *why* an endpoint exists and
+*when* to call it; reach for the OpenAPI document when you need the exact
+*shape* of a request or response, or to feed a codegen tool. A committed copy
+lives at `openapi.json` in the repository root; CI regenerates it with `bun run
+openapi` and diffs it against what's committed, so it stays what the route
+declarations currently describe. It is generated with an empty environment
+(version `"dev"`) so it doesn't churn on every release — the version is the
+one field it does not promise matches a given deployment.
+
 ---
 
 ## Tabla de Contenidos

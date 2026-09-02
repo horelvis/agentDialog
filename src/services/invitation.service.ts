@@ -258,12 +258,13 @@ export async function revokeInvitation(invitationId: string, agentId: string) {
     throw new ForbiddenError("Can only revoke pending invitations");
   }
 
-  await db
+  const [revoked] = await db
     .update(invitations)
     .set({ status: "revoked", updatedAt: new Date() })
-    .where(eq(invitations.id, invitationId));
+    .where(eq(invitations.id, invitationId))
+    .returning();
 
-  return invitation;
+  return revoked;
 }
 
 export async function listConversationInvitations(conversationId: string) {

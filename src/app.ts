@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createHash } from "node:crypto";
 import type { AppEnv } from "./types/hono";
 import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "hono/bun";
@@ -40,10 +41,31 @@ import humanTrustedAgentsRoutes from "./routes/human/trusted-agents";
 import humanQueryRoutes from "./routes/human/queries";
 import mcpRoutes from "./routes/mcp";
 import emailInboundRoutes from "./routes/webhooks/email-inbound";
+import { buildDocument } from "./openapi/document";
 import {
   getProtectedResourceMetadata,
   getAuthServerMetadata,
 } from "./mcp/oauth";
+
+/**
+ * buildDocument() walked all 26 operations' Zod schemas on every single
+ * request to this public, unauthenticated route — 4.4ms and 57KB of work
+ * repeated for a document that cannot change mid-process: the registry
+ * documented() fills is frozen at import time, and appVersion() reads
+ * process.env, which is constant once the process starts. Computed once,
+ * lazily, on the first request rather than at module load, so a test that
+ * imports this file before every route has registered itself (there is none
+ * today, but nothing enforces that) still sees the full registry.
+ */
+let cachedOpenApiDocument: { json: string; etag: string } | undefined;
+function getOpenApiDocument() {
+  if (!cachedOpenApiDocument) {
+    const json = JSON.stringify(buildDocument());
+    const etag = `"${createHash("sha256").update(json).digest("hex")}"`;
+    cachedOpenApiDocument = { json, etag };
+  }
+  return cachedOpenApiDocument;
+}
 
 export function createApp() {
   const app = new Hono();
@@ -69,6 +91,19 @@ export function createApp() {
 
   // Health & root
   app.route("/", healthRoutes);
+
+  // The contract, from the running service: what somebody reads is the version
+  // that is answering them, not what is on main. Cached (see
+  // getOpenApiDocument above) and ETag'd so a client that already has it can
+  // send If-None-Match and get a 304 instead of the full 57KB back.
+  app.get("/openapi.json", (c) => {
+    const { json, etag } = getOpenApiDocument();
+    if (c.req.header("if-none-match") === etag) {
+      return c.body(null, 304);
+    }
+    c.header("ETag", etag);
+    return c.body(json, 200, { "Content-Type": "application/json" });
+  });
 
   // Webhook routes (public, verified by provider signature)
   app.route("/api/v1/webhooks/email", emailInboundRoutes);

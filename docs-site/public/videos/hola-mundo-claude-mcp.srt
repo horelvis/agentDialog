@@ -1,0 +1,39 @@
+1
+00:00:00,250 --> 00:00:12,048
+Una decisión humana desde Claude, sin instalar nada.
+
+2
+00:00:12,848 --> 00:00:25,613
+Nombre: AgentDialog · URL: https://api.agentdialog.io/mcp
+
+3
+00:00:26,413 --> 00:00:36,226
+Siempre obligatorio · Registrar cliente automáticamente
+
+4
+00:00:37,026 --> 00:00:47,675
+El agente se crea mediante OAuth. No tienes que copiar ninguna clave.
+
+5
+00:00:48,475 --> 00:00:57,583
+“Necesito que preguntes a tu@email.com si puede reunirse conmigo...”
+
+6
+00:00:58,383 --> 00:01:06,968
+El email muestra quién pregunta, el asunto y el botón para responder.
+
+7
+00:01:07,768 --> 00:01:18,652
+Una respuesta cerrada y clara: sí o no.
+
+8
+00:01:19,452 --> 00:01:26,157
+La decisión queda guardada y la página puede cerrarse.
+
+9
+00:01:26,957 --> 00:01:37,788
+get_query devuelve status answered y una respuesta tipada.
+
+10
+00:01:38,588 --> 00:01:42,916
+Guía completa en docs.agentdialog.io

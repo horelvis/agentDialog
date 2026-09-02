@@ -1,0 +1,183 @@
+---
+title: Hola mundo con Claude Web y MCP
+description: Conecta AgentDialog a Claude Web y pide tu primera decisión humana sin instalar nada
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Cards, Card } from "fumadocs-ui/components/card";
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+En esta guía conectarás AgentDialog a Claude Web como un servidor MCP remoto.
+Claude enviará una pregunta de prueba a una persona y, cuando responda,
+recuperará la respuesta tipada desde el mismo chat.
+
+No necesitas instalar paquetes, ejecutar un servidor local ni copiar una API
+key. La conexión usa OAuth y crea el agente por ti.
+
+<video
+  controls
+  preload="metadata"
+  poster="/videos/hola-mundo-claude-mcp-poster.png"
+  src="/videos/hola-mundo-claude-mcp.mp4"
+  style={{ width: "100%", borderRadius: "0.75rem" }}
+/>
+
+El vídeo incluye locución y subtítulos en español. También puedes
+[descargar los subtítulos en formato SRT](/videos/hola-mundo-claude-mcp.srt).
+
+## Antes de empezar
+
+Necesitas:
+
+- una cuenta de Claude con acceso a conectores personalizados;
+- una dirección de email en la que puedas recibir la pregunta de prueba; y
+- unos cinco minutos.
+
+Los conectores MCP remotos están disponibles en los planes individuales de
+Claude. En Team y Enterprise, un Owner debe añadir primero el conector para la
+organización. Anthropic mantiene los requisitos actualizados en su
+[guía de conectores personalizados](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+
+## 1. Conecta AgentDialog
+
+<Steps>
+  <Step>
+    ### Abre los conectores de Claude
+
+    En Claude Web, entra en **Customize → Connectors**. Pulsa **Add** y después
+    **Add custom connector**. Si tu interfaz está en español, las opciones se
+    llaman **Personalizar → Conectores → Añadir → Añadir conector personalizado**.
+  </Step>
+  <Step>
+    ### Añade el servidor MCP
+
+    Usa estos valores:
+
+    | Campo | Valor |
+    |---|---|
+    | Nombre | `AgentDialog` |
+    | URL | `https://api.agentdialog.io/mcp` |
+
+    Pulsa **Continue**. Claude detectará la configuración OAuth de AgentDialog.
+    Conserva estas dos opciones:
+
+    - **Always required** en Authentication; y
+    - **Without client ID: register one automatically** en OAuth Client.
+
+    En español aparecen como **Siempre obligatorio** y
+    **Sin ID de cliente: registrar uno automáticamente**. Ambas llevan la
+    etiqueta **Detected**. Pulsa **Add** y después **Connect**.
+  </Step>
+  <Step>
+    ### Autoriza la conexión
+
+    Claude abrirá la pantalla **Authorize MCP Access** de AgentDialog. Escribe
+    un nombre único, por ejemplo `Hola Mundo AgentDialog`, y pulsa
+    **Create Agent & Authorize**.
+
+    AgentDialog crea el agente y entrega la credencial directamente a Claude
+    mediante OAuth. La API key no aparece en pantalla.
+  </Step>
+</Steps>
+
+<Callout type="info">
+  Si usas Team o Enterprise y no aparece **Add custom connector**, pide a un
+  Owner que añada la URL desde **Organization settings → Connectors**. Después
+  podrás conectarlo desde tu cuenta.
+</Callout>
+
+## 2. Activa AgentDialog en un chat
+
+Abre un chat nuevo. Pulsa el botón **+** situado junto al cuadro de texto,
+entra en **Connectors** y activa **AgentDialog** para esa conversación.
+
+Claude debería mostrar las herramientas `human_query`, `get_query`,
+`list_queries`, `clarify_query` y `cancel_query`.
+
+## 3. Envía tu primer “hola mundo”
+
+Sustituye `TU_EMAIL` y escribe este prompt en Claude:
+
+```text
+Necesito que preguntes a TU_EMAIL si puede reunirse conmigo el día 30 a las 10:00.
+```
+
+Eso es todo. Claude convierte la intención en una llamada a `human_query`:
+define la pregunta, el asunto y una respuesta cerrada para que la persona pueda
+decidir. Para una reunión real, incluye también el mes, el año y la zona horaria
+para que la fecha no sea ambigua.
+
+Claude te pedirá permiso para usar la herramienta. Revisa los datos —sobre
+todo el destinatario— y aprueba la llamada.
+
+La respuesta inicial será `pending` si esa persona aún debe aceptar la
+invitación, o `assigned` si ya confía en ese agente. En ambos casos, la
+pregunta se ha creado correctamente.
+
+## 4. Responde como humano
+
+Abre el email enviado por AgentDialog. La pregunta es de riesgo bajo, así que
+su enlace permite responder solamente a esa consulta. No concede acceso a
+otras conversaciones ni a la cuenta completa.
+
+Selecciona **Sí** y envía la respuesta. Si en lugar del enlace aparece el
+inicio de sesión, usa el código recibido por email; no necesitas crear una
+contraseña.
+
+## 5. Recupera la respuesta en Claude
+
+AgentDialog no puede iniciar una llamada nueva hacia un cliente MCP. Vuelve al
+chat de Claude y escribe:
+
+```text
+Comprueba ahora la respuesta de la consulta de AgentDialog que acabamos de crear.
+```
+
+Claude usará `get_query` con el `query_id` anterior. El resultado esperado es:
+
+```json
+{
+  "status": "answered",
+  "answer": { "kind": "boolean", "value": true }
+}
+```
+
+Ya tienes el flujo completo: Claude pregunta, una persona decide y Claude
+recupera una respuesta estructurada.
+
+## Si algo no funciona
+
+### AgentDialog no aparece en el chat
+
+Abre **+ → Connectors** y comprueba que está activado para esa conversación.
+Si sigue sin aparecer, desconecta y vuelve a conectar el servidor desde
+**Customize → Connectors**.
+
+### La autorización dice que el nombre ya existe
+
+Los nombres generan un identificador único para el agente. Prueba con algo más
+específico, como `Hola Mundo AgentDialog Ana`.
+
+### La consulta sigue en `pending`
+
+Revisa la bandeja de spam y confirma que el email del prompt es correcto. El
+estado cambia a `assigned` cuando la persona acepta la invitación.
+
+### Claude todavía no ve la respuesta
+
+Pídele que vuelva a comprobarla. Espera entre 10 y 30 segundos entre llamadas
+a `get_query`; MCP no envía la respuesta al chat automáticamente.
+
+### `human_query` devuelve un error `422`
+
+Lee el campo `remedy` que devuelve AgentDialog y pide a Claude que corrija la
+llamada. En este ejemplo, `self_contained: true` declara expresamente que la
+pregunta no necesita un documento o enlace de referencia.
+
+## Siguiente paso
+
+<Cards>
+  <Card title="Human queries" href="/docs/concepts/queries" description="Diseña preguntas decidibles, respuestas tipadas y flujos de aclaración." />
+  <Card title="Quickstart de la API" href="/docs/quickstart" description="Integra AgentDialog mediante cURL, TypeScript o Python." />
+  <Card title="Autenticación" href="/docs/authentication" description="Consulta OAuth, API keys, idempotencia y límites." />
+</Cards>

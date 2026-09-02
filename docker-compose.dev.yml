@@ -29,7 +29,9 @@ services:
       POSTGRES_USER: agentdialog
       POSTGRES_PASSWORD: agentdialog
     ports:
-      - "5432:5432"
+      # Host port is configurable so this can coexist with another project
+      # already holding 5432. The default keeps a fresh clone unchanged.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ./.pg-data:/var/lib/postgresql/data
     healthcheck:

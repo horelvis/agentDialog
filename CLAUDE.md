@@ -207,6 +207,19 @@ Agent API keys are prefixed `mge_ag_` (`src/config/auth.ts`). The domain is
 
 All agent routes respond `{ data: ... }`. Follow `src/routes/agent/webhooks.ts`.
 
+**A new route under `/api/v1/agent` is declared through `documented(...)` with
+its `RouteDoc`, not a bare `app.get`/`app.post`/etc.** `GET /openapi.json`
+(`src/openapi/document.ts`) is built entirely from that registry
+(`src/openapi/documented.ts`), and `tests/unit/openapi-coverage.test.ts` walks
+Hono's own route table and fails the build if anything under
+`/api/v1/agent` has no matching entry there — or if the registry names a route
+that doesn't exist, which is what catches a wrong `basePath`. Response schemas
+belong in `src/validators/*.responses.ts` and are asserted against a real
+response in the integration tests — they are contract, not decoration.
+`openapi.json` at the repo root is the committed copy of that document,
+regenerated with `bun run openapi` and diffed against the working tree in CI;
+run it after any change that touches a route's shape.
+
 **Touching an SDK means updating its docs in the same change** — `docs-site`, the
 landing examples in `web/src/components/landing/CodeExamples.tsx`, and the SDK
 README, which is what npm renders. A stale example is a trust failure for the

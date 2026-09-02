@@ -2,6 +2,14 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import { createHmac } from "crypto";
 import { createTestApp } from "../helpers";
 import { dispatchWebhooks } from "../../src/services/webhook.service";
+import {
+  webhookCreateResponse,
+  webhookListResponse,
+  webhookUpdateResponse,
+  webhookRotateSecretResponse,
+  webhookDeleteResponse,
+} from "../../src/validators/webhook.responses";
+import { webhookDeliveryBody } from "../../src/validators/webhook-delivery.responses";
 
 /**
  * The test the codebase did not have, and the reason a signature keyed with a
@@ -66,7 +74,9 @@ describe("Webhook signature", () => {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ url: receiverUrl, events: ["*"] }),
     });
-    const { data } = await created.json();
+    const body = await created.clone().json();
+    expect(() => webhookCreateResponse.parse(body)).not.toThrow();
+    const { data } = body;
     expect(data.secret).toStartWith("whsec_");
 
     captured.length = 0;
@@ -75,6 +85,11 @@ describe("Webhook signature", () => {
 
     expect(captured).toHaveLength(1);
     expect(verify(captured[0], data.secret)).toBe(true);
+
+    // The outbound delivery body itself — asserted by nothing else on this
+    // branch, unlike every inbound response, which has a test somewhere
+    // parsing it against its schema.
+    expect(() => webhookDeliveryBody.parse(JSON.parse(captured[0].body))).not.toThrow();
   });
 
   it("signs with both secrets during the rotation window", async () => {
@@ -89,7 +104,8 @@ describe("Webhook signature", () => {
       `/api/v1/agent/webhooks/${first.data.id}/rotate-secret`,
       { method: "POST", headers: { Authorization: `Bearer ${apiKey}` } },
     );
-    const second = await rotated.json();
+    const second = await rotated.clone().json();
+    expect(() => webhookRotateSecretResponse.parse(second)).not.toThrow();
     expect(second.data.secret).not.toBe(first.data.secret);
 
     captured.length = 0;
@@ -130,6 +146,10 @@ describe("Webhook signature", () => {
         headers: { Authorization: `Bearer ${apiKey}` },
       })
     ).text();
+
+    expect(() => webhookListResponse.parse(JSON.parse(listed))).not.toThrow();
+    expect(() => webhookUpdateResponse.parse(JSON.parse(updated))).not.toThrow();
+    expect(() => webhookDeleteResponse.parse(JSON.parse(removed))).not.toThrow();
 
     for (const payload of [listed, updated, removed]) {
       expect(payload).not.toContain("whsec_");

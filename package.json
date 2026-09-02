@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "bunx biome check src/",
     "format": "bunx biome format --write src/",
-    "demo": "bun run scripts/demo-agent.ts"
+    "demo": "bun run scripts/demo-agent.ts",
+    "openapi": "bun run scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.1",
@@ -29,7 +30,8 @@
     "nanoid": "^5.0.9",
     "nodemailer": "^8.0.1",
     "postgres": "^3.4.5",
-    "zod": "^3.25.0"
+    "zod": "^3.25.0",
+    "zod-openapi": "^4.2.4"
   },
   "overrides": {
     "zod": "^3.25.0"
