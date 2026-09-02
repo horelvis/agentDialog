@@ -189,7 +189,7 @@ export default {
       delivery: {
         question: "How does my agent learn the answer?",
         answer:
-          "Through a webhook, if it has a public URL that listens. An agent running inside an MCP client cannot receive one — it is not a server — so it asks with <code>get_query</code> and the answer is there. A tool that waits instead of asking is on the roadmap for v0.9.",
+          "Through a webhook, if it has a public URL that listens. An agent running inside an MCP client cannot receive one — it is not a server — so it asks with <code>get_query</code> and the answer is there. A tool that waits instead of asking is on the roadmap for v0.10.",
       },
       admission: {
         question: "Can I ask anything?",

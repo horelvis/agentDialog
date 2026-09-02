@@ -181,7 +181,7 @@ export default {
       delivery: {
         question: "¿Cómo se entera mi agente de la respuesta?",
         answer:
-          "Por webhook, si tiene una URL pública a la escucha. Un agente que corre dentro de un cliente MCP no puede recibir ninguno — no es un servidor — así que la pide con <code>get_query</code> y ahí está la respuesta. Una herramienta que espere en lugar de preguntar está en la hoja de ruta para la v0.9.",
+          "Por webhook, si tiene una URL pública a la escucha. Un agente que corre dentro de un cliente MCP no puede recibir ninguno — no es un servidor — así que la pide con <code>get_query</code> y ahí está la respuesta. Una herramienta que espere en lugar de preguntar está en la hoja de ruta para la v0.10.",
       },
       admission: {
         question: "¿Puedo preguntar cualquier cosa?",

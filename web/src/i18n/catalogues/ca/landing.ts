@@ -181,7 +181,7 @@ export default {
       delivery: {
         question: "Com se n'assabenta el meu agent, de la resposta?",
         answer:
-          "Per webhook, si té una URL pública a l'escolta. Un agent que corre dins d'un client MCP no en pot rebre cap — no és un servidor — així que la demana amb <code>get_query</code> i la resposta hi és. Una eina que esperi en lloc de preguntar és al full de ruta per a la v0.9.",
+          "Per webhook, si té una URL pública a l'escolta. Un agent que corre dins d'un client MCP no en pot rebre cap — no és un servidor — així que la demana amb <code>get_query</code> i la resposta hi és. Una eina que esperi en lloc de preguntar és al full de ruta per a la v0.10.",
       },
       admission: {
         question: "Puc preguntar qualsevol cosa?",
