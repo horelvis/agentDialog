@@ -1,0 +1,82 @@
+[
+  {
+    "id": "00-intro",
+    "eyebrow": "HOLA MUNDO",
+    "title": "Claude Web + AgentDialog",
+    "caption": "Una decisión humana desde Claude, sin instalar nada.",
+    "narration": "AgentDialog permite que Claude pregunte a una persona y reciba una respuesta estructurada. Vamos a crear un hola mundo desde Claude Web, sin instalar nada.",
+    "screen": null
+  },
+  {
+    "id": "01-connector",
+    "eyebrow": "PASO 1",
+    "title": "Añade el servidor MCP",
+    "caption": "Nombre: AgentDialog · URL: https://api.agentdialog.io/mcp",
+    "narration": "En Personalizar, abre Conectores, añade un conector personalizado y usa la dirección api punto agentdialog punto io barra m c p.",
+    "screen": "connector-form.png"
+  },
+  {
+    "id": "02-oauth-settings",
+    "eyebrow": "PASO 2",
+    "title": "Claude detecta OAuth",
+    "caption": "Siempre obligatorio · Registrar cliente automáticamente",
+    "narration": "Claude detecta automáticamente OAuth y el registro dinámico del cliente. Conserva las dos opciones detectadas y añade el conector.",
+    "screen": "oauth-settings.png"
+  },
+  {
+    "id": "03-authorize",
+    "eyebrow": "PASO 3",
+    "title": "Autoriza AgentDialog",
+    "caption": "El agente se crea mediante OAuth. No tienes que copiar ninguna clave.",
+    "narration": "Pulsa Conectar. AgentDialog abre su autorización, crea un agente nuevo y devuelve la credencial a Claude sin mostrar ninguna clave.",
+    "screen": "authorize.png"
+  },
+  {
+    "id": "04-prompt",
+    "eyebrow": "PASO 4",
+    "title": "Pídelo en lenguaje natural",
+    "caption": "“Necesito que preguntes a tu@email.com si puede reunirse conmigo...”",
+    "narration": "En un chat nuevo basta un prompt natural. Necesito que preguntes a esta persona si puede reunirse conmigo el día treinta a las diez.",
+    "screen": "claude-query.png"
+  },
+  {
+    "id": "05-email",
+    "eyebrow": "PASO 5",
+    "title": "La persona recibe la pregunta",
+    "caption": "El email muestra quién pregunta, el asunto y el botón para responder.",
+    "narration": "Claude convierte la intención en una consulta, y AgentDialog envía un correo con la pregunta y un enlace seguro para responder.",
+    "screen": "email.png"
+  },
+  {
+    "id": "06-answer",
+    "eyebrow": "PASO 6",
+    "title": "Responde en AgentDialog",
+    "caption": "Una respuesta cerrada y clara: sí o no.",
+    "narration": "La persona abre AgentDialog, revisa el contexto, elige una opción y envía su respuesta. El enlace solo sirve para esta pregunta.",
+    "screen": "answer-selected.png"
+  },
+  {
+    "id": "07-confirmation",
+    "eyebrow": "LISTO",
+    "title": "Respuesta enviada",
+    "caption": "La decisión queda guardada y la página puede cerrarse.",
+    "narration": "AgentDialog confirma que la respuesta se ha guardado. La persona ya puede cerrar la página.",
+    "screen": "answer-sent.png"
+  },
+  {
+    "id": "08-result",
+    "eyebrow": "PASO 7",
+    "title": "Claude recupera la respuesta",
+    "caption": "get_query devuelve status answered y una respuesta tipada.",
+    "narration": "De vuelta en Claude, pide comprobar la consulta. Claude llama a get query y recupera la respuesta tipada. Ya tienes tu primer flujo humano en el bucle.",
+    "screen": "claude-answer.png"
+  },
+  {
+    "id": "09-outro",
+    "eyebrow": "SIGUIENTE PASO",
+    "title": "Construye tu primer flujo humano",
+    "caption": "Guía completa en docs.agentdialog.io",
+    "narration": "La guía completa está en docs punto agentdialog punto io.",
+    "screen": null
+  }
+]

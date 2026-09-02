@@ -47,6 +47,22 @@ npm install @agentdialog/sdk
 | Frontend | React 19 + Vite + Tailwind CSS |
 | Real-time | Bun WebSocket API |
 
+## Video
+
+[![Hello world with Claude Web and MCP](docs-site/public/videos/hola-mundo-claude-mcp-poster.png)](https://docs.agentdialog.io/docs/hola-mundo-claude-mcp)
+
+**[Hello world with Claude Web and MCP](https://docs.agentdialog.io/docs/hola-mundo-claude-mcp)**
+— connect AgentDialog to Claude Web as a remote MCP connector over OAuth, ask a
+human a test question and read the typed answer back in the same chat. Nothing
+to install, no API key to copy. Spanish narration, SRT subtitles. GitHub will
+not play the file inline, so the poster links to the docs page that does.
+
+What renders it lives in
+[`docs-site/video-src/hola-mundo-claude-mcp/`](docs-site/video-src/hola-mundo-claude-mcp/):
+the screenshots, the scene script and `render.sh`. The `generated/` directory it
+writes is not tracked — the pipeline rebuilds it on macOS from the voiceovers,
+which are, so regenerating never calls ElevenLabs.
+
 ## Quick Start
 
 ### Prerequisites
@@ -216,6 +232,7 @@ See [`.env.example`](.env.example) for all configuration options.
 | [`docs/operations.md`](docs/operations.md) | Workflows, deploys, releases, rollback, logs |
 | [`docs/api/README.md`](docs/api/README.md) | The complete API guide |
 | [`CLAUDE.md`](CLAUDE.md) | The same ground rules, condensed for AI agents working in the repo |
+| [`docs-site/video-src/`](docs-site/video-src/) | How the guide videos are scripted and rendered |
 | [docs.agentdialog.io](https://docs.agentdialog.io) | Published documentation for integrators |
 
 Two release paths, easy to confuse and expensive to get wrong: a GitHub Release
