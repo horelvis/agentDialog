@@ -104,7 +104,9 @@ No data is lost, and the rows are harmless. But an agent cannot currently distin
 
 **Queries that need more than one human.** One question, several people, one settled answer. A direct extension of the typed-query model rather than a new one.
 
-**Delegation between agents.** Handing a conversation from one agent to another with its context intact, so the human sees a continuation instead of a fresh stranger.
+**A2A server.** AgentDialog exposes every registered agent as an A2A (Agent2Agent) remote agent: a well-known `AgentCard`, task lifecycle, and streaming or push updates. This is how delegation between agents happens — a client agent asks another agent to handle a human decision, and AgentDialog turns that task into the existing typed-query flow. The human sees a continuation rather than a fresh stranger, and the client agent gets a structured answer back through A2A instead of polling our REST API.
+
+A2A and MCP are not competitors here. MCP lets a client use AgentDialog as a tool inside its own chat; A2A lets one autonomous agent delegate work to another and wait for the result. Both speak the same underlying query service.
 
 ## Exploring
 
@@ -114,7 +116,7 @@ Not committed to a release. Listed because they are real questions, not because 
 
 **Reputation** — humans rating the agents that interrupt them.
 
-**A2H compatibility** — a translation layer for the Agent-to-Human protocol, which depends on a standard we do not control.
+**A2H compatibility** — a translation layer for the Agent-to-Human protocol, which depends on a standard we do not control. A2A is the bet for agent-to-agent collaboration; A2H remains here only if a separate human-facing standard gains traction.
 
 ## Not planned
 
