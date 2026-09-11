@@ -4,19 +4,21 @@
 **Estado:** aprobado, pendiente de plan de implementación
 **Especificación de referencia:** A2A Protocol v1.0 — https://a2a-protocol.org/v1.0.0/specification/
 
-AgentDialog se expone como un **A2A Server** cuyo skill principal es insertar a un humano en el ciclo de decisión de otro agente. Un agente cliente descubre a un agente registrado en AgentDialog a través de su `AgentCard`, le envía una tarea (`SendMessage`), y AgentDialog la convierte en la query/convocatoria humana que ya existe. Cuando el humano responde, la respuesta regresa al cliente como resultado de la tarea A2A.
+AgentDialog añade un **buzón A2A entre agentes**. Cada agente registrado en la plataforma obtiene un endpoint propio donde otros agentes compatibles con A2A v1.0 pueden descubrirlo, enviarle tareas (`SendMessage`) y seguir el ciclo de vida de esas tareas. **El humano no participa en este flujo**: el buzón es puramente un mecanismo de coordinación agente-a-agente.
+
+El agente destinatario no procesa la tarea dentro de AgentDialog. AgentDialog solo almacena, enruta y notifica. El propietario del buzón consume sus tareas (vía `ListTasks`, `GetTask` o streaming), las procesa en su propia infraestructura y actualiza el estado/artifacts con sus credenciales. El cliente A2A recibe los avances por SSE o push webhook.
 
 A2A no sustituye a MCP ni a la API REST. Cada interfaz cubre un modo distinto:
 
 | Interfaz | Cuándo se usa |
 |---|---|
 | MCP | Un asistente de chat (Claude, Cursor…) quiere usar a AgentDialog como una herramienta dentro de su propia conversación. |
-| REST | Un agente propio quiere crear queries, leer respuestas y gestionar webhooks directamente. |
-| A2A | Un agente autónomo quiere delegar en otro agente (el registrado en AgentDialog) y seguir el ciclo de vida de esa tarea. |
+| REST | Un agente propio quiere crear queries humanas, leer respuestas y gestionar webhooks directamente. |
+| A2A | Un agente autónomo quiere coordinarse con otros agentes registrados en AgentDialog a través de un buzón estándar. |
 
 ## Objetivo
 
-Que cualquier agente compatible con A2A v1.0 pueda descubrir y delegar en un agente registrado en AgentDialog sin saber nada de nuestra API REST interna.
+Que cualquier agente compatible con A2A v1.0 pueda descubrir y enviar tareas a otro agente registrado en AgentDialog sin saber nada de la implementación interna del destinatario. AgentDialog actúa como infraestructura de buzón: recibe, entrega, notifica y audita.
 
 ## Alcance
 
@@ -26,15 +28,17 @@ Que cualquier agente compatible con A2A v1.0 pueda descubrir y delegar en un age
 - Dos bindings v1.0: **HTTP+JSON/REST** y **JSON-RPC** sobre el mismo endpoint.
 - Operaciones core: `SendMessage`, `SendStreamingMessage`, `GetTask`, `ListTasks`, `CancelTask`.
 - Notificaciones push reutilizando el webhook service existente (`CreateTaskPushNotificationConfig`, `GetTaskPushNotificationConfig`, `ListTaskPushNotificationConfigs`, `DeleteTaskPushNotificationConfig`).
-- Mapeo de una tarea A2A al ciclo de vida de una `human_query` tipada.
-- Autenticación con API key tipo `mge_ag_` emitida por agente.
+- Modelo de datos propio de A2A: `a2a_tasks`, `a2a_messages`, `a2a_artifacts`.
+- Actualización de tareas por el agente destinatario usando sus credenciales AgentDialog.
+- Autenticación con API keys existentes (`mge_ag_`): tanto el remitente como el destinatario deben ser agentes registrados.
 
 **Fuera, deliberadamente:**
 
 - gRPC binding. Bun no lo tiene de primera clase y no aporta interoperabilidad frente a HTTP+JSON/JSON-RPC en nuestro entorno.
 - `GetExtendedAgentCard` autenticado en v1.0. Se deja preparado en el esquema pero no se implementa hasta que haya un caso de uso que lo justifique.
 - Agent Card firmado (JWS). v1.0 lo recomienda para confianza entre organizaciones; lo añadiremos cuando tengamos un mecanismo de claves por agente, no en el MVP.
-- Subtareas A2A paralelas dentro de una misma `contextId`. `contextId` se mapea a `conversationId`, pero cada `SendMessage` crea una única query.
+- Procesamiento de la tarea por AgentDialog. No hay LLM ni motor de agentes interno: solo buzón.
+- Intervención humana en el buzón A2A. Las queries humanas siguen existiendo en la API REST/MCP, separadas de este flujo.
 
 ## 1. Arquitectura
 
@@ -44,27 +48,71 @@ Cada agente registrado en AgentDialog obtiene una URL A2A propia:
 https://api.agentdialog.io/a2a/{agentSlug}
 ```
 
-Montada como sub-aplicación Hono en `src/app.ts`, bajo `/api/v1/a2a/:agentSlug` o directamente `/a2a/:agentSlug`. La decisión de ruta se deja al plan, pero la URL pública debe ser la de arriba.
+Montada como sub-aplicación Hono en `src/app.ts`, bajo `/a2a/:agentSlug`. La decisión de ruta exacta se deja al plan, pero la URL pública debe ser la de arriba.
 
-Dentro de esa sub-aplicación:
+Dentro de esa sub-aplicación, cualquier cliente A2A puede:
 
 - `GET /.well-known/agent.json` → `AgentCard` del agente (público, sin auth).
-- `POST /message:send` → HTTP binding de `SendMessage`.
+- `POST /message:send` → HTTP binding de `SendMessage`; crea una tarea en el buzón del destinatario.
 - `POST /message:stream` → HTTP binding de `SendStreamingMessage` (SSE).
-- `GET /tasks/:id` → `GetTask`.
-- `GET /tasks` → `ListTasks`.
-- `POST /tasks/:id/cancel` → `CancelTask`.
+- `GET /tasks/:id` → `GetTask`; leer una tarea del buzón del destinatario.
+- `GET /tasks` → `ListTasks`; listar tareas del buzón del destinatario.
+- `POST /tasks/:id:cancel` → `CancelTask`.
 - `POST /tasks/:id/pushNotificationConfigs` → crear config push.
 - `GET /tasks/:id/pushNotificationConfigs/:configId` → leer config push.
 - `GET /tasks/:id/pushNotificationConfigs` → listar configs push.
 - `DELETE /tasks/:id/pushNotificationConfigs/:configId` → borrar config push.
-- `POST /` con JSON-RPC envelope → JSON-RPC binding (misma lógica, distinta serialización).
+- `POST /` con JSON-RPC envelope → JSON-RPC binding.
 
-La lógica vive en un nuevo servicio `src/services/a2a.service.ts` que recibe objetos A2A y llama a `query.service.ts` y `conversation.service.ts`. Ninguna ruta A2A toca la base de datos directamente.
+Además, el agente destinatario (remitente de actualizaciones) usa endpoints de agente propios para manipular sus tareas:
 
-## 2. Mapeo de A2A al modelo de AgentDialog
+- `POST /api/v1/agent/a2a/tasks/:id/status` → actualizar estado (`TaskStatusUpdateEvent`).
+- `POST /api/v1/agent/a2a/tasks/:id/artifacts` → añadir artifact (`TaskArtifactUpdateEvent`).
+- `POST /api/v1/agent/a2a/tasks/:id/messages` → añadir mensaje del agente (multi-turn).
 
-### 2.1 Agent Card
+La lógica vive en un nuevo servicio `src/services/a2a.service.ts` y un servicio de entrega `src/services/a2a-delivery.service.ts`. Ninguna ruta A2A toca la base de datos directamente.
+
+## 2. Modelo de datos
+
+Tres tablas propias, separadas del flujo humano:
+
+### 2.1 `a2a_tasks`
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `id` | UUID | Identificador A2A del task (`taskId`). |
+| `recipient_agent_id` | UUID | Agente destinatario (el dueño del buzón). |
+| `sender_agent_id` | UUID | Agente remitente. |
+| `context_id` | string nullable | `contextId` A2A para agrupar tareas. |
+| `state` | enum | `submitted`, `working`, `input_required`, `completed`, `failed`, `canceled`. |
+| `status_message` | JSON nullable | Último `TaskStatus.message`. |
+| `created_at`, `updated_at` | timestamps | Auditoría. |
+
+### 2.2 `a2a_messages`
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `id` | UUID | Identificador del mensaje. |
+| `task_id` | UUID FK | Tarea a la que pertenece. |
+| `role` | enum | `user` (cliente) o `agent` (destinatario). |
+| `parts` | JSON | Array de Parts A2A. |
+| `created_at` | timestamp | Orden de la conversación. |
+
+El mensaje inicial de un `SendMessage` se guarda con `role = user`. Los mensajes de follow-up del cliente se añaden a la misma tarea. Los mensajes del destinatario se guardan con `role = agent`.
+
+### 2.3 `a2a_artifacts`
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `id` | UUID | Identificador del artifact. |
+| `task_id` | UUID FK | Tarea a la que pertenece. |
+| `parts` | JSON | Array de Parts A2A. |
+| `index` | integer | Orden dentro de la tarea. |
+| `created_at` | timestamp | Auditoría. |
+
+## 3. Mapeo de A2A al modelo de buzón
+
+### 3.1 Agent Card
 
 El `AgentCard` se deriva del registro del agente:
 
@@ -73,65 +121,46 @@ El `AgentCard` se deriva del registro del agente:
 | `name` | `displayName` |
 | `description` | `description` |
 | `version` | `1.0.0` inicial, más tarde el campo `version` del agente. |
-| `skills` | Un skill fijo `human_query` más los skills que el agente declare en `metadata.a2aSkills`. |
+| `skills` | `metadata.a2aSkills` declarados por el agente. Si no declara ninguno, el buzón sigue disponible con un skill genérico `agent-dialog-mailbox`. |
 | `supportedInterfaces` | `[{protocolBinding: "HTTP+JSON", url: baseUrl, protocolVersion: "1.0"}, {protocolBinding: "JSONRPC", url: baseUrl, protocolVersion: "1.0"}]` |
-| `capabilities` | `streaming: true`, `pushNotifications: true`, `stateTransitionHistory: false`, `extendedAgentCard: false`. |
+| `capabilities` | `streaming: true`, `pushNotifications: true`, `stateTransitionHistory: true`, `extendedAgentCard: false`. |
 | `securitySchemes` | `APIKeySecurityScheme` con nombre `agentdialog_api_key`. |
 | `defaultInputModes` | `["text/plain", "application/json"]` |
 | `defaultOutputModes` | `["application/json", "text/plain"]` |
 
-El campo `agentCard` que ya guardamos en `metadata` se fusiona **bajo** la estructura derivada: el agente puede añadir `skills`, `tags` o `examples`, pero no puede mentir sobre endpoints ni capacidades.
+El campo `agentCard` que ya guardamos en `metadata` se fusiona **bajo** la estructura derivada: el agente puede añadir `skills`, `tags` o `examples`, pero no puede mentir sobre endpoints, capacidades ni esquemas de seguridad.
 
-### 2.2 Mensajes y Parts
+### 3.2 Mensajes y Parts
 
 Un `SendMessage` contiene un `Message` con `parts`. Interpretamos:
 
-- `TextPart` → `subject.body` de la query.
-- `DataPart` con estructura reconocida → campos de la query (`query_type`, `target_human_email`, `timeout_minutes`, `answer_space`, `context`, `subject.uri`, `risk_level`, etc.).
-- `FilePart` → adjunto de la query (depende de la funcionalidad de adjuntos a queries que entra en v0.10).
+- `TextPart` → mensaje de texto del cliente.
+- `DataPart` → payload estructurado libre; lo guardamos como JSON tal cual.
+- `FilePart` → referencia a archivo; validamos URL pública y la almacenamos.
 
-Si el mensaje no trae `DataPart`, se rechaza con `ContentTypeNotSupportedError` o `InvalidParams` (JSON-RPC `-32602`) indicando que el skill `human_query` requiere una carga estructurada.
+No hay un schema fijo de entrada: el destinatario decide qué hacer con los parts.
 
-### 2.3 Tasks ↔ Queries
+### 3.3 Tasks ↔ Estados del buzón
 
-Cada `SendMessage` crea:
-
-1. Una conversación (`conversation`), usando `contextId` del mensaje A2A como `conversationId` si existe; si no, se genera uno.
-2. Una query tipada (`human_query`) dentro de esa conversación.
-3. Un `Task` A2A cuyo `id` es el `queryId`.
-
-Estados del task:
-
-| Estado A2A | Estado AgentDialog | Disparador |
+| Estado A2A | Estado interno | Disparador |
 |---|---|---|
-| `TASK_STATE_SUBMITTED` | query creada, notificación aún no enviada. | Inmediatamente tras `SendMessage`. |
-| `TASK_STATE_WORKING` | query notificada/pendiente o asignada, esperando humano. | Cuando la query queda en estado `pending` o `assigned`. |
-| `TASK_STATE_INPUT_REQUIRED` | `needs_context`. | El humano pide más contexto y el agente no ha respondido todavía. |
-| `TASK_STATE_COMPLETED` | `answered`. | El humano respondió. |
-| `TASK_STATE_FAILED` | Error irrecuperable del servicio. | No usado para rechazos de admisión (esos van como `TASK_STATE_REJECTED`). |
-| `TASK_STATE_CANCELED` | `cancelled`. | `CancelTask` o cancelación por parte del agente propietario. |
-| `TASK_STATE_REJECTED` | Admission gate rechazó la query. | La admisión dice que la pregunta no es decidible. |
+| `TASK_STATE_SUBMITTED` | `submitted` | Inmediatamente tras `SendMessage`. |
+| `TASK_STATE_WORKING` | `working` | El destinatario marca que está procesando. |
+| `TASK_STATE_INPUT_REQUIRED` | `input_required` | El destinatario necesita más información del cliente. |
+| `TASK_STATE_COMPLETED` | `completed` | El destinatario añade artifact final y cierra. |
+| `TASK_STATE_FAILED` | `failed` | El destinatario reporta fallo irrecuperable. |
+| `TASK_STATE_CANCELED` | `canceled` | `CancelTask` o cancelación por parte del destinatario. |
+| `TASK_STATE_REJECTED` | `rejected` | Validación rechazada (skill no soportado, remitente no autorizado, etc.). |
 
-El `Task` devuelto incluye el `status` actual y, cuando esté `COMPLETED`, un `Artifact` con la respuesta estructurada como `DataPart`.
+El destinatario actualiza el estado a través de los endpoints de agente. El cliente lo consulta por A2A.
 
-### 2.4 Artifacts
+### 3.4 Artifacts
 
-Un artifact final contiene un único `DataPart`:
+Cualquier artifact del destinatario se guarda en `a2a_artifacts` y se retransmite al cliente como `TaskArtifactUpdateEvent`. Los parts pueden ser texto, datos estructurados o referencias a archivos.
 
-```json
-{
-  "data": {
-    "kind": "choice",
-    "option_ids": ["renegotiate"]
-  }
-}
-```
+## 4. Protocol bindings
 
-La forma sigue exactamente el espacio de respuestas de queries tipadas (`answer_space`).
-
-## 3. Protocol bindings
-
-### 3.1 HTTP+JSON/REST
+### 4.1 HTTP+JSON/REST
 
 Seguimos la tabla de mapeo v1.0:
 
@@ -151,11 +180,11 @@ Headers:
 
 - `Content-Type: application/a2a+json` en requests.
 - `A2A-Version: 1.0`.
-- `Authorization: Bearer mge_ag_...`.
+- `Authorization: Bearer mge_ag_...` (API key del **remitente**).
 
 Errores en formato RFC 7807 (`application/problem+json`).
 
-### 3.2 JSON-RPC
+### 4.2 JSON-RPC
 
 Un único endpoint `POST /` recibe envelopes JSON-RPC 2.0 y despacha por `method`:
 
@@ -173,54 +202,66 @@ Un único endpoint `POST /` recibe envelopes JSON-RPC 2.0 y despacha por `method
 
 Errores JSON-RPC 2.0. Los errores A2A específicos se mapean a códigos propios del spec.
 
-### 3.3 Streaming
+### 4.3 Streaming
 
 `SendStreamingMessage` devuelve `text/event-stream`. Los eventos son:
 
 - `task_status` → `TaskStatusUpdateEvent`.
-- `task_artifact` → `TaskArtifactUpdateEvent` cuando la respuesta llega.
+- `task_artifact` → `TaskArtifactUpdateEvent`.
 
-Aprovechamos la infraestructura de WebSocket y Redis: cuando una query cambia de estado, publicamos en el canal de la tarea y el endpoint SSE lo reenvía.
+Aprovechamos Redis para publicar eventos de cada `taskId`; el endpoint SSE se suscribe a ese canal.
 
-## 4. Autenticación y autorización
+## 5. Autenticación y autorización
 
-Cada agente registrado en AgentDialog tiene un API key A2A. Inicialmente reutilizamos el mismo esquema `mge_ag_` de la API REST, pero la ruta A2A autentica al **cliente** que delega en el agente, no al agente propietario.
+Tanto remitente como destinatario deben ser agentes registrados en AgentDialog. Cada uno usa su propia API key `mge_ag_`.
 
-La autorización es simple:
+### 5.1 Cliente (remitente)
 
-- Un request a `https://api.agentdialog.io/a2a/{agentSlug}` está dirigido a ese agente.
-- La API key debe corresponder a ese agente.
-- El cliente autenticado puede crear tareas, leer sus propias tareas (filtradas por `requester` si lo registramos), cancelar tareas que él creó, y suscribirse a updates.
+- Se autentica con su API key en el header `Authorization`.
+- Puede enviar `SendMessage` a cualquier endpoint `/a2a/:agentSlug`.
+- Puede leer, listar y cancelar **sus propias tareas enviadas**.
+- No puede leer tareas enviadas por otros agentes al mismo destinatario.
 
-Si en el futuro queremos que un agente cliente se autentique con OAuth2, añadimos un `OAuth2SecurityScheme` al `AgentCard`; ahora usamos API key para no bloquearnos en flujos OAuth externos.
+### 5.2 Destinatario (propietario del buzón)
 
-## 5. Push notifications
+- Se autentica con su API key en los endpoints de agente (`/api/v1/agent/a2a/...`).
+- Puede leer **todas** las tareas dirigidas a él.
+- Puede actualizar estado, añadir mensajes/artifacts y cancelar tareas de su buzón.
+- No puede crear tareas en su propio buzón desde el lado de agente; eso solo ocurre por A2A.
+
+### 5.3 Rate limiting
+
+- Envíos al buzón: rate limit por remitente + destinatario, para evitar spam entre agentes.
+- Consultas del destinatario: rate limit por destinatario.
+
+## 6. Push notifications
 
 Las push notifications A2A reutilizan `src/services/webhook.service.ts`. Cuando un cliente crea una push config para una tarea:
 
-1. Guardamos `(taskId, webhookUrl, authInfo)` en una tabla nueva `a2a_push_configs`.
-2. Cada vez que la query cambia de estado o recibe una respuesta, si existe push config, enviamos un `POST` al webhook con el payload `TaskStatusUpdateEvent` o `TaskArtifactUpdateEvent`.
-3. Verificamos que la URL no apunte a loopback/private range (misma lógica que webhooks de agentes).
+1. Guardamos `(task_id, url, auth_info_hash, created_at, updated_at)` en `a2a_push_configs`.
+2. Cada vez que la tarea cambia de estado o recibe un artifact, `a2a-delivery.service.ts` envía un `POST` al webhook con el payload correspondiente (`TaskStatusUpdateEvent` o `TaskArtifactUpdateEvent`).
+3. Reutilizamos la validación de URL pública de `webhook.service.ts` (sin loopback/private range).
 
-No implementamos firmas de push A2A en v1.0; el payload es JSON plano. Se añadirá cuando el spec tenga un mecanismo de firma estable.
+No implementamos firmas de push A2A en v1.0; el payload es JSON plano. Se añadirá cuando el spec estabilice un mecanismo de firma.
 
-## 6. Versionado y extensiones
+## 7. Versionado y extensiones
 
 - Declaramos `protocolVersion: "1.0"` en cada interface.
 - No registramos extensiones propietarias en v1.0.
-- Si en el futuro añadimos un modo `a2a+agentdialog` (por ejemplo, para enviar una query directamente sin envolverla en parts), se declara como extensión con URI `https://agentdialog.io/extensions/a2a/query-direct/v1`.
+- Si en el futuro añadimos metadatos de entrega propios, se declaran como extensión con URI `https://agentdialog.io/extensions/a2a/delivery/v1`.
 
-## 7. Tests
+## 8. Tests
 
-- Tests unitarios en `src/lib/a2a/`: mapeo de estados, serialización de `AgentCard`, parsing de `DataPart`.
-- Tests unitarios de binding: JSON-RPC dispatcher, HTTP router coverage.
-- Tests de integración reales sobre HTTP+JSON y JSON-RPC contra la API, incluyendo un cliente A2A mínimo.
+- Tests unitarios en `src/lib/a2a/`: serialización de `AgentCard`, mapeo de estados, parsing de Parts.
+- Tests unitarios de `a2a.service.ts` con base de datos en memoria o mocks.
+- Tests de integración reales sobre HTTP+JSON y JSON-RPC, incluyendo un cliente A2A mínimo.
+- Tests de autorización: remitente no lee tareas ajenas, destinatario no escribe en buzones ajenos.
 - No testeamos gRPC.
 
-## 8. Riesgos y decisiones abiertas
+## 9. Riesgos y decisiones abiertas
 
-- **Identidad del requester.** Necesitamos saber quién creó una tarea A2A para `ListTasks` y autorización. A2A no define identidad del cliente más allá de la auth. Guardaremos un `requesterId` derivado del hash de la API key o de un campo `metadata.requester` si lo provee.
-- **Caché del Agent Card.** El spec v1.0 habla de caching por parte del cliente; nosotros añadimos headers `Cache-Control` y `ETag`.
-- **Multi-tenancy del endpoint.** `/a2a/{agentSlug}` deja claro qué agente es el remote agent. Esto evita que un `mcp-session-id` o similar se confunda con otro agente.
-- **Interacción con rate limiting.** Las llamadas A2A entran en el rate limit por agente, no por IP.
-- **Datos personales en el Agent Card.** No exponemos `target_human_email` ni contenido de conversaciones en el card; solo capacidades e identidad pública del agente.
+- **Identidad del remitente.** Necesitamos saber quién envió una tarea para autorización y `ListTasks`. Se deriva de la API key.
+- **Caché del Agent Card.** Añadimos headers `Cache-Control` y `ETag`; el spec v1.0 deja caching al cliente.
+- **Procesamiento asíncrono.** `SendMessage` devuelve inmediatamente un task en `submitted`. El cliente debe usar streaming, push o polling; no esperamos a que el destinatario procese.
+- **Escalabilidad del buzón.** `ListTasks` sin filtros puede crecer. Añadiremos paginación y filtros por `contextId`/estado desde el MVP.
+- **Interacción con el flujo humano.** El buzón A2A es independiente. No mezclamos tareas A2A con conversaciones humanas ni queries.
