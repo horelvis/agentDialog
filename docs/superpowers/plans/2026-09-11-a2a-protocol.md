@@ -21,6 +21,7 @@
 - `bunx tsc --noEmit` debe seguir saliendo con 0.
 - `tests/unit/` no puede tocar PostgreSQL, Redis ni la red.
 - Todos los endpoints A2A deben incluirse en el test de cobertura de router de `src/app.ts`.
+- **Trampa de resolución de imports en tests:** `bun test` no resuelve imports relativos (`../../src/lib/a2a/...`) desde tests unitarios recién creados en este repo. Usa imports absolutos `@/lib/a2a/...` en `tests/unit/a2a/`.
 
 ---
 
@@ -52,7 +53,7 @@ Verifica URLs, `supportedInterfaces`, `capabilities`, skill `agent-dialog-mailbo
 
 - [ ] **Step 4: Implementar `agent-card.ts`**
 
-- [ ] **Step 5: Ejecutar tests**
+- [x] **Step 5: Ejecutar tests**
 
 ```bash
 bun test tests/unit/a2a
