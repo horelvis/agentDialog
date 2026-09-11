@@ -80,13 +80,16 @@ Expected: all pass.
 
 Índices clave: `(recipient_agent_id, state)`, `(sender_agent_id)`, `(task_id)` en mensajes/artifacts/push configs.
 
-- [ ] **Step 1: Definir tablas e índices con Drizzle**
+- [x] **Step 1: Definir tablas e índices con Drizzle**
 
 - [ ] **Step 2: Generar migración**
 
 ```bash
+docker compose -f docker-compose.dev.yml up -d postgres
 bun run db:generate
 ```
+
+Pendiente porque `bun run db:generate` necesita PostgreSQL corriendo para comparar con el snapshot. Sin DB local disponible, no se generó el archivo `migrations/0011_a2a_mailbox.sql`.
 
 - [ ] **Step 3: Revisar migración (reversible, sin borrar datos)**
 
