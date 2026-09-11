@@ -11,3 +11,7 @@ export * from "./trust-revocations";
 export * from "./human-queries";
 export * from "./oauth";
 export * from "./query-grants";
+export * from "./a2a-tasks";
+export * from "./a2a-messages";
+export * from "./a2a-artifacts";
+export * from "./a2a-push-configs";

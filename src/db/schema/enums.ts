@@ -15,3 +15,15 @@ export const queryStatusEnum = pgEnum("query_status", [
 export const queryRiskEnum = pgEnum("query_risk", ["low", "medium", "high", "critical"]);
 export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "declined", "expired", "revoked"]);
 export const agentStatusEnum = pgEnum("agent_status", ["active", "suspended", "deactivated"]);
+
+export const a2aTaskStateEnum = pgEnum("a2a_task_state", [
+  "submitted",
+  "working",
+  "input_required",
+  "completed",
+  "failed",
+  "canceled",
+  "rejected",
+]);
+
+export const a2aMessageRoleEnum = pgEnum("a2a_message_role", ["user", "agent"]);
