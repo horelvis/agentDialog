@@ -100,9 +100,9 @@
 - Autenticar destinatario en `/api/v1/agent/a2a/*`.
 - Verificar que el destinatario de la URL existe y coincide con la key (cuando aplica).
 
-- [ ] **Step 1: Middleware remitente**
-- [ ] **Step 2: Middleware destinatario**
-- [ ] **Step 3: Tests unitarios**
+- [x] **Step 1: Middleware remitente**
+- [x] **Step 2: Middleware destinatario**
+- [x] **Step 3: Tests unitarios**
 
 ---
 
