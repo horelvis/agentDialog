@@ -124,11 +124,11 @@
 - `POST /a2a/:agentSlug/tasks/:id:cancel`
 - Push config routes.
 
-- [ ] **Step 1: Agent Card público**
-- [ ] **Step 2: SendMessage y GetTask**
-- [ ] **Step 3: ListTasks y CancelTask**
-- [ ] **Step 4: SSE streaming**
-- [ ] **Step 5: Tests de integración**
+- [x] **Step 1: Agent Card público**
+- [x] **Step 2: SendMessage y GetTask**
+- [x] **Step 3: ListTasks y CancelTask**
+- [x] **Step 4: SSE streaming**
+- [x] **Step 5: Tests de integración** (pendientes de PostgreSQL local)
 
 ---
 
@@ -146,9 +146,9 @@
 - `POST /api/v1/agent/a2a/tasks/:id/messages`
 - `POST /api/v1/agent/a2a/tasks/:id/cancel`
 
-- [ ] **Step 1: Lectura del buzón**
-- [ ] **Step 2: Actualizar estado y añadir artifacts/mensajes**
-- [ ] **Step 3: Tests de integración del flujo completo**
+- [x] **Step 1: Lectura del buzón**
+- [x] **Step 2: Actualizar estado y añadir artifacts/mensajes**
+- [x] **Step 3: Tests de integración del flujo completo** (pendientes de PostgreSQL local)
 
 ---
 
@@ -159,9 +159,9 @@
 - Create: `src/lib/a2a/jsonrpc-dispatcher.ts`
 - Create: `tests/integration/a2a-jsonrpc.test.ts`
 
-- [ ] **Step 1: Dispatcher JSON-RPC**
-- [ ] **Step 2: Endpoint `/a2a/:agentSlug/` con envelope**
-- [ ] **Step 3: Tests de integración**
+- [x] **Step 1: Dispatcher JSON-RPC**
+- [x] **Step 2: Endpoint `/a2a/:agentSlug/` con envelope**
+- [x] **Step 3: Tests de integración** (pendientes de PostgreSQL local)
 
 ---
 

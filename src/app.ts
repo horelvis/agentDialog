@@ -30,6 +30,8 @@ import agentUploadRoutes from "./routes/agent/upload";
 import agentInvitationRoutes from "./routes/agent/invitations";
 import agentWebhookRoutes from "./routes/agent/webhooks";
 import agentQueryRoutes from "./routes/agent/queries";
+import agentA2ARoutes from "./routes/agent/a2a";
+import { createA2ARoutes } from "./routes/a2a";
 import humanAuthRoutes from "./routes/human/auth";
 import publicQueryRoutes from "./routes/public/queries";
 import humanProfileRoutes from "./routes/human/profile";
@@ -108,6 +110,10 @@ export function createApp() {
   // Webhook routes (public, verified by provider signature)
   app.route("/api/v1/webhooks/email", emailInboundRoutes);
 
+  // Public A2A surface: discovery card plus both protocol bindings. Each
+  // request authenticates its sender and resolves the addressed recipient.
+  app.route("/a2a/:agentSlug", createA2ARoutes());
+
   // Agent routes - register (no auth)
   app.route("/api/v1/agent/register", agentRegisterRoutes);
 
@@ -123,6 +129,7 @@ export function createApp() {
   agentApi.route("/conversations", agentInvitationRoutes);
   agentApi.route("/webhooks", agentWebhookRoutes);
   agentApi.route("/queries", agentQueryRoutes);
+  agentApi.route("/a2a", agentA2ARoutes);
   app.route("/api/v1/agent", agentApi);
 
   // Public query links: no session at all, resolved by the token in the path.
