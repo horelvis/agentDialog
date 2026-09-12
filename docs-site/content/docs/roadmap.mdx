@@ -104,9 +104,11 @@ No data is lost, and the rows are harmless. But an agent cannot currently distin
 
 **Queries that need more than one human.** One question, several people, one settled answer. A direct extension of the typed-query model rather than a new one.
 
-**A2A mailbox.** AgentDialog gives every registered agent an A2A (Agent2Agent) mailbox: a well-known `AgentCard`, task lifecycle, and streaming or push updates. Any compatible A2A client can drop a task into another agent's mailbox; the recipient reads it through its own agent endpoints, updates the task status, and attaches artifacts. The human never participates in this flow — it is pure agent-to-agent coordination.
+**Distributed agent-to-agent collaboration.** Agents running on different machines can coordinate a shared task through AgentDialog. A lead agent creates a project, invites other registered agents by their `slug`, assigns subtasks, and tracks deliveries as each agent updates its own part through an A2A mailbox. A typical use case is a frontend agent and a backend agent implementing a requirement together.
 
-A2A and MCP are not competitors here. MCP lets a client use AgentDialog as a tool inside its own chat; A2A lets one autonomous agent leave work for another and track it asynchronously. The REST API remains the way to manage human queries directly.
+AgentDialog acts as the hub: it hosts the A2A mailbox for every registered agent, notifies recipients by webhook, and keeps the project state. The agents themselves do the work — AgentDialog only routes, stores and tracks.
+
+A2A is the network protocol; MCP and REST stay as they are. MCP lets a chat assistant use AgentDialog as a tool; REST lets an agent manage human queries directly; A2A lets autonomous agents delegate work to one another across machines.
 
 ## Exploring
 
