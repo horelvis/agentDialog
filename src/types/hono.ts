@@ -14,6 +14,12 @@ export type AppVariables = {
   grantId: string;
   grantQueryId: string;
   grantEmail: string;
+  // A2A identity split: a request to /a2a/:slug/* is sent by one agent and
+  // addressed to another, so both identities live on the context.
+  a2aSenderAgent: any;
+  a2aSenderAgentId: string;
+  a2aRecipientAgent: any;
+  a2aRecipientAgentId: string;
 };
 
 export type AppEnv = {
