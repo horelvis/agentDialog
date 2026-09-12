@@ -232,12 +232,12 @@
 
 ### Task 11: Cobertura de router, typecheck y lint
 
-- [ ] **Step 1: Montar `/a2a/:agentSlug` y `/api/v1/agent/a2a` en `src/app.ts`**
-- [ ] **Step 2: Montar `/api/v1/agent/projects` en `src/app.ts`**
-- [ ] **Step 3: Router coverage test incluye rutas A2A y proyectos**
-- [ ] **Step 4: Typecheck**
-- [ ] **Step 5: Lint**
-- [ ] **Step 6: Suite completa local**
+- [x] **Step 1: Montar `/a2a/:agentSlug` y `/api/v1/agent/a2a` en `src/app.ts`**
+- [x] **Step 2: Montar `/api/v1/agent/projects` en `src/app.ts`**
+- [x] **Step 3: Router coverage test incluye rutas A2A y proyectos**
+- [x] **Step 4: Typecheck**
+- [x] **Step 5: Lint**
+- [ ] **Step 6: Suite completa local** (requiere PostgreSQL y Redis — Docker apagado)
 
 ```bash
 redis-cli -n 1 FLUSHDB
