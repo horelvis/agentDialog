@@ -15,3 +15,6 @@ export * from "./a2a-tasks";
 export * from "./a2a-messages";
 export * from "./a2a-artifacts";
 export * from "./a2a-push-configs";
+export * from "./agent-projects";
+export * from "./agent-project-participants";
+export * from "./agent-project-tasks";

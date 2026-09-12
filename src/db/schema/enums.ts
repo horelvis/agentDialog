@@ -27,3 +27,16 @@ export const a2aTaskStateEnum = pgEnum("a2a_task_state", [
 ]);
 
 export const a2aMessageRoleEnum = pgEnum("a2a_message_role", ["user", "agent"]);
+
+export const projectStatusEnum = pgEnum("project_status", ["active", "paused", "completed", "canceled"]);
+export const participantRoleEnum = pgEnum("participant_role", ["lead", "member"]);
+export const participantStatusEnum = pgEnum("participant_status", ["pending", "active", "removed"]);
+export const projectTaskStatusEnum = pgEnum("project_task_status", [
+  "pending",
+  "assigned",
+  "in_progress",
+  "review",
+  "completed",
+  "failed",
+  "canceled",
+]);
