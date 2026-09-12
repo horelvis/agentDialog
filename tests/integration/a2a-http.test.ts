@@ -137,7 +137,7 @@ describe("A2A push configs", () => {
     });
     const task = await create.json();
 
-    const add = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/push-configs`, {
+    const add = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/pushNotificationConfigs`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: sender.authHeader },
       body: JSON.stringify({ url: "https://public.example.com/hook", authInfo: { type: "bearer", token: "secret" } }),
@@ -145,18 +145,18 @@ describe("A2A push configs", () => {
     expect(add.status).toBe(201);
     const config = await add.json();
 
-    const list = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/push-configs`, {
+    const list = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/pushNotificationConfigs`, {
       headers: { Authorization: sender.authHeader },
     });
     const configs = await list.json();
     expect(configs.map((c: any) => c.id)).toContain(config.id);
 
-    const get = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/push-configs/${config.id}`, {
+    const get = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/pushNotificationConfigs/${config.id}`, {
       headers: { Authorization: sender.authHeader },
     });
     expect(get.status).toBe(200);
 
-    const del = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/push-configs/${config.id}`, {
+    const del = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/pushNotificationConfigs/${config.id}`, {
       method: "DELETE",
       headers: { Authorization: sender.authHeader },
     });
@@ -172,10 +172,10 @@ describe("A2A push configs", () => {
     });
     const task = await create.json();
 
-    const add = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/push-configs`, {
+    const add = await app.request(`/a2a/${recipient.agent.slug}/tasks/${task.id}/pushNotificationConfigs`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: sender.authHeader },
-      body: JSON.stringify({ url: "http://127.0.0.1:9000/hook" }),
+      body: JSON.stringify({ url: "ftp://public.example.com/hook" }),
     });
     expect(add.status).toBe(422);
   });

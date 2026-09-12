@@ -2,9 +2,11 @@ import { describe, expect, it } from "bun:test";
 import type Redis from "ioredis";
 import {
   A2A_ARTIFACT_EVENT,
+  A2A_MESSAGE_EVENT,
   A2A_STATUS_EVENT,
   buildArtifactUpdatePayload,
   buildEventEnvelope,
+  buildMessageUpdatePayload,
   buildStatusUpdatePayload,
   deliverPushNotifications,
   publishTaskEvent,
@@ -39,6 +41,14 @@ describe("buildEventEnvelope", () => {
     const envelope = buildEventEnvelope(A2A_STATUS_EVENT, payload);
     expect(envelope.event).toBe(A2A_STATUS_EVENT);
     expect((envelope.payload as Record<string, unknown>).status).toEqual({ state: "TASK_STATE_WORKING" });
+  });
+
+  it("wraps a message update with its event type", () => {
+    const message = { role: "agent" as const, parts: [{ kind: "text" as const, text: "On it" }] };
+    const payload = buildMessageUpdatePayload(message);
+    const envelope = buildEventEnvelope(A2A_MESSAGE_EVENT, payload);
+    expect(envelope.event).toBe(A2A_MESSAGE_EVENT);
+    expect(payload.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
 

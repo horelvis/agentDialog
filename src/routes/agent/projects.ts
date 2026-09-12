@@ -6,6 +6,7 @@ import {
   createProject,
   inviteParticipant,
   createTask,
+  getProjectForAgent,
   getProject,
   listProjects,
   cancelProject,
@@ -135,17 +136,17 @@ app.get(
   "/:id",
   {
     summary: "Get a project",
-    description: "Returns the project with its participants and tasks. 403 unless the caller is the project lead.",
+    description: "The lead sees the project with all participants and tasks; a participant sees only the tasks assigned to it.",
     params: projectIdParams,
     responses: {
       ...authAndRateLimitErrors,
-      200: res(projectResponse, "The project, with participants and tasks."),
+      200: res(projectResponse, "The project. The lead sees everything; a participant only its own tasks."),
       404: res(apiError, "No such project."),
-      403: res(apiError, "Only the project lead can read the whole project."),
+      403: res(apiError, "The caller is neither the project lead nor a participant."),
     },
   },
   async (c) => {
-    const project = await getProject(c.get("agentId"), c.req.param("id") ?? "");
+    const project = await getProjectForAgent(c.get("agentId"), c.req.param("id") ?? "");
     return c.json({ data: toWireProject(project) });
   },
 );

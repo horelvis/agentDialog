@@ -58,21 +58,21 @@ describe("agent projects", () => {
       headers: { Authorization: backend.authHeader },
     });
     const { data: mailboxTasks } = await mailbox.json();
-    expect(mailboxTasks.map((t: any) => t.id)).toContain(projectTask.a2a_task_id);
+    expect(mailboxTasks.map((t: any) => t.id)).toContain(projectTask.tasks[0].a2a_task_id);
 
     // The assignee reports progress and delivers an artifact.
-    await app.request(`/api/v1/agent/a2a/tasks/${projectTask.a2a_task_id}/status`, {
+    await app.request(`/api/v1/agent/a2a/tasks/${projectTask.tasks[0].a2a_task_id}/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: backend.authHeader },
       body: JSON.stringify({ state: "TASK_STATE_WORKING" }),
     });
-    const deliver = await app.request(`/api/v1/agent/a2a/tasks/${projectTask.a2a_task_id}/artifacts`, {
+    const deliver = await app.request(`/api/v1/agent/a2a/tasks/${projectTask.tasks[0].a2a_task_id}/artifacts`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: backend.authHeader },
       body: JSON.stringify({ name: "login.ts", parts: [{ kind: "text", text: "export async function login() {}" }] }),
     });
     expect(deliver.status).toBe(201);
-    await app.request(`/api/v1/agent/a2a/tasks/${projectTask.a2a_task_id}/status`, {
+    await app.request(`/api/v1/agent/a2a/tasks/${projectTask.tasks[0].a2a_task_id}/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: backend.authHeader },
       body: JSON.stringify({ state: "TASK_STATE_COMPLETED" }),
@@ -124,11 +124,15 @@ describe("agent projects", () => {
     const aliceData = await aliceView.json();
     expect(aliceData.data.tasks.map((t: any) => t.title)).toEqual(["Alice only"]);
 
-    // Bob cannot read the project through the lead's endpoint.
-    const bobLeadView = await app.request(`/api/v1/agent/projects/${project.project_id}`, {
+    // Bob reads the project as a participant: he sees the project, but not
+    // Alice's task — only tasks assigned to him.
+    const bobView = await app.request(`/api/v1/agent/projects/${project.project_id}`, {
       headers: { Authorization: bob.authHeader },
     });
-    expect(bobLeadView.status).toBe(403);
+    expect(bobView.status).toBe(200);
+    const bobData = await bobView.json();
+    expect(bobData.data.tasks.map((t: any) => t.title)).not.toContain("Alice only");
+    expect(bobData.data.tasks).toHaveLength(0);
   });
 
   it("only the lead can cancel a project", async () => {

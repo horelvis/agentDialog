@@ -8,7 +8,7 @@ describe("A2A JSON-RPC binding", () => {
     const sender = await createTestAgent();
     const recipient = await createTestAgent();
 
-    const send = await app.request(`/a2a/${recipient.agent.slug}/`, {
+    const send = await app.request(`/a2a/${recipient.agent.slug}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: sender.authHeader },
       body: JSON.stringify({
@@ -24,7 +24,7 @@ describe("A2A JSON-RPC binding", () => {
     expect(sendBody.result.status.state).toBe("TASK_STATE_SUBMITTED");
 
     const taskId = sendBody.result.id;
-    const get = await app.request(`/a2a/${recipient.agent.slug}/`, {
+    const get = await app.request(`/a2a/${recipient.agent.slug}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: sender.authHeader },
       body: JSON.stringify({ jsonrpc: "2.0", method: "tasks/get", params: { taskId }, id: 2 }),
@@ -37,7 +37,7 @@ describe("A2A JSON-RPC binding", () => {
     const sender = await createTestAgent();
     const recipient = await createTestAgent();
 
-    const res = await app.request(`/a2a/${recipient.agent.slug}/`, {
+    const res = await app.request(`/a2a/${recipient.agent.slug}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: sender.authHeader },
       body: JSON.stringify({ jsonrpc: "2.0", method: "no/such", id: 3 }),

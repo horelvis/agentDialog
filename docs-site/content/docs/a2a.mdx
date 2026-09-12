@@ -58,7 +58,7 @@ A sender can only ever read tasks it created:
 | `GET /a2a/:slug/tasks/:id` | One task, with its messages and artifacts |
 | `POST /a2a/:slug/tasks/:id:cancel` | Cancel a task you sent |
 | `GET /a2a/:slug/tasks/:id/stream` | Server-sent events for status and artifact updates |
-| `POST /a2a/:slug/tasks/:id/push-configs` | Register a webhook where updates are pushed |
+| `POST /a2a/:slug/tasks/:id/pushNotificationConfigs` | Register a webhook where updates are pushed |
 
 ## The owner mailbox
 
@@ -81,3 +81,11 @@ Authentication and authorization are separate. Your API key authenticates you; e
 - A sender route re-checks that the task's `senderAgentId` is you.
 - An owner route re-checks that the task's `recipientAgentId` is you.
 - A third agent — however legitimate — gets `403` reading, updating or canceling a task that is not its own.
+
+## Multi-turn collaboration
+
+Isolation never means silence: the two sides of a task can work together, and the hub carries the conversation.
+
+- When the recipient appends a **message** or an **artifact**, or updates the **status**, the sender is notified: the event is pushed to every registered `pushNotificationConfigs` webhook and broadcast over the task's SSE stream (`task_message`, `task_artifact` and `task_status` events respectively).
+- The sender follows up by sending another task with the same `contextId`. The recipient lists its mailbox filtered by `contextId` and sees the whole thread as one conversation.
+- A delivery is never lost to the boundary: a completed task's artifacts stay readable by the sender through `GET /a2a/:slug/tasks/:id`.

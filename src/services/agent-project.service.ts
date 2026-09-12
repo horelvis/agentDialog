@@ -1,9 +1,10 @@
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   agentProjects,
   agentProjectParticipants,
   agentProjectTasks,
+  a2aTasks,
 } from "../db/schema";
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from "../lib/errors";
 import { sendMessage } from "./a2a-mailbox.service";
@@ -69,6 +70,30 @@ const PROJECT_TASK_STATUSES: ProjectTaskStatus[] = [
   "failed",
   "canceled",
 ];
+
+/**
+ * How an A2A task state shows up in the project. The mailbox is the source of
+ * truth for delivery; the project task status is read off the linked A2A task,
+ * so a completed delivery can never leave a stale "assigned" behind.
+ */
+export function a2aStateToProjectTaskStatus(a2aState: string): ProjectTaskStatus {
+  switch (a2aState) {
+    case "working":
+      return "in_progress";
+    case "input_required":
+      return "review";
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "canceled":
+      return "canceled";
+    case "rejected":
+      return "failed";
+    default:
+      return "assigned";
+  }
+}
 
 /**
  * Derive the project status from its tasks' statuses. Empty projects stay
@@ -204,6 +229,16 @@ export async function getProject(leadAgentId: string, projectId: string): Promis
 }
 
 /**
+ * The right view of a project for whoever calls: the lead sees everything, a
+ * participant sees only its own tasks, and an outsider gets 403.
+ */
+export async function getProjectForAgent(agentId: string, projectId: string): Promise<PublicProject> {
+  const project = await fetchProjectRow(projectId);
+  if (project.leadAgentId === agentId) return buildProject(project);
+  return getProjectAsParticipant(agentId, projectId);
+}
+
+/**
  * The participant's view of a project: only the tasks assigned to this agent.
  * The lead's view, getProject, shows everything.
  */
@@ -228,10 +263,13 @@ export async function getProjectAsParticipant(agentId: string, projectId: string
   const participants = await fetchParticipants(projectId);
   const filtered = participants.filter((p) => p.agentId === agentId);
 
+  const liveStatuses = await projectTaskStatuses(tasks);
+  const liveTasks = tasks.map((t, i) => ({ ...publicProjectTask(t), status: liveStatuses[i] ?? t.status as ProjectTaskStatus }));
+
   return {
     ...projectToPublic(project),
     participants: filtered,
-    tasks: tasks.map(publicProjectTask),
+    tasks: liveTasks,
   };
 }
 
@@ -352,7 +390,12 @@ async function buildProject(project: typeof agentProjects.$inferSelect): Promise
     fetchTasks(project.id),
   ]);
 
-  const status = computeProjectStatus(tasks.map((t) => t.status as ProjectTaskStatus));
+  const statuses = await projectTaskStatuses(tasks);
+
+  // An explicitly canceled project stays canceled whatever its tasks say; the
+  // derived status is only the fallback for projects never moved by hand.
+  const derived = computeProjectStatus(statuses);
+  const status = project.status === "canceled" ? "canceled" : derived;
 
   return {
     ...projectToPublic(project),
@@ -360,6 +403,24 @@ async function buildProject(project: typeof agentProjects.$inferSelect): Promise
     participants: participants.map(publicParticipant),
     tasks: tasks.map(publicProjectTask),
   };
+}
+
+/**
+ * The live status of every project task, read from its linked A2A task. The
+ * stored `status` column is the initial value; delivery progress lives in the
+ * mailbox, so that is what is shown.
+ */
+async function projectTaskStatuses(tasks: Array<typeof agentProjectTasks.$inferSelect>): Promise<ProjectTaskStatus[]> {
+  if (tasks.length === 0) return [];
+
+  const db = getDb();
+  const a2aRows = await db
+    .select({ id: a2aTasks.id, state: a2aTasks.state })
+    .from(a2aTasks)
+    .where(inArray(a2aTasks.id, tasks.map((t) => t.a2aTaskId)));
+
+  const stateById = new Map(a2aRows.map((r) => [r.id, r.state]));
+  return tasks.map((t) => a2aStateToProjectTaskStatus(stateById.get(t.a2aTaskId) ?? "submitted"));
 }
 
 function projectToPublic(project: typeof agentProjects.$inferSelect) {

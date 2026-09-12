@@ -5,6 +5,7 @@ import {
   type TaskStatus,
   type TaskStatusUpdateEvent,
   type Artifact,
+  type Message,
 } from "@/lib/a2a";
 
 export interface PushConfig {
@@ -21,6 +22,12 @@ export interface DeliveryResult {
 
 export const A2A_STATUS_EVENT = "task_status";
 export const A2A_ARTIFACT_EVENT = "task_artifact";
+export const A2A_MESSAGE_EVENT = "task_message";
+
+export interface MessageUpdateEvent {
+  message: Message;
+  timestamp: string;
+}
 
 /**
  * Build the SSE payload for a task status change. The envelope carries the
@@ -53,11 +60,24 @@ export function buildArtifactUpdatePayload(
 }
 
 /**
+ * Build the SSE payload for a new message in the task thread. A2A streams
+ * status and artifact events; a message is how the recipient talks back inside
+ * a multi-turn collaboration, and the sender must learn it landed even though
+ * the spec does not define a message event — this is the hub's extension.
+ */
+export function buildMessageUpdatePayload(message: Message): MessageUpdateEvent {
+  return {
+    message,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/**
  * Build the envelope used for both SSE and push notifications.
  */
 export function buildEventEnvelope(
-  eventType: typeof A2A_STATUS_EVENT | typeof A2A_ARTIFACT_EVENT,
-  payload: TaskStatusUpdateEvent | TaskArtifactUpdateEvent,
+  eventType: typeof A2A_STATUS_EVENT | typeof A2A_ARTIFACT_EVENT | typeof A2A_MESSAGE_EVENT,
+  payload: TaskStatusUpdateEvent | TaskArtifactUpdateEvent | MessageUpdateEvent,
 ): Record<string, unknown> {
   return { event: eventType, payload };
 }
@@ -72,8 +92,8 @@ export function taskEventChannel(taskId: string): string {
 export async function publishTaskEvent(
   redis: Redis,
   taskId: string,
-  eventType: typeof A2A_STATUS_EVENT | typeof A2A_ARTIFACT_EVENT,
-  payload: TaskStatusUpdateEvent | TaskArtifactUpdateEvent,
+  eventType: typeof A2A_STATUS_EVENT | typeof A2A_ARTIFACT_EVENT | typeof A2A_MESSAGE_EVENT,
+  payload: TaskStatusUpdateEvent | TaskArtifactUpdateEvent | MessageUpdateEvent,
 ): Promise<void> {
   const envelope = buildEventEnvelope(eventType, payload);
   await redis.publish(taskEventChannel(taskId), JSON.stringify(envelope));

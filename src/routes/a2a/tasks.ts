@@ -60,24 +60,28 @@ hono.get("/tasks", validateQuery(listTasksQuerySchema), async (c) => {
   return c.json(tasks);
 });
 
+// The A2A spec's cancel path is POST /tasks/{id}:cancel. Hono parses the
+// trailing ":cancel" as part of the parameter name (a param matches [^/]+),
+// so the id arrives as "id:cancel" and is stripped here.
 hono.post("/tasks/:id:cancel", async (c) => {
-  const taskId = c.req.param("id") ?? "";
+  const raw = c.req.param("id:cancel") ?? "";
+  const taskId = raw.replace(/:cancel$/, "");
   const task = await cancelTaskAsSender(taskId, c.get("a2aSenderAgentId"));
   return c.json(task);
 });
 
-hono.post("/tasks/:id/push-configs", validateBody(pushConfigSchema), async (c) => {
+hono.post("/tasks/:id/pushNotificationConfigs", validateBody(pushConfigSchema), async (c) => {
   const { url, authInfo } = c.get("validatedBody") as { url: string; authInfo?: Record<string, unknown> };
   const config = await createPushConfig(c.req.param("id") ?? "", c.get("a2aSenderAgentId"), url, authInfo);
   return c.json(config, 201);
 });
 
-hono.get("/tasks/:id/push-configs", async (c) => {
+hono.get("/tasks/:id/pushNotificationConfigs", async (c) => {
   const configs = await listPushConfigs(c.req.param("id") ?? "", c.get("a2aSenderAgentId"));
   return c.json(configs);
 });
 
-hono.get("/tasks/:id/push-configs/:configId", async (c) => {
+hono.get("/tasks/:id/pushNotificationConfigs/:configId", async (c) => {
   const config = await getPushConfig(
     c.req.param("id") ?? "",
     c.get("a2aSenderAgentId"),
@@ -86,7 +90,7 @@ hono.get("/tasks/:id/push-configs/:configId", async (c) => {
   return c.json(config);
 });
 
-hono.delete("/tasks/:id/push-configs/:configId", async (c) => {
+hono.delete("/tasks/:id/pushNotificationConfigs/:configId", async (c) => {
   await deletePushConfig(
     c.req.param("id") ?? "",
     c.get("a2aSenderAgentId"),

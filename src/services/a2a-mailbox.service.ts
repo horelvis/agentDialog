@@ -6,12 +6,15 @@ import { getRedis } from "../lib/redis";
 import { inspectWebhookTarget } from "../lib/webhook-url-guard";
 import {
   A2A_ARTIFACT_EVENT,
+  A2A_MESSAGE_EVENT,
   A2A_STATUS_EVENT,
   buildArtifactUpdatePayload,
   buildEventEnvelope,
+  buildMessageUpdatePayload,
   buildStatusUpdatePayload,
   deliverPushNotifications,
   publishTaskEvent,
+  type MessageUpdateEvent,
   type PushConfig,
 } from "./a2a-delivery.service";
 import {
@@ -80,7 +83,7 @@ export async function getTaskAsSender(taskId: string, senderAgentId: string): Pr
   if (task.senderAgentId !== senderAgentId) {
     throw new ForbiddenError("Task does not belong to this sender");
   }
-  return buildTaskResponse(task);
+  return buildFullTaskResponse(task);
 }
 
 export async function getTaskAsRecipient(taskId: string, recipientAgentId: string): Promise<Task> {
@@ -88,17 +91,25 @@ export async function getTaskAsRecipient(taskId: string, recipientAgentId: strin
   if (task.recipientAgentId !== recipientAgentId) {
     throw new ForbiddenError("Task is not addressed to this agent");
   }
-  return buildTaskResponse(task);
+  return buildFullTaskResponse(task);
 }
 
 export async function listTasksAsSender(senderAgentId: string, filters: ListTasksFilters = {}): Promise<Task[]> {
   const rows = await fetchTaskRows({ senderAgentId, ...filters });
-  return rows.map((row) => buildTaskResponse(row));
+  const tasks: Task[] = [];
+  for (const row of rows) {
+    tasks.push(await buildFullTaskResponse(row));
+  }
+  return tasks;
 }
 
 export async function listTasksAsRecipient(recipientAgentId: string, filters: ListTasksFilters = {}): Promise<Task[]> {
   const rows = await fetchTaskRows({ recipientAgentId, ...filters });
-  return rows.map((row) => buildTaskResponse(row));
+  const tasks: Task[] = [];
+  for (const row of rows) {
+    tasks.push(await buildFullTaskResponse(row));
+  }
+  return tasks;
 }
 
 export async function cancelTaskAsSender(taskId: string, senderAgentId: string): Promise<Task> {
@@ -163,7 +174,9 @@ export async function addTaskMessage(
     })
     .returning();
 
-  return buildMessageResponse(row);
+  const response = buildMessageResponse(row);
+  await notifyTaskChange(taskId, A2A_MESSAGE_EVENT, buildMessageUpdatePayload(response));
+  return response;
 }
 
 export async function addTaskArtifact(
@@ -200,7 +213,21 @@ export async function addTaskArtifact(
  */
 export async function getTaskResponse(taskId: string): Promise<Task> {
   const task = await fetchTaskRow(taskId);
-  return buildTaskResponse(task);
+  return buildFullTaskResponse(task);
+}
+
+/**
+ * A task response that carries its messages and artifacts. Every task-facing
+ * entry point uses this, so a client never sees a task stripped of its thread
+ * and deliverables.
+ */
+async function buildFullTaskResponse(task: typeof a2aTasks.$inferSelect): Promise<Task> {
+  const db = getDb();
+  const [messages, artifacts] = await Promise.all([
+    db.select().from(a2aMessages).where(eq(a2aMessages.taskId, task.id)).orderBy(asc(a2aMessages.createdAt)),
+    db.select().from(a2aArtifacts).where(eq(a2aArtifacts.taskId, task.id)).orderBy(asc(a2aArtifacts.index)),
+  ]);
+  return buildTaskResponse(task, messages, artifacts);
 }
 
 async function fetchTaskRow(taskId: string) {
@@ -416,8 +443,8 @@ async function fetchPushConfigs(taskId: string): Promise<PushConfig[]> {
 
 async function notifyTaskChange(
   taskId: string,
-  eventType: typeof A2A_STATUS_EVENT | typeof A2A_ARTIFACT_EVENT,
-  payload: TaskStatusUpdateEvent | TaskArtifactUpdateEvent,
+  eventType: typeof A2A_STATUS_EVENT | typeof A2A_ARTIFACT_EVENT | typeof A2A_MESSAGE_EVENT,
+  payload: TaskStatusUpdateEvent | TaskArtifactUpdateEvent | MessageUpdateEvent,
 ): Promise<void> {
   const redis = getRedis();
   await publishTaskEvent(redis, taskId, eventType, payload);
