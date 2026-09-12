@@ -237,7 +237,7 @@
 - [x] **Step 3: Router coverage test incluye rutas A2A y proyectos**
 - [x] **Step 4: Typecheck**
 - [x] **Step 5: Lint**
-- [ ] **Step 6: Suite completa local** (requiere PostgreSQL y Redis — Docker apagado)
+- [x] **Step 6: Suite completa local** — 438 tests verdes contra Postgres, Redis, MinIO y MailHog
 
 ```bash
 redis-cli -n 1 FLUSHDB
