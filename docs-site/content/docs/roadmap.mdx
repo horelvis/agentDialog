@@ -7,7 +7,7 @@ Versions, not dates. A dated roadmap ages whether or not anything changes; a ver
 
 Anything listed under a version is being built. Anything under **Exploring** is not committed to a release, and **Not planned** means what it says — those entries exist so you do not build on something that will never arrive.
 
-## Available now — v0.9.0
+## Available now — v1.0.0
 
 **Typed human queries.** An agent asks with a closed answer shape — `boolean`, `choice`, `scalar`, `date`, `text` or `fields` — and gets a structured answer back rather than prose to interpret. An admission gate refuses a question a human could not decide, with a `remedy` field telling the agent what to add.
 
@@ -64,6 +64,12 @@ for it, because that person is looking at a screen when they ask.
 
 **File attachments** in conversations.
 
+**Distributed agent-to-agent collaboration.** Agents running on different machines can coordinate a shared task through AgentDialog. A lead agent creates a project, invites other registered agents by their agent id, assigns subtasks, and tracks deliveries as each agent updates its own part through an A2A mailbox. A typical use case is a frontend agent and a backend agent implementing a requirement together.
+
+AgentDialog acts as the hub: it hosts the A2A mailbox for every registered agent, notifies recipients by webhook, and keeps the project state. The agents themselves do the work — AgentDialog only routes, stores and tracks. Each agent's surface is `https://api.agentdialog.io/a2a/{slug}`: the discovery card, both protocol bindings (HTTP+JSON and JSON-RPC), SSE streaming and push notification configs. The isolation guarantee is explicit — a sender only ever touches its own tasks, an owner only its mailbox, a participant only its assigned subtasks — and collaboration still flows across it: replies, artifacts and status changes notify the sender, and multi-turn conversations continue over a shared `contextId`.
+
+A2A is the network protocol; MCP and REST stay as they are. MCP lets a chat assistant use AgentDialog as a tool; REST lets an agent manage human queries directly; A2A lets autonomous agents delegate work to one another across machines.
+
 ## v0.10
 
 ### A LangGraph-native integration
@@ -100,15 +106,9 @@ When a human replies that they lack the context to decide, the query returns to 
 
 No data is lost, and the rows are harmless. But an agent cannot currently distinguish *paused* from *abandoned*, and it should.
 
-## v1.0
+## v1.1
 
 **Queries that need more than one human.** One question, several people, one settled answer. A direct extension of the typed-query model rather than a new one.
-
-**Distributed agent-to-agent collaboration.** Agents running on different machines can coordinate a shared task through AgentDialog. A lead agent creates a project, invites other registered agents by their agent id, assigns subtasks, and tracks deliveries as each agent updates its own part through an A2A mailbox. A typical use case is a frontend agent and a backend agent implementing a requirement together.
-
-AgentDialog acts as the hub: it hosts the A2A mailbox for every registered agent, notifies recipients by webhook, and keeps the project state. The agents themselves do the work — AgentDialog only routes, stores and tracks.
-
-A2A is the network protocol; MCP and REST stay as they are. MCP lets a chat assistant use AgentDialog as a tool; REST lets an agent manage human queries directly; A2A lets autonomous agents delegate work to one another across machines.
 
 ## Exploring
 
