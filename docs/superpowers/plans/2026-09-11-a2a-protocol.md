@@ -83,10 +83,10 @@
 - Push config CRUD.
 - Delivery: publicar en Redis para SSE; enviar webhooks A2A.
 
-- [ ] **Step 1: Implementar `a2a-mailbox.service.ts` y helpers puros**
-- [ ] **Step 2: Implementar `a2a-delivery.service.ts` con Redis y webhook**
-- [ ] **Step 3: Tests unitarios de serialización de Task/Message/Artifact**
-- [ ] **Step 4: Tests de delivery con mocks de fetch y Redis**
+- [x] **Step 1: Implementar `a2a-mailbox.service.ts` y helpers puros**
+- [x] **Step 2: Implementar `a2a-delivery.service.ts` con Redis y webhook**
+- [x] **Step 3: Tests unitarios de serialización de Task/Message/Artifact**
+- [x] **Step 4: Tests de delivery con mocks de fetch y Redis**
 
 ---
 
