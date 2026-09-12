@@ -253,6 +253,6 @@ bun test tests/unit tests/integration
 - Create: `docs-site/content/docs/agent-projects.mdx`
 - Modify: `docs-site/content/docs/roadmap.mdx`
 
-- [ ] **Step 1: Documentar A2A mailbox**
-- [ ] **Step 2: Documentar proyectos colaborativos con ejemplo frontend+backend**
-- [ ] **Step 3: Actualizar roadmap**
+- [x] **Step 1: Documentar A2A mailbox**
+- [x] **Step 2: Documentar proyectos colaborativos con ejemplo frontend+backend**
+- [x] **Step 3: Actualizar roadmap**

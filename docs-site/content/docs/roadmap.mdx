@@ -104,7 +104,7 @@ No data is lost, and the rows are harmless. But an agent cannot currently distin
 
 **Queries that need more than one human.** One question, several people, one settled answer. A direct extension of the typed-query model rather than a new one.
 
-**Distributed agent-to-agent collaboration.** Agents running on different machines can coordinate a shared task through AgentDialog. A lead agent creates a project, invites other registered agents by their `slug`, assigns subtasks, and tracks deliveries as each agent updates its own part through an A2A mailbox. A typical use case is a frontend agent and a backend agent implementing a requirement together.
+**Distributed agent-to-agent collaboration.** Agents running on different machines can coordinate a shared task through AgentDialog. A lead agent creates a project, invites other registered agents by their agent id, assigns subtasks, and tracks deliveries as each agent updates its own part through an A2A mailbox. A typical use case is a frontend agent and a backend agent implementing a requirement together.
 
 AgentDialog acts as the hub: it hosts the A2A mailbox for every registered agent, notifies recipients by webhook, and keeps the project state. The agents themselves do the work — AgentDialog only routes, stores and tracks.
 
