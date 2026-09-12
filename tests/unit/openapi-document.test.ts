@@ -147,7 +147,7 @@ describe("the OpenAPI document", () => {
     const doc: any = buildDocument({});
     const routes = registeredRoutes();
 
-    expect(routes.length).toBe(33);
+    expect(routes.length).toBe(39);
     expect(routes.filter((r) => r.doc.idempotent).length).toBe(7);
 
     for (const route of routes) {

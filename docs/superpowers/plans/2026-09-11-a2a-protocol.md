@@ -172,16 +172,16 @@
 - Create: `src/db/schema/agent-project-participants.ts`
 - Create: `src/db/schema/agent-project-tasks.ts`
 - Modify: `src/db/schema/index.ts`
-- Create: migración correspondiente (con PostgreSQL local)
+- Create: migración correspondiente (`migrations/0012_agent_projects.sql`)
 
 **Interfaces:**
 - `projects(id, name, description, status, lead_agent_id, metadata, timestamps)`
 - `project_participants(project_id, agent_id, role, status)`
 - `project_tasks(project_id, a2a_task_id, title, description, assignee_agent_id, status, timestamps)`
 
-- [ ] **Step 1: Definir tablas**
-- [ ] **Step 2: Generar y aplicar migración**
-- [ ] **Step 3: Tests de validación de estados del proyecto**
+- [x] **Step 1: Definir tablas**
+- [x] **Step 2: Migración escrita a mano y registrada en el journal** (PostgreSQL local pendiente de arrancar)
+- [x] **Step 3: Tests de validación de estados del proyecto** (en `tests/unit/agent-project.test.ts`)
 
 ---
 
@@ -197,14 +197,16 @@
 - `inviteParticipant(leadAgentId, projectId, agentId, role): Participant`
 - `createTask(leadAgentId, projectId, assigneeAgentId, title, description, message): ProjectTask`
 - `getProject(leadAgentId, projectId): Project with tasks`
+- `getProjectAsParticipant(agentId, projectId): solo las tareas del participante`
 - `listProjects(leadAgentId): Project[]`
+- `listProjectsForAgent(agentId): Project[]`
 - `cancelProject(leadAgentId, projectId): Project`
 - Helper: `computeProjectStatus(tasks): ProjectStatus`
 
-- [ ] **Step 1: Lógica pura de estados del proyecto**
-- [ ] **Step 2: Implementar servicio usando buzón A2A**
-- [ ] **Step 3: Tests unitarios con mocks**
-- [ ] **Step 4: Tests de integración flujo completo**
+- [x] **Step 1: Lógica pura de estados del proyecto**
+- [x] **Step 2: Implementar servicio usando buzón A2A**
+- [x] **Step 3: Tests unitarios con mocks**
+- [x] **Step 4: Tests de integración flujo completo** (pendientes de PostgreSQL local)
 
 ---
 
@@ -222,9 +224,9 @@
 - `POST /api/v1/agent/projects/:id/tasks`
 - `POST /api/v1/agent/projects/:id/cancel`
 
-- [ ] **Step 1: CRUD de proyectos**
-- [ ] **Step 2: Invitar participantes y crear subtareas**
-- [ ] **Step 3: Router coverage test incluye estas rutas**
+- [x] **Step 1: CRUD de proyectos**
+- [x] **Step 2: Invitar participantes y crear subtareas**
+- [x] **Step 3: Router coverage test incluye estas rutas**
 
 ---
 

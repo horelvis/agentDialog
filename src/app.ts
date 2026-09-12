@@ -31,6 +31,7 @@ import agentInvitationRoutes from "./routes/agent/invitations";
 import agentWebhookRoutes from "./routes/agent/webhooks";
 import agentQueryRoutes from "./routes/agent/queries";
 import agentA2ARoutes from "./routes/agent/a2a";
+import agentProjectRoutes from "./routes/agent/projects";
 import { createA2ARoutes } from "./routes/a2a";
 import humanAuthRoutes from "./routes/human/auth";
 import publicQueryRoutes from "./routes/public/queries";
@@ -130,6 +131,7 @@ export function createApp() {
   agentApi.route("/webhooks", agentWebhookRoutes);
   agentApi.route("/queries", agentQueryRoutes);
   agentApi.route("/a2a", agentA2ARoutes);
+  agentApi.route("/projects", agentProjectRoutes);
   app.route("/api/v1/agent", agentApi);
 
   // Public query links: no session at all, resolved by the token in the path.
