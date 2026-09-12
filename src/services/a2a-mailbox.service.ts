@@ -1,12 +1,23 @@
 import { eq, and, asc, desc } from "drizzle-orm";
 import { getDb } from "../db";
-import { a2aTasks, a2aMessages, a2aArtifacts } from "../db/schema";
+import { a2aTasks, a2aMessages, a2aArtifacts, a2aPushConfigs } from "../db/schema";
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from "../lib/errors";
+import { getRedis } from "../lib/redis";
+import { inspectWebhookTarget } from "../lib/webhook-url-guard";
+import {
+  A2A_ARTIFACT_EVENT,
+  A2A_STATUS_EVENT,
+  buildArtifactUpdatePayload,
+  buildEventEnvelope,
+  buildStatusUpdatePayload,
+  deliverPushNotifications,
+  publishTaskEvent,
+  type PushConfig,
+} from "./a2a-delivery.service";
 import {
   a2aStateFromInternal,
   internalStateFromA2a,
   isTerminalInternalState,
-  type AgentCard,
   type Artifact,
   type Message,
   type Part,
@@ -127,7 +138,9 @@ export async function updateTaskStatus(
     })
     .where(eq(a2aTasks.id, taskId));
 
-  return getTaskAsRecipient(taskId, recipientAgentId);
+  const updatedTask = await getTaskAsRecipient(taskId, recipientAgentId);
+  await notifyTaskChange(taskId, A2A_STATUS_EVENT, buildStatusUpdatePayload(updatedTask.status));
+  return updatedTask;
 }
 
 export async function addTaskMessage(
@@ -169,14 +182,16 @@ export async function addTaskArtifact(
       taskId,
       name: artifact.name ?? null,
       description: artifact.description ?? null,
-    parts: artifact.parts as Array<Record<string, unknown>>,
-    index: artifact.index ?? 0,
-    append: artifact.append ? 1 : 0,
-    lastChunk: artifact.lastChunk ? 1 : 0,
-  })
+      parts: artifact.parts as Array<Record<string, unknown>>,
+      index: artifact.index ?? 0,
+      append: artifact.append ? 1 : 0,
+      lastChunk: artifact.lastChunk ? 1 : 0,
+    })
     .returning();
 
-  return buildArtifactResponse(row);
+  const response = buildArtifactResponse(row);
+  await notifyTaskChange(taskId, A2A_ARTIFACT_EVENT, buildArtifactUpdatePayload(response));
+  return response;
 }
 
 /**
@@ -291,10 +306,127 @@ export function buildArtifactResponse(row: typeof a2aArtifacts.$inferSelect): Ar
   };
 }
 
-export function buildStatusUpdateEvent(status: TaskStatus): TaskStatusUpdateEvent {
-  return { status, timestamp: new Date().toISOString() };
+export interface PublicPushConfig {
+  id: string;
+  taskId: string;
+  url: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export function buildArtifactUpdateEvent(artifact: Artifact): TaskArtifactUpdateEvent {
-  return { artifact, timestamp: new Date().toISOString() };
+function publicPushConfig(row: typeof a2aPushConfigs.$inferSelect): PublicPushConfig {
+  return {
+    id: row.id,
+    taskId: row.taskId,
+    url: row.url,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+async function assertSenderOwnsTask(taskId: string, senderAgentId: string) {
+  const task = await fetchTaskRow(taskId);
+  assertSenderAccess(task, senderAgentId);
+}
+
+export async function createPushConfig(
+  taskId: string,
+  senderAgentId: string,
+  url: string,
+  authInfo?: Record<string, unknown>,
+): Promise<PublicPushConfig> {
+  await assertSenderOwnsTask(taskId, senderAgentId);
+
+  const verdict = await inspectWebhookTarget(url);
+  if (!verdict.allowed) {
+    throw new ValidationError(verdict.reason!);
+  }
+
+  const db = getDb();
+  const [row] = await db
+    .insert(a2aPushConfigs)
+    .values({ taskId, url, authInfo: authInfo ?? null })
+    .returning();
+
+  return publicPushConfig(row);
+}
+
+export async function getPushConfig(
+  taskId: string,
+  senderAgentId: string,
+  configId: string,
+): Promise<PublicPushConfig> {
+  await assertSenderOwnsTask(taskId, senderAgentId);
+
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(a2aPushConfigs)
+    .where(and(eq(a2aPushConfigs.id, configId), eq(a2aPushConfigs.taskId, taskId)))
+    .limit(1);
+
+  if (!row) throw new NotFoundError("A2A push config", configId);
+  return publicPushConfig(row);
+}
+
+export async function listPushConfigs(
+  taskId: string,
+  senderAgentId: string,
+): Promise<PublicPushConfig[]> {
+  await assertSenderOwnsTask(taskId, senderAgentId);
+
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(a2aPushConfigs)
+    .where(eq(a2aPushConfigs.taskId, taskId))
+    .orderBy(desc(a2aPushConfigs.createdAt));
+
+  return rows.map(publicPushConfig);
+}
+
+export async function deletePushConfig(
+  taskId: string,
+  senderAgentId: string,
+  configId: string,
+): Promise<void> {
+  await assertSenderOwnsTask(taskId, senderAgentId);
+
+  const db = getDb();
+  const result = await db
+    .delete(a2aPushConfigs)
+    .where(and(eq(a2aPushConfigs.id, configId), eq(a2aPushConfigs.taskId, taskId)))
+    .returning({ id: a2aPushConfigs.id });
+
+  if (result.length === 0) throw new NotFoundError("A2A push config", configId);
+}
+
+async function fetchPushConfigs(taskId: string): Promise<PushConfig[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ url: a2aPushConfigs.url, authInfo: a2aPushConfigs.authInfo })
+    .from(a2aPushConfigs)
+    .where(eq(a2aPushConfigs.taskId, taskId));
+
+  return rows.map((r) => ({
+    url: r.url,
+    authInfo: r.authInfo ? (r.authInfo as Record<string, unknown>) : undefined,
+  }));
+}
+
+async function notifyTaskChange(
+  taskId: string,
+  eventType: typeof A2A_STATUS_EVENT | typeof A2A_ARTIFACT_EVENT,
+  payload: TaskStatusUpdateEvent | TaskArtifactUpdateEvent,
+): Promise<void> {
+  const redis = getRedis();
+  await publishTaskEvent(redis, taskId, eventType, payload);
+
+  const configs = await fetchPushConfigs(taskId);
+  if (configs.length > 0) {
+    // Fire-and-forget: failures are logged by the delivery layer, not thrown.
+    deliverPushNotifications(configs, buildEventEnvelope(eventType, payload)).catch((err) => {
+      console.error(`A2A push delivery failed for task ${taskId}:`, err);
+    });
+  }
 }
