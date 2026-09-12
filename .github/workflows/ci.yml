@@ -58,12 +58,17 @@ jobs:
       # MinIO needs `server /data` as its command, which a service container
       # cannot express, so it runs as a step. The suite does need it: the file
       # download tests create the bucket and upload through it.
+      #
+      # Pulled from quay.io, MinIO's own registry, pinned to a release: the
+      # runner hit "pull access denied" on minio/minio:latest from Docker Hub,
+      # where anonymous pulls are rate-limited, while the pinned postgres and
+      # redis service images came through fine.
       - name: Start MinIO
         run: |
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio server /data
+            quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
           for i in $(seq 1 30); do
             if curl -sf http://localhost:9000/minio/health/live >/dev/null; then
               echo "MinIO ready"
