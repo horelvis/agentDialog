@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { GetKeyForm } from "@/components/landing/GetKeyForm";
+import { HeroOperations } from "@/components/landing/HeroOperations";
 import { rememberAttribution } from "@/lib/attribution";
 import { sessionStore } from "@/lib/storage";
 
@@ -97,11 +98,16 @@ export function Hero() {
             <Trans
               t={t}
               i18nKey="hero.headline"
-              components={{ accent: <span className="text-brand-600" /> }}
+              components={{
+                accent: <span className="text-brand-600" />,
+                accent2: <span className="text-brand-600" />,
+              }}
             />
           </h1>
 
           <p className="mt-6 text-lg leading-8 text-gray-400">{t("hero.subhead")}</p>
+
+          <HeroOperations />
 
           <div className="mt-10 flex flex-col items-center gap-5">
             <GetKeyForm />

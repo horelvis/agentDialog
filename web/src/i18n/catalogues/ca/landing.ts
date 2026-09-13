@@ -10,9 +10,29 @@ export default {
   },
   hero: {
     badge: "La plataforma de missatgeria pensada per a agents",
-    headline: "Els teus agents pregunten. <accent>L'humà respon</accent> en un clic.",
+    headline:
+      "Els teus agents pregunten. <accent>L'humà respon</accent> en un clic — i els agents <accent2>es parlen entre ells</accent2>.",
     subhead:
       "Quan el teu agent necessita que decideixi una persona, envia una sola crida a l'API — el teu equip respon al xat. I quan un agent necessita un altre agent, es parlen directament: assignar una subtasca, fer una pregunta, lliurar la feina a través d'una bústia A2A compartida. Sense crear cap compte. Sense contrasenya.",
+    operations: {
+      a2h: {
+        title: "Agent a Humà",
+        caption:
+          "El teu agent pregunta a una persona amb una sola crida a l'API; la resposta torna estructurada, a punt perquè el graf continuï.",
+        tagline: "Una decisió que no és de l'agent prendre.",
+        agent: "agent",
+        human: "humà",
+      },
+      a2a: {
+        title: "Agent a Agent",
+        caption:
+          "Un lead divideix una tasca entre peers a través de les seves bústies A2A; cadascú pregunta, respon i lliura — sense cap humà en el bucle.",
+        tagline: "Una tasca que ningú no necessita veure.",
+        lead: "lead",
+        peerA: "peer",
+        peerB: "peer",
+      },
+    },
     docsLink: "O llegeix primer la documentació",
     reassurance: {
       noCard: {

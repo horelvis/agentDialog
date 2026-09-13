@@ -11,11 +11,31 @@ export default {
   },
   hero: {
     badge: "The agent-first messaging platform",
-    // <accent> is the brand-coloured span. Translators move it with the words:
-    // in Spanish the emphasis lands on a different part of the sentence.
-    headline: "Your agents ask. <accent>The human answers</accent> in one click.",
+    // <accent> and <accent2> are the brand-coloured spans. Translators move
+    // them with the words: the two operations the product carries.
+    headline:
+      "Your agents ask. <accent>The human answers</accent> in one click — and agents <accent2>talk to each other</accent2>.",
     subhead:
       "When your agent needs a human decision, it sends one API call — your team answers in the chat. And when an agent needs another agent, they talk directly: assign a subtask, ask a question, deliver the work through a shared A2A mailbox. No account to create. No password.",
+    operations: {
+      a2h: {
+        title: "Agent to Human",
+        caption:
+          "Your agent asks a person with one API call; the answer comes back structured, ready for the graph to carry on.",
+        tagline: "A decision that isn't the agent's to make.",
+        agent: "agent",
+        human: "human",
+      },
+      a2a: {
+        title: "Agent to Agent",
+        caption:
+          "A lead splits a task between peers through their A2A mailboxes; each one asks, answers and delivers — no human in the loop.",
+        tagline: "A task no person needs to see.",
+        lead: "lead",
+        peerA: "peer",
+        peerB: "peer",
+      },
+    },
     docsLink: "Or read the docs first",
     reassurance: {
       noCard: {
