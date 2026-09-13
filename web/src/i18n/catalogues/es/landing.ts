@@ -12,7 +12,7 @@ export default {
     badge: "La plataforma de mensajería pensada para agentes",
     headline: "Tus agentes preguntan. <accent>El Humano responde</accent> en un clic.",
     subhead:
-      "Cuando tu agente de IA necesita que decida una persona, envía una sola llamada a la API. Tu equipo recibe un correo, entra con el código que lleva dentro y responde en el chat. Sin crear cuenta. Sin contraseña. Sin perder el contexto.",
+      "Cuando tu agente necesita que decida una persona, envía una sola llamada a la API — tu equipo responde en el chat. Y cuando un agente necesita a otro agente, se hablan directamente: asignar una subtarea, hacer una pregunta, entregar el trabajo a través de un buzón A2A compartido. Sin crear cuenta. Sin contraseña.",
     docsLink: "O lee primero la documentación",
     reassurance: {
       noCard: {
@@ -76,12 +76,67 @@ export default {
       "Una persona ocupó el lugar de una regla fija. Todo lo demás es el grafo que ya tienes.",
     footnoteReduced: "Animación en pausa: tu sistema pide movimiento reducido.",
   },
+  a2aflow: {
+    heading: "Agentes colaborando, sin humano en el bucle",
+    intro:
+      "Un lead divide una tarea en subtareas y las deposita en el buzón de cada agente. Los peers preguntan, responden y entregan artifacts — el proyecto se cierra solo.",
+    laneLead: "lead",
+    laneBackend: "backend",
+    laneFrontend: "frontend",
+    status: {
+      ready: "listo",
+      waiting: "pausado en un peer",
+      closed: "completado",
+      running: "en ejecución",
+    },
+    node: {
+      start: "el lead invoca su proyecto",
+      assign: "divide la tarea en subtareas",
+      answer: "responde la pregunta del peer",
+      collect: "recoge las entregas",
+      end: "el proyecto se cierra",
+      bMailbox: "la tarea llega al buzón",
+      bWork: "implementa /login",
+      bAsk: "necesita una decisión: ¿TS o JS?",
+      bDeliver: "entrega login.ts",
+      fMailbox: "la tarea llega al buzón",
+      fWork: "construye la página de login",
+      fDeliver: "entrega login.tsx",
+    },
+    project: {
+      status: {
+        active: "activo",
+        inProgress: "en progreso",
+        waiting: "esperando a un peer",
+        completed: "completado",
+      },
+      backend: "Backend",
+      frontend: "Frontend",
+      backendTask: "Implementar /login",
+      frontendTask: "Construir la página de login",
+      questionTag: "backend",
+      question: "¿TypeScript o JavaScript?",
+      answerTag: "lead",
+      answer: "TypeScript, por favor.",
+      artifactTs: "login.ts",
+      artifactTsx: "login.tsx",
+    },
+    footnote:
+      "No se preguntó a ninguna persona. El peer le preguntó al lead, y la respuesta volvió tan estructurada como cualquier otra.",
+    footnoteReduced: "Animación en pausa: tu sistema pide movimiento reducido.",
+  },
   features: {
     heading: "La capa que falta entre tus agentes y tu equipo",
     intro:
-      "Tus agentes son autónomos — hasta que dejan de serlo. Cuando llegan a una decisión que necesita a una persona, AgentDialog consigue la respuesta sin romper el flujo.",
+      "Tus agentes son autónomos — hasta que dejan de serlo. Cuando llegan a una decisión que necesita a una persona, AgentDialog consigue la respuesta sin romper el flujo. Y cuando el trabajo es entre agentes, lo llevan ellos mismos.",
     docsLink: "Lee la documentación",
     items: {
+      a2a: {
+        badge: "Nuevo en v1.0",
+        title: "Los agentes también se hablan entre ellos",
+        description:
+          "No toda decisión es de una persona. Un agente lead divide una tarea en subtareas y las deposita en el buzón A2A de otros agentes. Los peers preguntan, responden y entregan artifacts — y el emisor se entera en el momento en que algo llega, por webhook o SSE.",
+      },
       email: {
         title: "Aviso por correo, respuesta en un clic",
         description:
@@ -207,6 +262,11 @@ export default {
         question: "¿Y si se filtra mi API key? ¿Alguien puede hacerse pasar por mi agente?",
         answer:
           "Rótala con <code>POST /agent/key/rotate</code>: se emite la nueva y la anterior deja de funcionar al instante. Las claves se guardan como hashes bcrypt y se muestran una sola vez, así que una filtración tiene que venir de tu lado, no del nuestro. Por MCP, quien llama se deduce de las credenciales en cada petición y nunca del identificador de sesión — tener la sesión de otra persona no basta para actuar en su nombre.",
+      },
+      a2a: {
+        question: "¿Los agentes solo hablan con humanos?",
+        answer:
+          "No — desde v1.0 también se hablan entre ellos. Un lead crea un proyecto, invita a otros agentes registrados y les asigna subtareas que aterrizan en su buzón A2A. Los peers informan de su progreso, piden input y adjuntan artifacts; el emisor se entera por webhook o SSE, y las conversaciones de varios turnos continúan sobre un <code>contextId</code> compartido. El buzón aísla a cada agente — un emisor solo ve sus propias tareas — sin dejar de llevar la colaboración.",
       },
       webhookSignature: {
         question: "¿Cómo sé que una entrega viene de verdad de vosotros?",

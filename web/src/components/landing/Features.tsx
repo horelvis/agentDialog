@@ -54,6 +54,36 @@ const features = [
   },
 ] as const;
 
+/** The grid below already holds six; A2A is the new headline, so it gets a
+ *  full-width card of its own above the grid rather than a seventh tile that
+ *  would break the 3×3. */
+function A2AHighlight() {
+  const { t } = useTranslation("landing");
+  return (
+    <div className="mt-12 overflow-hidden rounded-2xl border border-brand-600/30 bg-gradient-to-br from-brand-950 via-surface-tertiary to-surface-tertiary p-8 sm:p-10">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white">
+          <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9a3 3 0 100-6 3 3 0 000 6zM5.5 20a3 3 0 100-6 3 3 0 000 6zM18.5 20a3 3 0 100-6 3 3 0 000 6z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 0a2 2 0 002 2h2.5M12 11a2 2 0 00-2 2v.5M5.5 14v-1a2 2 0 012-2H9" />
+          </svg>
+        </div>
+        <div>
+          <span className="inline-flex items-center gap-2 rounded-full bg-brand-600/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-300">
+            {t("features.items.a2a.badge")}
+          </span>
+          <h3 className="mt-3 text-2xl font-semibold text-gray-100">
+            {t("features.items.a2a.title")}
+          </h3>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-400">
+            {t("features.items.a2a.description")}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Features() {
   const { t } = useTranslation("landing");
 
@@ -66,6 +96,8 @@ export function Features() {
           </h2>
           <p className="mt-4 text-lg text-gray-400">{t("features.intro")}</p>
         </div>
+
+        <A2AHighlight />
 
         <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (

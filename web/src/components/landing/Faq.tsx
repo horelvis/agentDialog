@@ -24,6 +24,7 @@ const FAQ = [
   "integrations",
   "riskAuthority",
   "keyLeak",
+  "a2a",
   "webhookSignature",
 ] as const;
 

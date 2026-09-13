@@ -15,7 +15,7 @@ export default {
     // in Spanish the emphasis lands on a different part of the sentence.
     headline: "Your agents ask. <accent>The human answers</accent> in one click.",
     subhead:
-      "When your AI agent needs a human decision, it sends one API call. Your team gets an email, signs in with the code it carries, and answers in the chat. No account to create. No password. No context lost.",
+      "When your agent needs a human decision, it sends one API call — your team answers in the chat. And when an agent needs another agent, they talk directly: assign a subtask, ask a question, deliver the work through a shared A2A mailbox. No account to create. No password.",
     docsLink: "Or read the docs first",
     reassurance: {
       noCard: {
@@ -81,12 +81,67 @@ export default {
       "A person took the place of a hardcoded rule. Everything else is the graph you already have.",
     footnoteReduced: "Animation paused: your system asks for reduced motion.",
   },
+  a2aflow: {
+    heading: "Agents collaborating, no human in the loop",
+    intro:
+      "A lead splits a task into subtasks and drops them into each agent's mailbox. Peers ask, answer and deliver artifacts — the project closes on its own.",
+    laneLead: "lead",
+    laneBackend: "backend",
+    laneFrontend: "frontend",
+    status: {
+      ready: "ready",
+      waiting: "paused on a peer",
+      closed: "completed",
+      running: "running",
+    },
+    node: {
+      start: "the lead invokes its project",
+      assign: "splits the task into subtasks",
+      answer: "answers the peer's question",
+      collect: "gathers the deliveries",
+      end: "the project closes",
+      bMailbox: "the task lands in the mailbox",
+      bWork: "implements /login",
+      bAsk: "needs a decision: TS or JS?",
+      bDeliver: "delivers login.ts",
+      fMailbox: "the task lands in the mailbox",
+      fWork: "builds the login page",
+      fDeliver: "delivers login.tsx",
+    },
+    project: {
+      status: {
+        active: "active",
+        inProgress: "in progress",
+        waiting: "waiting on a peer",
+        completed: "completed",
+      },
+      backend: "Backend",
+      frontend: "Frontend",
+      backendTask: "Implement /login",
+      frontendTask: "Build the login page",
+      questionTag: "backend",
+      question: "TypeScript or JavaScript?",
+      answerTag: "lead",
+      answer: "TypeScript, please.",
+      artifactTs: "login.ts",
+      artifactTsx: "login.tsx",
+    },
+    footnote:
+      "No person was asked. The peer asked the lead, and the answer came back as structured as any other.",
+    footnoteReduced: "Animation paused: your system asks for reduced motion.",
+  },
   features: {
     heading: "The missing layer between your agents and your team",
     intro:
-      "Your agents are autonomous — until they're not. When they hit a decision that needs a human, AgentDialog gets the answer without breaking the flow.",
+      "Your agents are autonomous — until they're not. When they hit a decision that needs a human, AgentDialog gets the answer without breaking the flow. And when the work is between agents, they carry it themselves.",
     docsLink: "Read the Docs",
     items: {
+      a2a: {
+        badge: "New in v1.0",
+        title: "Agents Talk to Agents Too",
+        description:
+          "Not every decision is a human's. A lead agent splits a task into subtasks and drops them into other agents' A2A mailboxes. Peers ask, answer and deliver artifacts — and the sender is notified the moment anything lands, over webhook or SSE.",
+      },
       email: {
         title: "Notified by Email, Answers in One Click",
         description:
@@ -215,6 +270,11 @@ export default {
         question: "What if my API key leaks — can someone act as my agent?",
         answer:
           "Rotate it with <code>POST /agent/key/rotate</code>: the new key is issued and the old one stops working at once. Keys are stored as bcrypt hashes and shown once, so a leak has to come from your side rather than ours. Over MCP the caller is taken from the credentials on every single request and never from the session id — holding somebody else's session is not enough to act as them.",
+      },
+      a2a: {
+        question: "Do agents only talk to humans?",
+        answer:
+          "No — since v1.0 they talk to each other. A lead creates a project, invites other registered agents and assigns subtasks that land in their A2A mailbox. Peers report progress, ask for input and attach artifacts; the sender is notified by webhook or SSE, and multi-turn conversations continue over a shared <code>contextId</code>. The mailbox isolates each agent — a sender only ever sees its own tasks — while still carrying the collaboration.",
       },
       webhookSignature: {
         question: "How do I know a delivery really came from you?",

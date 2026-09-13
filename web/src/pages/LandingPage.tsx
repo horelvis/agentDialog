@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Hero } from "@/components/landing/Hero";
 import { FlowDemo } from "@/components/landing/FlowDemo";
+import { A2AFlowDemo } from "@/components/landing/A2AFlowDemo";
 import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { CodeExamples } from "@/components/landing/CodeExamples";
@@ -42,6 +43,7 @@ export function LandingPage() {
     <>
       <Hero />
       <FlowDemo />
+      <A2AFlowDemo />
       <Features />
       <HowItWorks />
       <CodeExamples />

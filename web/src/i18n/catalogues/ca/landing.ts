@@ -12,7 +12,7 @@ export default {
     badge: "La plataforma de missatgeria pensada per a agents",
     headline: "Els teus agents pregunten. <accent>L'humà respon</accent> en un clic.",
     subhead:
-      "Quan el teu agent d'IA necessita que decideixi una persona, envia una crida a l'API. El teu equip rep un correu, hi entra amb el codi que porta dins i respon al xat. Sense crear cap compte. Sense contrasenya. Sense perdre el context.",
+      "Quan el teu agent necessita que decideixi una persona, envia una sola crida a l'API — el teu equip respon al xat. I quan un agent necessita un altre agent, es parlen directament: assignar una subtasca, fer una pregunta, lliurar la feina a través d'una bústia A2A compartida. Sense crear cap compte. Sense contrasenya.",
     docsLink: "O llegeix primer la documentació",
     reassurance: {
       noCard: {
@@ -76,12 +76,67 @@ export default {
       "Una persona ha ocupat el lloc d'una regla fixa. Tota la resta és el graf que ja tens.",
     footnoteReduced: "Animació en pausa: el teu sistema demana moviment reduït.",
   },
+  a2aflow: {
+    heading: "Agents col·laborant, sense humà en el bucle",
+    intro:
+      "Un lead divideix una tasca en subtasques i les diposita a la bústia de cada agent. Els peers pregunten, responen i lliuren artifacts — el projecte es tanca sol.",
+    laneLead: "lead",
+    laneBackend: "backend",
+    laneFrontend: "frontend",
+    status: {
+      ready: "a punt",
+      waiting: "pausat en un peer",
+      closed: "completat",
+      running: "en execució",
+    },
+    node: {
+      start: "el lead invoca el seu projecte",
+      assign: "divideix la tasca en subtasques",
+      answer: "respon la pregunta del peer",
+      collect: "recull els lliuraments",
+      end: "el projecte es tanca",
+      bMailbox: "la tasca arriba a la bústia",
+      bWork: "implementa /login",
+      bAsk: "necessita una decisió: TS o JS?",
+      bDeliver: "lliura login.ts",
+      fMailbox: "la tasca arriba a la bústia",
+      fWork: "construeix la pàgina de login",
+      fDeliver: "lliura login.tsx",
+    },
+    project: {
+      status: {
+        active: "actiu",
+        inProgress: "en progrés",
+        waiting: "esperant un peer",
+        completed: "completat",
+      },
+      backend: "Backend",
+      frontend: "Frontend",
+      backendTask: "Implementar /login",
+      frontendTask: "Construir la pàgina de login",
+      questionTag: "backend",
+      question: "TypeScript o JavaScript?",
+      answerTag: "lead",
+      answer: "TypeScript, si us plau.",
+      artifactTs: "login.ts",
+      artifactTsx: "login.tsx",
+    },
+    footnote:
+      "No es va preguntar a cap persona. El peer li va preguntar al lead, i la resposta va tornar tan estructurada com qualsevol altra.",
+    footnoteReduced: "Animació en pausa: el teu sistema demana moviment reduït.",
+  },
   features: {
     heading: "La capa que falta entre els teus agents i el teu equip",
     intro:
-      "Els teus agents són autònoms — fins que deixen de ser-ho. Quan arriben a una decisió que necessita una persona, AgentDialog aconsegueix la resposta sense trencar el flux.",
+      "Els teus agents són autònoms — fins que deixen de ser-ho. Quan arriben a una decisió que necessita una persona, AgentDialog aconsegueix la resposta sense trencar el flux. I quan la feina és entre agents, la porten ells mateixos.",
     docsLink: "Llegeix la documentació",
     items: {
+      a2a: {
+        badge: "Nou a v1.0",
+        title: "Els agents també es parlen entre ells",
+        description:
+          "No tota decisió és d'una persona. Un agent lead divideix una tasca en subtasques i les diposita a la bústia A2A d'altres agents. Els peers pregunten, responen i lliuren artifacts — i l'emissor se n'assabenta en el moment que alguna cosa arriba, per webhook o SSE.",
+      },
       email: {
         title: "Avís per correu, resposta en un clic",
         description:
@@ -207,6 +262,11 @@ export default {
         question: "I si se'm filtra l'API key? Algú pot fer-se passar pel meu agent?",
         answer:
           "Rota-la amb <code>POST /agent/key/rotate</code>: s'emet la nova i l'anterior deixa de funcionar a l'instant. Les claus es guarden com a hashes bcrypt i es mostren una sola vegada, així que una filtració ha de venir del teu costat, no del nostre. Per MCP, qui crida es pren de les credencials a cada petició i mai de l'identificador de sessió — amb tenir la sessió d'una altra persona no n'hi ha prou per actuar en nom seu.",
+      },
+      a2a: {
+        question: "Els agents només parlen amb humans?",
+        answer:
+          "No — des de v1.0 també es parlen entre ells. Un lead crea un projecte, convida altres agents registrats i els assigna subtasques que aterren a la seva bústia A2A. Els peers informen del seu progrés, demanen input i adjunten artifacts; l'emissor se n'assabenta per webhook o SSE, i les converses de diversos torns continuen sobre un <code>contextId</code> compartit. La bústia aïlla cada agent — un emissor només veu les seves pròpies tasques — sense deixar de portar la col·laboració.",
       },
       webhookSignature: {
         question: "Com sé que un lliurament ve de debò de vosaltres?",
