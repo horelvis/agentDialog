@@ -397,11 +397,16 @@ async function buildProject(project: typeof agentProjects.$inferSelect): Promise
   const derived = computeProjectStatus(statuses);
   const status = project.status === "canceled" ? "canceled" : derived;
 
+  const liveTasks = tasks.map((t, i) => ({
+    ...publicProjectTask(t),
+    status: statuses[i] ?? t.status as ProjectTaskStatus,
+  }));
+
   return {
     ...projectToPublic(project),
     status,
     participants: participants.map(publicParticipant),
-    tasks: tasks.map(publicProjectTask),
+    tasks: liveTasks,
   };
 }
 

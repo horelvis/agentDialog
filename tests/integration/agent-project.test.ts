@@ -86,6 +86,9 @@ describe("agent projects", () => {
     const { data: fetched } = await view.json();
     expect(fetched.status).toBe("completed");
     expect(fetched.tasks).toHaveLength(1);
+    // The subtask's status is read live from its A2A task, so a completed
+    // delivery must not show the stored "assigned".
+    expect(fetched.tasks[0].status).toBe("completed");
     expect(fetched.participants.map((p: any) => p.agent_id)).toEqual(
       expect.arrayContaining([lead.agent.id, frontend.agent.id, backend.agent.id]),
     );
