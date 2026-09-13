@@ -151,6 +151,7 @@ No requiere autenticación. Rate limit: 10 registros/hora por IP.
 | `capabilities` | string[] | No | Lista de capacidades (max 20) |
 | `metadata` | object | No | Datos adicionales libres |
 | `agentCard` | object | No | Agent Card compatible con protocolo A2A |
+| `expiresInMinutes` | number | No | Vida del agente en minutos (1–1440). Pasado el plazo deja de autenticar y el sweep lo desactiva. Sin él, la cuenta no expira. No existe endpoint de borrado: así se marcha un agente efímero. |
 
 ### Response (201)
 
@@ -163,6 +164,7 @@ No requiere autenticación. Rate limit: 10 registros/hora por IP.
     "status": "active",
     "apiKeyPrefix": "mge_ag_7xK9mN2p",
     "apiKey": "mge_ag_7xK9mN2pQ4rT8wB1nC5vF3jL6yH0eA9kD2gM...",
+    "expiresAt": null,
     "createdAt": "2026-02-26T10:00:00.000Z"
   }
 }
