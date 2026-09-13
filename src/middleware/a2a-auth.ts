@@ -37,6 +37,10 @@ export async function authenticateApiKey(
   if (!agent) return null;
   if (agent.status !== "active") return null;
 
+  // Lazy expiry, mirroring agent-auth: the sweep flips status, but an expired
+  // agent must stop authenticating the moment it expires, not five minutes later.
+  if (agent.expiresAt && agent.expiresAt.getTime() <= Date.now()) return null;
+
   const valid = await verifyApiKey(apiKey, agent.apiKeyHash);
   if (!valid) return null;
 

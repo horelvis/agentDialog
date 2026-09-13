@@ -37,6 +37,7 @@ app.get(
       agentCard: agent.agentCard,
       trustScore: agent.trustScore,
       totalRatings: agent.totalRatings,
+      expiresAt: agent.expiresAt ? agent.expiresAt.toISOString() : null,
       createdAt: agent.createdAt.toISOString(),
       updatedAt: agent.updatedAt.toISOString(),
     },

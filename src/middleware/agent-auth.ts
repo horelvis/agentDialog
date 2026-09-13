@@ -30,6 +30,12 @@ export const agentAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     throw new UnauthorizedError(`Agent account is ${agent.status}`);
   }
 
+  // Lazy expiry: refuse the moment the lifetime passes, without waiting for
+  // the expiry sweep to flip the status. Defense in depth, not the sweep.
+  if (agent.expiresAt && agent.expiresAt.getTime() <= Date.now()) {
+    throw new UnauthorizedError("Agent account has expired");
+  }
+
   const valid = await verifyApiKey(apiKey, agent.apiKeyHash);
   if (!valid) {
     throw new UnauthorizedError("Invalid API key");

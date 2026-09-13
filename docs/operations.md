@@ -85,6 +85,11 @@ one and reuse it — do not have CI create one per deploy, which would also burn
 the 10-per-hour registration limit. Without the secret the step fails and says
 so.
 
+Ephemeral agents have a way to leave: registering with `expiresInMinutes`
+(1–1440) sets `expires_at`, authentication refuses the moment it passes, and a
+five-minute sweep flips the status to `deactivated`. `scripts/smoke-a2a.ts`
+uses this, so its three agents clean themselves up two hours after a run.
+
 Run it by hand against any environment:
 
 ```bash

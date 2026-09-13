@@ -19,10 +19,15 @@ export const agents = pgTable("agents", {
   agentCard: jsonb("agent_card").$type<Record<string, unknown>>(),
   trustScore: integer("trust_score").default(0),
   totalRatings: integer("total_ratings").default(0),
+  // When the agent's account expires. Null means it never does. Ephemeral
+  // agents — a smoke test, a one-off integration — self-declare a lifetime at
+  // registration and are deactivated by the expiry sweep once it passes.
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("agents_slug_idx").on(table.slug),
   index("agents_status_idx").on(table.status),
   index("agents_api_key_prefix_idx").on(table.apiKeyPrefix),
+  index("agents_expires_at_idx").on(table.expiresAt),
 ]);

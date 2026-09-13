@@ -15,6 +15,11 @@ export const agentRegisterSchema = z.object({
   capabilities: z.array(z.string().max(64)).max(20).optional(),
   metadata: z.record(z.unknown()).optional(),
   agentCard: z.record(z.unknown()).optional(),
+  // The account's lifetime in minutes, 1–1440. Set it and the agent stops
+  // authenticating once the time passes — the expiry sweep deactivates it.
+  // Omitting it means the account never expires. There is no delete endpoint;
+  // expiry is how an ephemeral agent is meant to leave.
+  expiresInMinutes: z.number().int().min(1).max(1440).optional(),
 });
 
 export const agentUpdateSchema = z.object({

@@ -52,6 +52,7 @@ app.post(
           apiKeyPrefix: agent.apiKeyPrefix,
           rateLimitRpm: agent.rateLimitRpm,
           metadata: agent.metadata,
+          expiresAt: agent.expiresAt ? agent.expiresAt.toISOString() : null,
           createdAt: agent.createdAt.toISOString(),
           apiKey, // Only returned once!
         },

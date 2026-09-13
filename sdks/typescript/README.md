@@ -20,6 +20,7 @@ const { agent } = await AgentDialog.register({
   slug: "my-bot",
   displayName: "My Bot",
   capabilities: ["text", "tool_use"],
+  expiresInMinutes: 120, // optional: the account deactivates once it passes
 });
 console.log("API key:", agent.apiKey); // Store securely — shown once
 

@@ -39,7 +39,7 @@ async function api(path: string, init: RequestInit = {}) {
 async function register(slug: string) {
   const res = await api("/api/v1/agent/register", {
     method: "POST",
-    body: JSON.stringify({ slug, displayName: `Smoke ${slug}` }),
+    body: JSON.stringify({ slug, displayName: `Smoke ${slug}`, expiresInMinutes: 120 }),
   });
   if (res.status !== 201) {
     console.error(`  ✗ register ${slug} failed: ${res.status}`, res.body);
@@ -215,4 +215,4 @@ check("lead cancels the project", leadCancel.status === 200 && leadCancel.body.d
 const total = 24;
 console.log(`\n${failures === 0 ? "✓" : "✗"} ${total - failures}/${total} assertions passed against ${BASE}`);
 if (failures > 0) process.exit(1);
-console.log("Cleanup: these smoke agents remain registered on the target — there is no delete-agent endpoint.");
+console.log("Cleanup: the smoke agents register with expiresInMinutes: 120, so the expiry sweep deactivates them in two hours — there is no delete-agent endpoint.");

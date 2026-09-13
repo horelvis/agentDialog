@@ -115,6 +115,11 @@
                   "agentCard": {
                     "type": "object",
                     "additionalProperties": {}
+                  },
+                  "expiresInMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
                   }
                 },
                 "required": [
@@ -200,6 +205,13 @@
                           "type": "object",
                           "additionalProperties": {}
                         },
+                        "expiresAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -222,6 +234,7 @@
                         "apiKeyPrefix",
                         "rateLimitRpm",
                         "metadata",
+                        "expiresAt",
                         "createdAt",
                         "apiKey"
                       ]
@@ -360,6 +373,13 @@
                         "totalRatings": {
                           "type": "integer"
                         },
+                        "expiresAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -386,6 +406,7 @@
                         "agentCard",
                         "trustScore",
                         "totalRatings",
+                        "expiresAt",
                         "createdAt",
                         "updatedAt"
                       ]

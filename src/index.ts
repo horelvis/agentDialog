@@ -7,11 +7,15 @@ import { createApp } from "./app";
 import { setupWebSocket, websocketHandlers, authenticateWs } from "./ws";
 import type { WsData } from "./ws/types";
 import { initStorage } from "./services/file.service";
+import { startAgentExpirySweep } from "./services/agent-expiry.service";
 
 const app = createApp();
 
 // Pre-create storage bucket at startup
 initStorage().catch((e) => console.warn("[STORAGE] Bucket init failed:", e.message));
+
+// Ephemeral agents self-declare a lifetime; the sweep reclaims them.
+startAgentExpirySweep();
 
 const server = Bun.serve<WsData>({
   port: config.PORT,

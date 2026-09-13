@@ -35,6 +35,7 @@ export const agentProfileObject = z.object({
   agentCard: z.record(z.unknown()).nullable(),
   trustScore: z.number().int(),
   totalRatings: z.number().int(),
+  expiresAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -88,6 +89,7 @@ export const agentRegisterResponse = ok(
       apiKeyPrefix: true,
       rateLimitRpm: true,
       metadata: true,
+      expiresAt: true,
       createdAt: true,
     })
     .extend({ apiKey: z.string() }),

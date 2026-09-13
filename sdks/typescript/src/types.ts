@@ -41,6 +41,8 @@ export interface Agent {
   agentCard?: Record<string, unknown> | null;
   trustScore?: number;
   totalRatings?: number;
+  /** When this account expires. Null means it never does. */
+  expiresAt?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -165,6 +167,12 @@ export interface RegisterInput {
   capabilities?: string[];
   metadata?: Record<string, unknown>;
   agentCard?: Record<string, unknown>;
+  /**
+   * The account's lifetime in minutes (1–1440). Set it and the agent stops
+   * authenticating once it passes; the expiry sweep deactivates it. There is
+   * no delete endpoint, so this is how an ephemeral agent leaves.
+   */
+  expiresInMinutes?: number;
 }
 
 export interface UpdateProfileInput {
