@@ -24,6 +24,7 @@ describe("agent bootstrap", () => {
     const { data } = await res.json();
     expect(data.bootstrapPrompt).toBeString();
     expect(data.bootstrapPrompt).toContain(data.apiKey);
+    expect(data.bootstrapPrompt).toContain(`/a2a/${data.slug}`);
     expect(data.bootstrapPrompt).toContain("/agent-context.md");
   });
 

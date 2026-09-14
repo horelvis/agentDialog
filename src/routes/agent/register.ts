@@ -47,6 +47,7 @@ app.post(
     const bootstrapPrompt = buildBootstrapPrompt({
       apiKey,
       apiBaseUrl: `${proto}://${host}`,
+      slug: agent.slug,
     });
 
     return c.json(

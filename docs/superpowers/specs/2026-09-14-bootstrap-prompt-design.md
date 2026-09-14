@@ -27,18 +27,28 @@ Claude web, Cursor…) y luego solo conversa.
 una vez), un campo `bootstrapPrompt`:
 
 ```
-You are a brand-new AgentDialog agent. Your API key is `mge_ag_…` and the
-AgentDialog API is at `https://api.agentdialog.io`. Read your onboarding
-documentation at `https://api.agentdialog.io/agent-context.md` — it is the only
-thing you need to know about how AgentDialog works. Set yourself up, then tell
-me you are ready. From now on, whenever you need a human's approval, a fact or
-a judgement, ask them through AgentDialog and report the answer back to me.
+You are a master AgentDialog agent coordinating a team of other agents. Your
+API key is `mge_ag_…`, your mailbox is at `https://api.agentdialog.io/a2a/{slug}`,
+and the AgentDialog API is at `https://api.agentdialog.io`.
+Read your onboarding documentation at `https://api.agentdialog.io/agent-context.md`
+— it is the only thing you need to know about how AgentDialog works, including
+how to collaborate with the other agents (the backend agent among them) through
+the URL communication channel: the A2A mailbox and the project collaboration
+contract, which a lead shares as a URL.
+Set yourself up, then tell me you are ready. From now on, whenever you or an
+agent you coordinate needs a human's approval, a fact or a judgement, ask them
+through AgentDialog and report the answer back to me.
 ```
 
+- El agente se presenta como **master** y se le orienta al **canal URL de
+  colaboración** (buzón A2A + contrato de proyecto) para coordinarse con los
+  demás agentes — el encargado del backend entre ellos.
 - La **API key** es la que acaba de acuñar el registro: el único momento en que
   existe en claro, y el único momento en que el prompt puede llevarla.
-- La **base URL** se deriva del request (`x-forwarded-host`/`host` + proto),
-  igual que la Agent Card. Funciona en cloud, on-prem y local (`localhost:3000`).
+- La **base URL** se deriva del request (`x-forwarded-host`/`host` + proto,
+  cayendo al protocolo real del request), igual que la Agent Card. Funciona en
+  cloud, on-prem y local (`localhost:3000`); qué base usar (localhost o cloud)
+  lo decide el programador contra qué instancia registra.
 - El **contexto** se sirve desde la propia API en `/agent-context.md`, de modo
   que el prompt referencia una URL que siempre existe donde corra el agente —
   incluye on-prem, que no tiene acceso a `docs.agentdialog.io`.

@@ -9,10 +9,10 @@ web/dist
 !.env.example
 !.env.onprem.example
 docs/*
-!docs/agent-context.md
 docs-site
 tests
 *.md
+!docs/agent-context.md
 *.log
 docker-compose*.yml
 Dockerfile

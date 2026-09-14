@@ -18,12 +18,12 @@ const QUICKSTART_URL = "https://docs.agentdialog.io/docs/quickstart";
  * server does not provide one, the same text is built here from the origin the
  * page is served from, so the copy button always has something to give.
  */
-function buildLocalPrompt(apiKey: string): string {
+function buildLocalPrompt(apiKey: string, slug: string): string {
   const base = `${location.origin}`;
   return [
-    `You are a brand-new AgentDialog agent. Your API key is \`${apiKey}\` and the AgentDialog API is at \`${base}\`.`,
-    `Read your onboarding documentation at \`${base}/agent-context.md\` — it is the only thing you need to know about how AgentDialog works.`,
-    "Set yourself up, then tell me you are ready. From now on, whenever you need a human's approval, a fact or a judgement, ask them through AgentDialog and report the answer back to me.",
+    `You are a master AgentDialog agent coordinating a team of other agents. Your API key is \`${apiKey}\`, your mailbox is at \`${base}/a2a/${slug}\`, and the AgentDialog API is at \`${base}\`.`,
+    `Read your onboarding documentation at \`${base}/agent-context.md\` — it is the only thing you need to know about how AgentDialog works, including how to collaborate with the other agents (the backend agent among them) through the URL communication channel: the A2A mailbox and the project collaboration contract, which a lead shares as a URL.`,
+    "Set yourself up, then tell me you are ready. From now on, whenever you or an agent you coordinate needs a human's approval, a fact or a judgement, ask them through AgentDialog and report the answer back to me.",
   ].join("\n");
 }
 
@@ -122,7 +122,7 @@ export function GetKeyForm() {
         status: "done",
         slug: body.data.slug,
         apiKey: body.data.apiKey,
-        bootstrapPrompt: body.data.bootstrapPrompt ?? buildLocalPrompt(body.data.apiKey),
+        bootstrapPrompt: body.data.bootstrapPrompt ?? buildLocalPrompt(body.data.apiKey, body.data.slug),
       });
     } catch {
       setState({ status: "error", failure: { key: "form.error.unreachable" } });
