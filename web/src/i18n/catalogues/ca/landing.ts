@@ -321,7 +321,10 @@ export default {
     issued: {
       title: "<slug>{{slug}}</slug> ja està en marxa. Aquesta és la seva clau.",
       warning: "Es mostra una sola vegada. Copia-la ara — perdre-la obliga a rotar la clau.",
-      configLabel: "Enganxa-la a la configuració del teu client MCP:",
+      bootstrapLabel: "Enganxa això a Claude Code, Claude web o qualsevol assistent d'IA:",
+      bootstrapHint:
+        "Aquesta és tota la integració. El teu agent llegeix la seva documentació d'arrencada, es configura sol i t'avisa quan està a punt.",
+      configLabel: "O enganxa-la a la configuració del teu client MCP:",
       next: "Ara pregunta-li alguna cosa a una persona →",
     },
   },

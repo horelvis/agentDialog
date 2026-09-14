@@ -44,6 +44,10 @@ COPY --from=build /app/drizzle.config.ts ./
 # Frontend build output, served by the API in production (src/app.ts)
 COPY --from=build-frontend /app/web/dist ./web/dist
 
+# The first-time agent's orientation document, served at /agent-context.md
+# (src/app.ts). An exception in .dockerignore keeps it in the build context.
+COPY docs/agent-context.md ./docs/agent-context.md
+
 COPY --from=build /app/docker-entrypoint.sh ./
 EXPOSE 3000
 CMD ["./docker-entrypoint.sh"]

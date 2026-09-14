@@ -9,6 +9,7 @@ import { documented } from "../../openapi/documented";
 import { res } from "../../openapi/types";
 import { agentRegisterResponse } from "../../validators/agent.responses";
 import { apiError } from "../../validators/response.helpers";
+import { buildBootstrapPrompt } from "../../lib/bootstrap";
 
 const hono = new Hono<AppEnv>();
 // Mounted at app.ts's own "/api/v1/agent/register" — a separate app.route()
@@ -36,6 +37,18 @@ app.post(
     const input = c.get("validatedBody");
     const { agent, apiKey } = await registerAgent(input);
 
+    // The prompt the customer pastes into their AI. The key only exists here,
+    // and the base URL is the instance that answered the request — the same
+    // derivation the Agent Card uses for x-forwarded-host. The protocol falls
+    // back to the request's own, so a plain-http localhost sandbox yields a
+    // URL the agent can actually reach instead of a broken https guess.
+    const host = c.req.header("x-forwarded-host") || c.req.header("host") || new URL(c.req.url).host;
+    const proto = c.req.header("x-forwarded-proto") || new URL(c.req.url).protocol.replace(":", "");
+    const bootstrapPrompt = buildBootstrapPrompt({
+      apiKey,
+      apiBaseUrl: `${proto}://${host}`,
+    });
+
     return c.json(
       {
         data: {
@@ -55,6 +68,7 @@ app.post(
           expiresAt: agent.expiresAt ? agent.expiresAt.toISOString() : null,
           createdAt: agent.createdAt.toISOString(),
           apiKey, // Only returned once!
+          bootstrapPrompt,
         },
       },
       201,

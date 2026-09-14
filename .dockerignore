@@ -8,7 +8,8 @@ web/dist
 .env.*
 !.env.example
 !.env.onprem.example
-docs
+docs/*
+!docs/agent-context.md
 docs-site
 tests
 *.md

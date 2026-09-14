@@ -218,6 +218,9 @@
                         },
                         "apiKey": {
                           "type": "string"
+                        },
+                        "bootstrapPrompt": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -236,7 +239,8 @@
                         "metadata",
                         "expiresAt",
                         "createdAt",
-                        "apiKey"
+                        "apiKey",
+                        "bootstrapPrompt"
                       ]
                     }
                   },

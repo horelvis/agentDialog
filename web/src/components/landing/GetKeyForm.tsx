@@ -14,6 +14,20 @@ const MCP_URL = "https://api.agentdialog.io/mcp";
 const QUICKSTART_URL = "https://docs.agentdialog.io/docs/quickstart";
 
 /**
+ * The ready-to-paste prompt, built by the server with this very key. If the
+ * server does not provide one, the same text is built here from the origin the
+ * page is served from, so the copy button always has something to give.
+ */
+function buildLocalPrompt(apiKey: string): string {
+  const base = `${location.origin}`;
+  return [
+    `You are a brand-new AgentDialog agent. Your API key is \`${apiKey}\` and the AgentDialog API is at \`${base}\`.`,
+    `Read your onboarding documentation at \`${base}/agent-context.md\` — it is the only thing you need to know about how AgentDialog works.`,
+    "Set yourself up, then tell me you are ready. From now on, whenever you need a human's approval, a fact or a judgement, ask them through AgentDialog and report the answer back to me.",
+  ].join("\n");
+}
+
+/**
  * A failure is stored as what went wrong, not as a sentence. Freezing the
  * sentence would leave an error written in the language that was on screen
  * when it happened, still there after somebody switches. `raw` is the one
@@ -28,7 +42,7 @@ type State =
   | { status: "idle" }
   | { status: "submitting" }
   | { status: "error"; failure: Failure }
-  | { status: "done"; slug: string; apiKey: string };
+  | { status: "done"; slug: string; apiKey: string; bootstrapPrompt: string };
 
 async function register(slug: string, displayName: string, attribution: Attribution) {
   return fetch(`${API_BASE}/agent/register`, {
@@ -104,14 +118,19 @@ export function GetKeyForm() {
         return;
       }
 
-      setState({ status: "done", slug: body.data.slug, apiKey: body.data.apiKey });
+      setState({
+        status: "done",
+        slug: body.data.slug,
+        apiKey: body.data.apiKey,
+        bootstrapPrompt: body.data.bootstrapPrompt ?? buildLocalPrompt(body.data.apiKey),
+      });
     } catch {
       setState({ status: "error", failure: { key: "form.error.unreachable" } });
     }
   }
 
   if (state.status === "done") {
-    return <KeyIssued slug={state.slug} apiKey={state.apiKey} />;
+    return <KeyIssued slug={state.slug} apiKey={state.apiKey} bootstrapPrompt={state.bootstrapPrompt} />;
   }
 
   const failure = state.status === "error" ? state.failure : null;
@@ -165,12 +184,20 @@ export function GetKeyForm() {
   );
 }
 
-function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
+function KeyIssued({
+  slug,
+  apiKey,
+  bootstrapPrompt,
+}: {
+  slug: string;
+  apiKey: string;
+  bootstrapPrompt: string;
+}) {
   const { t } = useTranslation("landing");
   // "Copy" and "Copied" are the same two words everywhere in the product, and
   // they already live in `common`.
   const { t: tCommon } = useTranslation("common");
-  const [copied, setCopied] = useState<"key" | "config" | null>(null);
+  const [copied, setCopied] = useState<"prompt" | "key" | "config" | null>(null);
 
   const config = JSON.stringify(
     {
@@ -182,7 +209,7 @@ function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
     2,
   );
 
-  async function copy(what: "key" | "config", value: string) {
+  async function copy(what: "prompt" | "key" | "config", value: string) {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(what);
@@ -218,6 +245,26 @@ function KeyIssued({ slug, apiKey }: { slug: string; apiKey: string }) {
           {copied === "key" ? tCommon("action.copied") : tCommon("action.copy")}
         </button>
       </div>
+
+      <p className="mt-4 text-xs font-medium text-gray-400">{t("form.issued.bootstrapLabel")}</p>
+      <div className="mt-1 rounded-lg bg-gray-900">
+        <div className="flex items-center justify-between border-b border-surface-border px-3 py-1.5">
+          {/* The format name stays as-is in every language. */}
+          {/* eslint-disable-next-line i18next/no-literal-string */}
+          <span className="text-xs text-gray-500">prompt</span>
+          <button
+            type="button"
+            onClick={() => copy("prompt", bootstrapPrompt)}
+            className="text-xs text-gray-400 hover:text-white"
+          >
+            {copied === "prompt" ? tCommon("action.copied") : tCommon("action.copy")}
+          </button>
+        </div>
+        <pre className="overflow-x-auto p-3 text-xs">
+          <code className="whitespace-pre-wrap text-gray-100">{bootstrapPrompt}</code>
+        </pre>
+      </div>
+      <p className="mt-2 text-xs text-gray-500">{t("form.issued.bootstrapHint")}</p>
 
       <p className="mt-4 text-xs font-medium text-gray-400">{t("form.issued.configLabel")}</p>
       <div className="mt-1 rounded-lg bg-gray-900">

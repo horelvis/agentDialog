@@ -321,7 +321,10 @@ hero: {
     issued: {
       title: "<slug>{{slug}}</slug> está en marcha. Esta es su clave.",
       warning: "Se muestra una sola vez. Cópiala ahora — perderla obliga a rotar la clave.",
-      configLabel: "Pégala en la configuración de tu cliente MCP:",
+      bootstrapLabel: "Pega esto en Claude Code, Claude web o cualquier asistente de IA:",
+      bootstrapHint:
+        "Esa es toda la integración. Tu agente lee su documentación de arranque, se configura solo y te avisa cuando está listo.",
+      configLabel: "O pégala en la configuración de tu cliente MCP:",
       next: "Ahora pregúntale algo a una persona →",
     },
   },

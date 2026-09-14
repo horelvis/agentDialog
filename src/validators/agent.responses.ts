@@ -92,7 +92,13 @@ export const agentRegisterResponse = ok(
       expiresAt: true,
       createdAt: true,
     })
-    .extend({ apiKey: z.string() }),
+    .extend({
+      apiKey: z.string(),
+      // Ready-to-paste prompt for a first-time agent, built with this very key
+      // and the base URL of the instance that served the request. Only exists
+      // in this response — nothing stores it.
+      bootstrapPrompt: z.string(),
+    }),
 );
 
 /**

@@ -112,6 +112,18 @@ export function createApp() {
   // Webhook routes (public, verified by provider signature)
   app.route("/api/v1/webhooks/email", emailInboundRoutes);
 
+  // The first-time agent's orientation document. Public: it is documentation.
+  // Served by the API so the bootstrap prompt can point at a URL that exists
+  // wherever the agent runs, including on-premise deployments that have no
+  // access to docs.agentdialog.io.
+  app.get("/agent-context.md", async (c) => {
+    const file = Bun.file("./docs/agent-context.md");
+    if (!(await file.exists())) {
+      return c.notFound();
+    }
+    return c.body(await file.text(), 200, { "Content-Type": "text/markdown; charset=utf-8" });
+  });
+
   // Public A2A surface: discovery card plus both protocol bindings. Each
   // request authenticates its sender and resolves the addressed recipient.
   // Project contract links are mounted first so "projects" is not read as an

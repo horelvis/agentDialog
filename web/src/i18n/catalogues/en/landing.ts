@@ -336,7 +336,10 @@ export default {
       // <slug> is the agent slug, in a <code> element.
       title: "<slug>{{slug}}</slug> is live. Here is its key.",
       warning: "Shown once. Copy it now — losing it means rotating the key.",
-      configLabel: "Paste into your MCP client config:",
+      bootstrapLabel: "Paste this into Claude Code, Claude web or any AI assistant:",
+      bootstrapHint:
+        "That is the whole integration. Your agent reads its onboarding docs, sets itself up, and reports back when it is ready.",
+      configLabel: "Or paste into your MCP client config:",
       next: "Now ask a human a question →",
     },
   },
