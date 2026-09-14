@@ -24,6 +24,7 @@ conversation._
 - **Auto-trust** — Humans who've previously accepted an agent's invitation are auto-assigned on future queries
 - **Rate limiting & DDoS protection** — Global, per-endpoint, and progressive penalty
 - **Data isolation** — Per-participant access checks on all endpoints prevent unauthorized cross-conversation access
+- **On-premise deployment** — The whole product in one Docker container (API + web chat + MCP + embedded MinIO) with Postgres and Redis, an operator CLI for secrets and the first agent, corporate SMTP, and webhooks into your internal network
 
 ## Packages
 
@@ -102,9 +103,34 @@ cd web && bun install && bun run dev
 
 ### Docker (all-in-one)
 
+Builds the production image (backend **and** the web chat UI) and serves it with
+Postgres, Redis and MinIO:
+
 ```bash
 docker compose up
 ```
+
+### On-premise (your own infrastructure)
+
+One product container (API + web chat + MCP + embedded MinIO) plus Postgres and
+Redis, running entirely inside your network. Data and secrets stay yours.
+
+```bash
+# 1. Generate .env with real secrets (prompts for SMTP and public URLs)
+bun run scripts/admin.ts init-env
+
+# 2. Bring up the stack
+docker compose -f docker-compose.onprem.yml up -d --build
+
+# 3. Create the first agent and print its API key (shown once)
+docker compose -f docker-compose.onprem.yml exec app \
+  bun run scripts/admin.ts create-agent --slug asistente --name "Asistente"
+```
+
+`DEPLOYMENT_MODE=onprem` permits webhooks into your internal services,
+hard-requires a corporate SMTP relay and an https `APP_URL`, and the app is
+single-replica by design (WebSocket and MCP sessions live in memory). The full
+operator guide is in [`docs/onprem.md`](docs/onprem.md).
 
 ## API Overview
 
@@ -208,7 +234,9 @@ bun run format         # Format with Biome
 
 ## Deployment
 
-Deployed on **Google Cloud Run** with:
+The product ships two ways, from the same code:
+
+**SaaS (this repository's own deployment)** — Google Cloud Run with:
 - **Database:** [Neon](https://neon.tech) (PostgreSQL, free tier)
 - **Cache:** [Upstash](https://upstash.com) (Redis, free tier)
 - **Frontend:** [Cloudflare Pages](https://pages.cloudflare.com)
@@ -218,6 +246,11 @@ Deployed on **Google Cloud Run** with:
 # Deploy to Cloud Run
 GCP_PROJECT_ID=your-project ./scripts/deploy.sh
 ```
+
+**On-premise (yours)** — one container from the `onprem` Docker target, plus
+Postgres and Redis, launched by `docker-compose.onprem.yml`. The operator CLI
+(`scripts/admin.ts`) generates the `.env` and the first agent. Operator guide:
+[`docs/onprem.md`](docs/onprem.md).
 
 ## Environment Variables
 
@@ -230,6 +263,7 @@ See [`.env.example`](.env.example) for all configuration options.
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Setting the project up, running the tests, opening a PR |
 | [`docs/architecture.md`](docs/architecture.md) | How the pieces fit, and the decisions you cannot infer from the code |
 | [`docs/operations.md`](docs/operations.md) | Workflows, deploys, releases, rollback, logs |
+| [`docs/onprem.md`](docs/onprem.md) | Deploying and operating the on-premise Docker stack |
 | [`docs/api/README.md`](docs/api/README.md) | The complete API guide |
 | [`CLAUDE.md`](CLAUDE.md) | The same ground rules, condensed for AI agents working in the repo |
 | [`docs-site/video-src/`](docs-site/video-src/) | How the guide videos are scripted and rendered |

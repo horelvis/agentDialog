@@ -1,0 +1,73 @@
+# AgentDialog on-premise. One product container (API + UI + embedded MinIO)
+# plus Postgres and Redis. The product container is the only thing the operator
+# thinks about; the two data stores are there to be survived.
+#
+#   docker compose -f docker-compose.onprem.yml up -d
+#
+# Requires a .env first: `bun run scripts/admin.ts init-env` writes one from
+# .env.onprem.example with secrets filled in. Set ONPREM_ENV_FILE to name a
+# different file. See docs/onprem.md.
+#
+# The product container is single-replica by design: the WebSocket registry and
+# MCP sessions live in the process memory. Do not scale `app`.
+
+# Explicit project name: the default (the directory name) collides with
+# docker-compose.dev.yml, and a stray `down -v` on one must not kill the other.
+name: agentdialog-onprem
+
+services:
+  app:
+    build:
+      context: .
+      target: onprem
+    image: agentdialog:onprem
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file: ${ONPREM_ENV_FILE:-.env}
+    volumes:
+      - minio-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # Intent only; honored by `docker stack`, ignored by plain `docker compose`.
+    # The product must run as exactly one replica.
+    deploy:
+      replicas: 1
+
+  # Put a TLS-terminating reverse proxy of your own in front of the app port.
+  # APP_URL in .env must be the public https URL.
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agentdialog
+      POSTGRES_USER: agentdialog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentdialog}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentdialog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  redis-data:
+  minio-data:

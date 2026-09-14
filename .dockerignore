@@ -7,6 +7,7 @@ web/dist
 .env
 .env.*
 !.env.example
+!.env.onprem.example
 docs
 docs-site
 tests

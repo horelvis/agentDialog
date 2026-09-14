@@ -86,6 +86,10 @@ describe("WEBHOOK_ALLOW_PRIVATE_TARGETS", () => {
     SESSION_SECRET: "s".repeat(32),
     INBOUND_EMAIL_WEBHOOK_SECRET: "a-secret",
     WEBHOOK_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
+    // On-premise production hard-requires these; including them lets the same
+    // fixture parse for both modes.
+    SMTP_HOST: "smtp.corp.example",
+    APP_URL: "https://agentdialog.corp.example",
   };
 
   test("defaults to off in production and on elsewhere", () => {
@@ -107,9 +111,30 @@ describe("WEBHOOK_ALLOW_PRIVATE_TARGETS", () => {
     const result = envSchema.safeParse({
       ...base,
       NODE_ENV: "production",
+      DEPLOYMENT_MODE: "cloud",
       WEBHOOK_ALLOW_PRIVATE_TARGETS: "true",
     });
     expect(result.success).toBe(false);
+  });
+
+  test("on-premise production starts with private targets enabled", () => {
+    const result = envSchema.safeParse({
+      ...base,
+      NODE_ENV: "production",
+      DEPLOYMENT_MODE: "onprem",
+      WEBHOOK_ALLOW_PRIVATE_TARGETS: "true",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("on-premise permits private targets when explicitly enabled", () => {
+    expect(
+      privateTargetsAllowed({
+        NODE_ENV: "production",
+        DEPLOYMENT_MODE: "onprem",
+        WEBHOOK_ALLOW_PRIVATE_TARGETS: true,
+      } as Env),
+    ).toBe(true);
   });
 
   test("production starts with private targets disabled", () => {

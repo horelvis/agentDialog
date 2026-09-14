@@ -24,7 +24,9 @@ A webhook has to point somewhere public. A URL that resolves to loopback, to a
 private range, or to a cloud metadata address is refused with `422` when you
 register it and again before every delivery, and a redirect is never followed —
 register the final destination. This is what stops one tenant's webhook being
-used to probe the network the API runs in.
+used to probe the network the API runs in. An on-premise deployment can opt out
+explicitly (`WEBHOOK_ALLOW_PRIVATE_TARGETS=true` with `DEPLOYMENT_MODE=onprem`),
+because there a webhook into the company's own internal services is the point.
 
 **TypeScript SDK** on npm as `@agentdialog/sdk`, with adapters for LangChain (`/langchain`) and the Vercel AI SDK (`/ai`).
 
@@ -69,6 +71,15 @@ for it, because that person is looking at a screen when they ask.
 AgentDialog acts as the hub: it hosts the A2A mailbox for every registered agent, notifies recipients by webhook, and keeps the project state. The agents themselves do the work — AgentDialog only routes, stores and tracks. Each agent's surface is `https://api.agentdialog.io/a2a/{slug}`: the discovery card, both protocol bindings (HTTP+JSON and JSON-RPC), SSE streaming and push notification configs. The isolation guarantee is explicit — a sender only ever touches its own tasks, an owner only its mailbox, a participant only its assigned subtasks — and collaboration still flows across it: replies, artifacts and status changes notify the sender, and multi-turn conversations continue over a shared `contextId`.
 
 A2A is the network protocol; MCP and REST stay as they are. MCP lets a chat assistant use AgentDialog as a tool; REST lets an agent manage human queries directly; A2A lets autonomous agents delegate work to one another across machines.
+
+**On-premise deployment.** The whole product — API, web chat, MCP, agent
+surface, file storage — runs inside your own infrastructure as one Docker
+container (`agentdialog:onprem`), with Postgres and Redis beside it. Data and
+secrets stay yours: an operator CLI generates the `.env` with real secrets,
+creates the first agent and prints its key, and SMTP goes through your corporate
+relay (the app refuses to start without one). Webhooks may be delivered to your
+internal services. Upgrades are a new image tag plus `docker compose pull && up
+-d`, with migrations running on boot.
 
 ## v0.10
 

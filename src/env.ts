@@ -4,6 +4,11 @@ export const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   HOST: z.string().default("0.0.0.0"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  // Where the instance runs. `cloud` is the managed SaaS; `onprem` is a
+  // company's own Docker deployment. The two share a binary but not a security
+  // posture: on-prem explicitly permits webhooks into the private network,
+  // requires its own SMTP relay, and serves over https.
+  DEPLOYMENT_MODE: z.enum(["cloud", "onprem"]).default("cloud"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 
   DATABASE_URL: z.string().url(),
@@ -15,7 +20,7 @@ export const envSchema = z.object({
   MINIO_SECRET_KEY: z.string().default("minioadmin"),
   MINIO_BUCKET: z.string().default("agentdialog-files"),
   MINIO_USE_SSL: z.string().default("false").transform((v) => v === "true"),
-  MINIO_PUBLIC_URL: z.string().optional(),
+  MINIO_PUBLIC_URL: z.string().url().optional(),
 
   API_KEY_SALT_ROUNDS: z.coerce.number().default(12),
   SESSION_SECRET: z.string().min(32),
@@ -107,16 +112,58 @@ export const envSchema = z.object({
 
   // On a public API the webhook URL is attacker-chosen, so allowing a private
   // target in production hands any agent a probe into the VPC and the cloud
-  // metadata service. There is no legitimate production use, and an operator
-  // setting it deserves to find out at startup rather than in an incident.
-  if (env.NODE_ENV === "production" && env.WEBHOOK_ALLOW_PRIVATE_TARGETS === true) {
+  // metadata service. On an on-premise deployment there is no cloud metadata and
+  // the private network is the product's reason to exist — an agent delivering
+  // webhooks to internal services is the point. The operator opts in explicitly
+  // with WEBHOOK_ALLOW_PRIVATE_TARGETS=true; env.ts only refuses the value when
+  // the deployment is cloud.
+  if (
+    env.NODE_ENV === "production" &&
+    env.DEPLOYMENT_MODE === "cloud" &&
+    env.WEBHOOK_ALLOW_PRIVATE_TARGETS === true
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["WEBHOOK_ALLOW_PRIVATE_TARGETS"],
       message:
-        "WEBHOOK_ALLOW_PRIVATE_TARGETS must not be true in production: it disables " +
-        "the guard that stops a webhook reaching loopback, the private ranges and " +
-        "the cloud metadata service.",
+        "WEBHOOK_ALLOW_PRIVATE_TARGETS must not be true in cloud production: it " +
+        "disables the guard that stops a webhook reaching loopback, the private " +
+        "ranges and the cloud metadata service. On-premise deployments set " +
+        "DEPLOYMENT_MODE=onprem to permit it.",
+    });
+  }
+
+  // An on-premise deployment without an SMTP relay is one nobody can sign in to:
+  // humans authenticate with a code sent by email, and there is no other door.
+  // Fail at startup rather than ship a deploy that looks healthy and is empty.
+  if (
+    env.NODE_ENV === "production" &&
+    env.DEPLOYMENT_MODE === "onprem" &&
+    ["localhost", "127.0.0.1", "::1"].includes(env.SMTP_HOST.toLowerCase())
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["SMTP_HOST"],
+      message:
+        "SMTP_HOST must be a real relay in on-premise production. A local " +
+        "address means no sign-in codes ever leave the box, and no human can " +
+        "authenticate.",
+    });
+  }
+
+  // One-click answer links and sign-in codes travel by email. Serving them from
+  // a plain-http URL hands the credential to whoever sees the traffic.
+  if (
+    env.NODE_ENV === "production" &&
+    env.DEPLOYMENT_MODE === "onprem" &&
+    !env.APP_URL.startsWith("https://")
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["APP_URL"],
+      message:
+        "APP_URL must be https in on-premise production: answer links and " +
+        "sign-in codes travel by email and must not point at a plain-http URL.",
     });
   }
 
