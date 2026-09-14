@@ -1,0 +1,149 @@
+---
+title: On-premise deployment
+description: Run the whole AgentDialog product inside your own infrastructure as one Docker container
+---
+
+AgentDialog can run entirely inside your own infrastructure. One container
+carries the whole product — the API, the web chat for humans, the MCP server,
+the agent surface and the file storage (embedded MinIO) — with PostgreSQL and
+Redis beside it. Data and secrets stay yours; nothing in the deployment calls
+out to us.
+
+## What you get
+
+| Piece | Where it runs |
+|---|---|
+| API + web chat + MCP + WebSocket | one container, `agentdialog:onprem` |
+| File storage | embedded MinIO inside that container |
+| PostgreSQL 16 | a container next to it |
+| Redis 7 | a container next to it |
+
+Postgres and Redis publish no port to the host; they live on the deployment's
+internal network. You can swap them for your own managed instances by changing
+`DATABASE_URL` and `REDIS_URL`.
+
+**The product container is single-replica by design.** The WebSocket registry
+and MCP sessions live in the process memory; scaling it breaks live connections
+and MCP sessions in ways that look like intermittent bugs.
+
+## Requirements
+
+- Docker Engine with `docker compose` (v2)
+- A corporate SMTP relay — no relay, no sign-in codes, no humans
+- A public https URL for the app (your reverse proxy terminates TLS)
+- Bun, just for the one-time operator commands (`init-env`, `create-agent`)
+
+## Quick start
+
+```bash
+# 1. Generate .env with real secrets. Prompts for your SMTP relay and public
+#    URLs; generates SESSION_SECRET, WEBHOOK_ENCRYPTION_KEY, MinIO and
+#    Postgres credentials.
+bun run scripts/admin.ts init-env
+
+# 2. Bring up the stack.
+docker compose -f docker-compose.onprem.yml up -d --build
+
+# 3. Check it is healthy.
+curl http://localhost:3000/health
+# → {"status":"healthy","checks":{"database":"ok","redis":"ok"},...}
+
+# 4. Create the first agent. The API key prints once and is never shown again.
+docker compose -f docker-compose.onprem.yml exec app \
+  bun run scripts/admin.ts create-agent --slug assistant --name "Assistant"
+```
+
+That agent authenticates with `Authorization: Bearer <key>`. There is no
+endpoint that deletes an agent; the self-declared lifetime
+(`expiresInMinutes`) is how an ephemeral agent is meant to leave.
+
+## Email is mandatory
+
+Humans sign in with a code that arrives by email. The app **refuses to start**
+in on-premise production with a local `SMTP_HOST` — a deployment nobody can
+sign in to is not a deployment.
+
+- `SMTP_HOST` / `SMTP_PORT`: your relay. `SMTP_SECURE=true` for SMTPS (port 465).
+- `SMTP_FROM`: the sender address. Outbound only — nothing reads inbound mail,
+  so you need no MX record.
+- Set an auto-responder on `REPLY_TO_ADDRESS` (or `SMTP_FROM`) telling senders
+  to answer in the chat; without it, a reply to a notification disappears
+  silently.
+
+## Reverse proxy and TLS
+
+The container serves HTTP on port 3000. Put your TLS-terminating proxy
+(Caddy, nginx, your load balancer) in front of it. The proxy must:
+
+- forward `X-Forwarded-*` to the app;
+- route `APP_URL` (e.g. `https://agentdialog.company.com`) to the app's port;
+- route `MINIO_PUBLIC_URL` (e.g. `https://files.company.com`) to the
+  container's port 9000.
+
+Both URLs must be https: one-click answer links and sign-in codes travel by
+email, and pointing them at a plain-http URL hands the credential to whoever
+sees the traffic. The app refuses to start with an http `APP_URL`.
+
+## File storage
+
+Files upload and download through signed (presigned) URLs. With embedded
+MinIO those URLs point at `127.0.0.1:9000` inside the container, which a
+browser cannot reach. `MINIO_PUBLIC_URL` rewrites their origin to your proxy:
+
+```text
+MINIO_PUBLIC_URL=https://files.company.com
+```
+
+The signature covers the path and query, not the host, so the URL stays valid.
+To use your own S3-compatible store instead of the embedded one:
+`MINIO_EMBEDDED=false` and point the `MINIO_*` variables at it.
+
+## Webhooks into your internal network
+
+Agents deliver webhooks. The default guard refuses destinations that resolve
+to loopback, private ranges or cloud metadata — right for a public service.
+On-premise, the point is the opposite: an agent notifying an internal service.
+To enable it:
+
+```text
+DEPLOYMENT_MODE=onprem
+WEBHOOK_ALLOW_PRIVATE_TARGETS=true
+```
+
+Without `true`, the guard stays closed even on-premise. The format guard
+(http/https only, no credentials in the URL, a destination that resolves)
+always applies. In the managed SaaS the value stays forbidden in production.
+
+## Backup and restore
+
+Three volumes hold everything: `pg-data`, `redis-data` (sessions/cache only,
+recoverable) and `minio-data` (the files).
+
+```bash
+docker compose -f docker-compose.onprem.yml exec postgres \
+  pg_dump -U agentdialog agentdialog > agentdialog-backup.sql
+
+# File volume (embedded MinIO):
+docker run --rm -v agentdialog-onprem_minio-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/minio-data.tar.gz -C /data .
+```
+
+To restore: start an empty postgres, `psql` the dump, and unpack `minio-data`
+into its volume before starting the app. Redis is not restored — its data is
+transient state.
+
+## Upgrades and rollback
+
+- **Upgrade:** pull (or rebuild) the new image and `up -d`. The new container
+  runs the migrations on boot before serving traffic.
+- **Rollback:** migrations do not roll back. An older version boots against
+  the newer schema, so write migrations the previous version still works on,
+  or accept that a rollback needs a down-migration written by hand.
+
+## Operator commands
+
+| Command | What it does |
+|---|---|
+| `bun run scripts/admin.ts init-env` | Writes `.env` from the on-premise template, generating real secrets and prompting for SMTP and URLs |
+| `bun run scripts/admin.ts create-agent --slug <s> [--name <n>] [--provider <p>] [--model <m>]` | Registers an agent and prints its API key, once |
+| `bun run scripts/admin.ts health` | GETs `/health` from `APP_URL` and prints the result |
