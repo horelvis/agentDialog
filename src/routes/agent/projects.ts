@@ -14,6 +14,15 @@ import {
   type PublicParticipant,
   type PublicProjectTask,
 } from "../../services/agent-project.service";
+import {
+  createProjectShare,
+  setProjectContractRules,
+} from "../../services/a2a-project-share.service";
+import {
+  upsertProjectPushConfig,
+  getProjectPushConfig,
+  deleteProjectPushConfig,
+} from "../../services/a2a-project-push.service";
 import { documented } from "../../openapi/documented";
 import { res } from "../../openapi/types";
 import { apiError } from "../../validators/response.helpers";
@@ -52,6 +61,15 @@ const createTaskSchema = z.object({
   title: z.string().min(1).max(256),
   description: z.string().max(4096).optional(),
   message: z.string().min(1).max(10000),
+});
+
+const contractRulesSchema = z.object({
+  markdown: z.string().max(100_000),
+});
+
+const projectPushSchema = z.object({
+  url: z.string().url(),
+  authInfo: z.record(z.unknown()).optional(),
 });
 
 const projectIdParams = z.object({ id: z.string().uuid() });
@@ -200,6 +218,120 @@ app.post(
     await createTask(c.get("agentId"), c.req.param("id") ?? "", assigneeAgentId, title, description, message);
     const project = await getProject(c.get("agentId"), c.req.param("id") ?? "");
     return c.json({ data: toWireProject(project) }, 201);
+  },
+);
+
+app.post(
+  "/:id/contract-rules",
+  {
+    summary: "Set the collaboration contract's rules",
+    description: "Only the project lead can do this. The rules are a Markdown document the lead writes; the hub stores it and serves it inside the contract JSON at the project's share URL.",
+    params: projectIdParams,
+    body: contractRulesSchema,
+    responses: {
+      ...authAndRateLimitErrors,
+      200: res(z.object({ ok: z.boolean() }), "The rules were saved and are served in the next contract fetch."),
+      403: res(apiError, "Only the project lead can set the rules."),
+      422: res(apiError, "The request body failed validation."),
+    },
+  },
+  validateBody(contractRulesSchema),
+  async (c) => {
+    const { markdown } = c.get("validatedBody") as { markdown: string };
+    await setProjectContractRules(c.req.param("id") ?? "", c.get("agentId"), markdown);
+    return c.json({ data: { ok: true } });
+  },
+);
+
+app.post(
+  "/:id/share",
+  {
+    summary: "Create or rotate the project's share link",
+    description: "Only the project lead can do this. Returns the contract URL and the token that reads it. Rotating invalidates the previous token.",
+    params: projectIdParams,
+    responses: {
+      ...authAndRateLimitErrors,
+      200: res(apiError, "The share URL and its token."),
+      403: res(apiError, "Only the project lead can create a share link."),
+    },
+  },
+  async (c) => {
+    const host = c.req.header("x-forwarded-host") || c.req.header("host") || new URL(c.req.url).host;
+    const proto = c.req.header("x-forwarded-proto") || "https";
+    const apiBaseUrl = `${proto}://${host}`;
+
+    const { token, shareUrl } = await createProjectShare(
+      c.req.param("id") ?? "",
+      c.get("agentId"),
+      apiBaseUrl,
+    );
+    return c.json({ data: { share_url: shareUrl, token } });
+  },
+);
+
+app.post(
+  "/:id/push",
+  {
+    summary: "Register or replace the caller's project callback",
+    description: "An active participant sets where it wants project events delivered. One callback per participant per project. `task_new` reaches the assignee; task status, artifact and message changes reach the sender.",
+    params: projectIdParams,
+    body: projectPushSchema,
+    responses: {
+      ...authAndRateLimitErrors,
+      200: res(apiError, "The registered callback."),
+      403: res(apiError, "Only an active participant can register a callback."),
+      422: res(apiError, "The request body failed validation, or the URL is not a reachable webhook target."),
+    },
+  },
+  validateBody(projectPushSchema),
+  async (c) => {
+    const { url, authInfo } = c.get("validatedBody") as { url: string; authInfo?: Record<string, unknown> };
+    const config = await upsertProjectPushConfig(c.req.param("id") ?? "", c.get("agentId"), url, authInfo);
+    return c.json({
+      data: {
+        config_id: config.id,
+        project_id: config.projectId,
+        agent_id: config.agentId,
+        url: config.url,
+        created_at: config.createdAt.toISOString(),
+        updated_at: config.updatedAt.toISOString(),
+      },
+    });
+  },
+);
+
+app.get(
+  "/:id/push",
+  {
+    summary: "Get the caller's project callback",
+    params: projectIdParams,
+    responses: {
+      ...authAndRateLimitErrors,
+      200: res(apiError, "The caller's callback, or nothing if none is registered."),
+      403: res(apiError, "Only an active participant can read its callback."),
+    },
+  },
+  async (c) => {
+    const config = await getProjectPushConfig(c.req.param("id") ?? "", c.get("agentId"));
+    return c.json({ data: config ? { url: config.url, project_id: config.projectId } : null });
+  },
+);
+
+app.delete(
+  "/:id/push",
+  {
+    summary: "Delete the caller's project callback",
+    params: projectIdParams,
+    responses: {
+      ...authAndRateLimitErrors,
+      200: res(z.object({ ok: z.boolean() }), "The callback was deleted."),
+      403: res(apiError, "Only an active participant can delete its callback."),
+      404: res(apiError, "No callback is registered for this participant."),
+    },
+  },
+  async (c) => {
+    await deleteProjectPushConfig(c.req.param("id") ?? "", c.get("agentId"));
+    return c.json({ data: { ok: true } });
   },
 );
 

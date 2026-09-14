@@ -32,6 +32,7 @@ import agentWebhookRoutes from "./routes/agent/webhooks";
 import agentQueryRoutes from "./routes/agent/queries";
 import agentA2ARoutes from "./routes/agent/a2a";
 import agentProjectRoutes from "./routes/agent/projects";
+import projectContractRoutes from "./routes/a2a/project-contract";
 import { createA2ARoutes } from "./routes/a2a";
 import humanAuthRoutes from "./routes/human/auth";
 import publicQueryRoutes from "./routes/public/queries";
@@ -113,6 +114,9 @@ export function createApp() {
 
   // Public A2A surface: discovery card plus both protocol bindings. Each
   // request authenticates its sender and resolves the addressed recipient.
+  // Project contract links are mounted first so "projects" is not read as an
+  // agent slug.
+  app.route("/a2a/projects", projectContractRoutes);
   app.route("/a2a/:agentSlug", createA2ARoutes());
 
   // Agent routes - register (no auth)

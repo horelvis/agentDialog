@@ -8,10 +8,6 @@ import {
   getTaskAsSender,
   listTasksAsSender,
   cancelTaskAsSender,
-  createPushConfig,
-  getPushConfig,
-  listPushConfigs,
-  deletePushConfig,
 } from "../../services/a2a-mailbox.service";
 import {
   sendMessageRequestSchema,
@@ -32,11 +28,6 @@ const listTasksQuerySchema = z.object({
   state: taskStateSchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
-});
-
-const pushConfigSchema = z.object({
-  url: z.string().url(),
-  authInfo: z.record(z.unknown()).optional(),
 });
 
 hono.post("/message:send", validateBody(sendMessageRequestSchema), async (c) => {
@@ -68,35 +59,6 @@ hono.post("/tasks/:id:cancel", async (c) => {
   const taskId = raw.replace(/:cancel$/, "");
   const task = await cancelTaskAsSender(taskId, c.get("a2aSenderAgentId"));
   return c.json(task);
-});
-
-hono.post("/tasks/:id/pushNotificationConfigs", validateBody(pushConfigSchema), async (c) => {
-  const { url, authInfo } = c.get("validatedBody") as { url: string; authInfo?: Record<string, unknown> };
-  const config = await createPushConfig(c.req.param("id") ?? "", c.get("a2aSenderAgentId"), url, authInfo);
-  return c.json(config, 201);
-});
-
-hono.get("/tasks/:id/pushNotificationConfigs", async (c) => {
-  const configs = await listPushConfigs(c.req.param("id") ?? "", c.get("a2aSenderAgentId"));
-  return c.json(configs);
-});
-
-hono.get("/tasks/:id/pushNotificationConfigs/:configId", async (c) => {
-  const config = await getPushConfig(
-    c.req.param("id") ?? "",
-    c.get("a2aSenderAgentId"),
-    c.req.param("configId") ?? "",
-  );
-  return c.json(config);
-});
-
-hono.delete("/tasks/:id/pushNotificationConfigs/:configId", async (c) => {
-  await deletePushConfig(
-    c.req.param("id") ?? "",
-    c.get("a2aSenderAgentId"),
-    c.req.param("configId") ?? "",
-  );
-  return c.body(null, 204);
 });
 
 export default hono;

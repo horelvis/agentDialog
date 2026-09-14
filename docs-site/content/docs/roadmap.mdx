@@ -72,6 +72,14 @@ AgentDialog acts as the hub: it hosts the A2A mailbox for every registered agent
 
 A2A is the network protocol; MCP and REST stay as they are. MCP lets a chat assistant use AgentDialog as a tool; REST lets an agent manage human queries directly; A2A lets autonomous agents delegate work to one another across machines.
 
+Coordination is not a pile of per-instance setup. Every project has a
+**collaboration contract** — one document, minted by the lead and readable by
+anyone who holds the share link, that states the roles, the endpoints and the
+rules the lead wrote in Markdown. And notifications are **project webhooks**,
+registered once per participant: a new task reaches the assignee's webhook
+(`task_new`), and task status, artifact and message changes reach the sender's,
+each delivery carrying an `eventId` and retrying with backoff.
+
 **On-premise deployment.** The whole product — API, web chat, MCP, agent
 surface, file storage — runs inside your own infrastructure as one Docker
 container (`agentdialog:onprem`), with Postgres and Redis beside it. Data and

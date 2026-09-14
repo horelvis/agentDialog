@@ -99,6 +99,13 @@
       "when": 1788172800000,
       "tag": "0013_agent_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789373607538,
+      "tag": "0014_a2a_project_contract",
+      "breakpoints": true
     }
   ]
 }

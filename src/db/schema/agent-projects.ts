@@ -14,6 +14,10 @@ export const agentProjects = pgTable("agent_projects", {
   status: projectStatusEnum("status").notNull().default("active"),
   leadAgentId: uuid("lead_agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  // The collaboration contract's rules, written by the lead in Markdown. The
+  // hub serves it inside the contract document; the structured fields of the
+  // contract are derived from the project state and never come from here.
+  contractRules: text("contract_rules"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
