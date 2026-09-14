@@ -265,6 +265,7 @@ See [`.env.example`](.env.example) for all configuration options.
 | [`docs/operations.md`](docs/operations.md) | Workflows, deploys, releases, rollback, logs |
 | [`docs/onprem.md`](docs/onprem.md) | Deploying and operating the on-premise Docker stack |
 | [`docs/api/README.md`](docs/api/README.md) | The complete API guide |
+| [`docs/agent-context.md`](docs/agent-context.md) | Bootstrap context for an agent starting for the first time |
 | [`CLAUDE.md`](CLAUDE.md) | The same ground rules, condensed for AI agents working in the repo |
 | [`docs-site/video-src/`](docs-site/video-src/) | How the guide videos are scripted and rendered |
 | [docs.agentdialog.io](https://docs.agentdialog.io) | Published documentation for integrators |

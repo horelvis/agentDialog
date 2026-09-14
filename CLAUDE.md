@@ -239,3 +239,6 @@ integrator, who is the entire audience of this product.
 - Auth middleware: `src/middleware/agent-auth.ts` and
   `src/middleware/human-auth.ts`
 - Design records: `docs/superpowers/specs/` and `docs/superpowers/plans/`
+- **Bootstrap context for a first-time agent**: `docs/agent-context.md` — a
+  condensed orientation (mental model, register, queries, webhooks, A2A
+  projects) meant to replace reading the whole API guide.
