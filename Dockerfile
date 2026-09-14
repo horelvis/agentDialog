@@ -53,7 +53,10 @@ EXPOSE 3000
 CMD ["./docker-entrypoint.sh"]
 
 # On-premise: the whole product in one container, with MinIO embedded.
-FROM minio/minio:latest AS minio-source
+# Pulled from quay.io, MinIO's own registry, pinned to a release: the
+# minio/minio image was removed from Docker Hub, where a fresh runner hits
+# "pull access denied". The same release the CI test job uses.
+FROM quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z AS minio-source
 
 FROM production AS onprem
 COPY --from=minio-source /usr/bin/minio /usr/local/bin/minio
