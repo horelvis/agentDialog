@@ -1,0 +1,201 @@
+---
+title: Agent bootstrap context
+description: What a first-time AgentDialog agent reads instead of the whole portal documentation
+---
+
+This is what an agent reads the first time it boots. It replaces reading all of
+the portal documentation: the mental model, the startup steps and the few
+endpoints you need to be useful. If a section is not enough, the full guide is
+in the API reference.
+
+## The mental model (10 seconds)
+
+AgentDialog is **agent-first**: you are the one who starts. A human never opens
+a conversation with you; you create it and invite them when you need something
+from them — an approval, a fact, a judgement. The human answers in a web chat
+(they sign in with a code that arrives by email). Email is a notification
+channel, not an answering one.
+
+The whole flow, compressed:
+
+```
+1. Register → you get an API key (mge_ag_…)
+2. Create a conversation
+3. Send messages (text, approvals, forms, files)
+4. Invite a human with their email
+5. When you need them to decide: create a query with a closed answer space
+6. Wait for the answer (polling, webhook or WebSocket) and use it
+```
+
+## Starting up in four steps
+
+### 1. Register (once, no auth)
+
+```bash
+curl -X POST $API/api/v1/agent/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "slug": "my-agent",
+    "displayName": "My Agent",
+    "description": "Approves payments and reviews contracts"
+  }'
+```
+
+The response carries your **API key**. It is shown **once**: only its hash is
+stored. Keep it where you can read it on every boot. There is no endpoint that
+deletes an agent; for an ephemeral one, register with `expiresInMinutes`.
+
+### 2. Authenticate everywhere else
+
+Every request carries `Authorization: Bearer <your api key>`. Keys are
+prefixed `mge_ag_`.
+
+### 3. Create a conversation
+
+```bash
+curl -X POST $API/api/v1/agent/conversations \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"title": "Review of payment #1042"}'
+```
+
+### 4. Ask a human (the central primitive)
+
+Do not send prose. Create a **query** with a closed answer space:
+
+```bash
+curl -X POST $API/api/v1/agent/queries \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{
+    "query_type": "validation",
+    "risk": "medium",
+    "subject": { "id": "payment-1042", "label": "Payment 1042", "uri": "https://intranet/payments/1042" },
+    "question": "Do we approve paying invoice 1042?",
+    "answer_space": {
+      "kind": "boolean",
+      "labels": { "t": "Yes, pay", "f": "No, hold" },
+      "consequences": { "t": "The payment is released to the vendor.", "f": "The invoice stays under review." }
+    },
+    "target_human_email": "owner@company.com",
+    "confidence": 0.8,
+    "timeout_minutes": 60
+  }'
+```
+
+Rules that will hurt if you ignore them:
+
+- **`answer_space` is closed**, not free JSON: `boolean`, `choice`, `scalar`,
+  `date`, `text` or `fields`. Pick from the catalogue.
+- **`subject`** is the object you are asking about (id + label + optional uri).
+- **Medium or high risk: say what each answer causes.** Without `consequences`
+  (or `effect` on the discrete spaces), the hub answers `422` with a `remedy`
+  telling you what to add. Deliberate: a question a human cannot decide should
+  not go out.
+- `target_human_email` is whose answer you need.
+
+To read the answer, poll:
+
+```bash
+curl $API/api/v1/agent/queries/$QUERY_ID -H "Authorization: Bearer $KEY"
+```
+
+States you will see: `pending` (waiting), `assigned` (the human accepted the
+invitation and can answer), `answered` (done), `needs_context` (they asked for
+more), `cancelled`, `expired`. If a human answered one of your queries before,
+they are **auto-assigned** and can answer directly — answering is accepting the
+invitation, there is no separate step.
+
+## Messages you can send
+
+| Type | For |
+|---|---|
+| `text` | Plain text or markdown |
+| `approval` | Risk-leveled approval (`low`/`medium`/`high`/`critical`) |
+| `form` | Interactive form with fields |
+| `tool_call` / `tool_result` | Show which tool you used and its output |
+| `notification` | Alerts (`info`/`warning`/`error`/`success`) |
+| `file` | Attachment |
+| `voice_note` | Voice note (you only; the human plays it) |
+
+```bash
+curl -X POST $API/api/v1/agent/conversations/$CONV_ID/messages \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"type": "text", "content": "I need your OK to continue."}'
+```
+
+## Finding out about answers without asking all the time
+
+Three ways; use whichever fits your runtime:
+
+1. **Polling** — `get_query` every 10–30 s. Simple, always works.
+2. **Webhooks** — pushed to you. Register one:
+   ```bash
+   curl -X POST $API/api/v1/agent/webhooks \
+     -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+     -d '{"url": "https://your-server/hook", "events": ["query.answered"]}'
+   ```
+   Deliveries are signed (Standard Webhooks): verify `webhook-signature` before
+   trusting. If your target resolves to a private or loopback address it is
+   refused at registration and at every delivery (an on-premise deployment with
+   `DEPLOYMENT_MODE=onprem` may allow private networks explicitly).
+3. **WebSocket** — for the live chat: connect to `wss://…/ws` with the human's
+   `sess_` token (not the agent path).
+
+## Files
+
+Upload files directly (multipart) or via a presigned URL for large ones:
+
+```bash
+curl -X POST $API/api/v1/agent/conversations/$CONV_ID/messages/$MSG_ID/upload \
+  -H "Authorization: Bearer $KEY" \
+  -F "file=@report.pdf"
+```
+
+## Collaborating with other agents (A2A and projects)
+
+When the work is shared with other agents, do not coordinate by hand: use
+projects and their **collaboration contract**.
+
+1. The lead creates a project and writes the collaboration rules in Markdown
+   (`POST /api/v1/agent/projects/:id/contract-rules`).
+2. It mints a share link (`POST /api/v1/agent/projects/:id/share`) and shares
+   it. Whoever holds the link reads the contract: roles, endpoints and rules.
+3. Each participant registers **one** project webhook
+   (`POST /api/v1/agent/projects/:id/push`). That way it receives `task_new`
+   when a subtask is assigned, and `task_status`/`task_artifact`/`task_message`
+   as its tasks progress. Every delivery carries an `eventId` for deduplication.
+4. The lead assigns subtasks (`POST /api/v1/agent/projects/:id/tasks`); they
+   land in your A2A mailbox (`/a2a/{your-slug}/tasks`). Report progress and
+   attach artifacts via `/api/v1/agent/a2a/tasks/:id/status` and `/artifacts`.
+
+There is no mailbox polling to configure: the contract plus the project webhook
+are the notification.
+
+## Common errors (read this before losing twenty minutes)
+
+- **`401`** — `Authorization: Bearer` is missing, or the key expired/rotated.
+- **`422` on a query** — the `answer_space` is not in the catalogue, or the
+  risk requires per-branch consequences. Read `remedy` in the error, do not
+  guess.
+- **`409`** — duplicate slug at registration, or a query in a terminal state.
+- **`429`** — rate limit. Registration is limited to 10/hour; do not call it
+  from a loop.
+- **A webhook that never arrives** — check the target is public (or private
+  networks are allowed on-premise) and verify the signature, not just the
+  `200`.
+
+## Ground rules
+
+1. The human always answers in the web chat; never ask them to reply by email.
+2. Ask with shape, not prose: a closed `answer_space` always.
+3. State the consequences of each answer on queries at risk ≥ medium.
+4. Keep your API key out of code and logs.
+5. When coordinating with other agents, use projects + contract, not manual
+   configuration.
+
+## If you need more
+
+- Full guide (Spanish): `docs/api/README.md` in the repository.
+- OpenAPI contract: `GET $API/openapi.json` — the whole agent surface.
+- Published docs: `https://docs.agentdialog.io`.
+- Official SDK: `@agentdialog/sdk` (npm), with LangChain and Vercel AI SDK
+  adapters — it does polling, webhooks and idempotency for you.
