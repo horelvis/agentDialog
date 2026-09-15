@@ -233,7 +233,7 @@ hero: {
     backendRole: "backend",
     channel: "A2A",
     identityNote:
-      "Cada agente recibe su id al registrarse — POST /api/v1/agent/register devuelve data.id — y el par lo comparte para que el lead pueda invitarlo.",
+      "Invita por slug: el nombre con el que un agente se registra, el mismo de la URL de su agent card (/a2a/{slug}). El par comparte su slug y el lead lo invita — sin ids que copiar.",
     footnote:
       "El lead abre un proyecto y deja la subtarea en el buzón del par. El par recibe el aviso (task_new), hace el trabajo y reporta el estado.",
   },

@@ -163,4 +163,59 @@ describe("agent projects", () => {
     const { data } = await asLead.json();
     expect(data.status).toBe("canceled");
   });
+
+  it("invites and assigns by slug, without copying an agent id", async () => {
+    const lead = await createTestAgent();
+    const backend = await createTestAgent();
+    const project = await createProject(lead);
+
+    const invite = await app.request(`/api/v1/agent/projects/${project.project_id}/participants`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: lead.authHeader },
+      body: JSON.stringify({ agent_slug: backend.agent.slug }),
+    });
+    expect(invite.status).toBe(201);
+    const { data: invited } = await invite.json();
+    expect(invited.participants.map((p: any) => p.agent_id)).toContain(backend.agent.id);
+
+    const assign = await app.request(`/api/v1/agent/projects/${project.project_id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: lead.authHeader },
+      body: JSON.stringify({
+        assignee_agent_slug: backend.agent.slug,
+        title: "Implement /login",
+        message: "Implement the login endpoint.",
+      }),
+    });
+    expect(assign.status).toBe(201);
+    const { data: assigned } = await assign.json();
+    expect(assigned.tasks[0].assignee_agent_id).toBe(backend.agent.id);
+  });
+
+  it("refuses an invite that names neither or both of id and slug, and an unknown slug", async () => {
+    const lead = await createTestAgent();
+    const member = await createTestAgent();
+    const project = await createProject(lead);
+
+    const neither = await app.request(`/api/v1/agent/projects/${project.project_id}/participants`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: lead.authHeader },
+      body: JSON.stringify({ role: "member" }),
+    });
+    expect(neither.status).toBe(422);
+
+    const both = await app.request(`/api/v1/agent/projects/${project.project_id}/participants`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: lead.authHeader },
+      body: JSON.stringify({ agent_id: member.agent.id, agent_slug: member.agent.slug }),
+    });
+    expect(both.status).toBe(422);
+
+    const unknown = await app.request(`/api/v1/agent/projects/${project.project_id}/participants`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: lead.authHeader },
+      body: JSON.stringify({ agent_slug: "no-such-agent-anywhere" }),
+    });
+    expect(unknown.status).toBe(404);
+  });
 });

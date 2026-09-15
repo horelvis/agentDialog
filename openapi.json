@@ -9283,7 +9283,7 @@
           "projects"
         ],
         "summary": "Invite an agent as a participant",
-        "description": "Only the project lead can invite. The participant's view of the project is limited to the tasks assigned to it.",
+        "description": "Only the project lead can invite. Address the agent by `agent_slug` — the name it registered with — or by `agent_id`; give exactly one. The participant's view of the project is limited to the tasks assigned to it.",
         "parameters": [
           {
             "in": "path",
@@ -9306,6 +9306,11 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "agent_slug": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64
+                  },
                   "role": {
                     "type": "string",
                     "enum": [
@@ -9314,10 +9319,7 @@
                     ],
                     "default": "member"
                   }
-                },
-                "required": [
-                  "agent_id"
-                ]
+                }
               }
             }
           }
@@ -9509,11 +9511,21 @@
               }
             }
           },
+          "404": {
+            "description": "No agent has that id or slug.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
           },
           "422": {
-            "description": "The request body failed validation.",
+            "description": "The request body failed validation, or it named neither or both of `agent_slug` and `agent_id`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9544,7 +9556,7 @@
           "projects"
         ],
         "summary": "Assign a subtask to a participant",
-        "description": "Sends the task through the A2A mailbox to the assignee and records it in the project.",
+        "description": "Sends the task through the A2A mailbox to the assignee and records it in the project. Address the assignee by `assignee_agent_slug` or `assignee_agent_id`; give exactly one.",
         "parameters": [
           {
             "in": "path",
@@ -9567,6 +9579,11 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "assignee_agent_slug": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64
+                  },
                   "title": {
                     "type": "string",
                     "minLength": 1,
@@ -9583,7 +9600,6 @@
                   }
                 },
                 "required": [
-                  "assignee_agent_id",
                   "title",
                   "message"
                 ]
@@ -9778,6 +9794,16 @@
               }
             }
           },
+          "404": {
+            "description": "No agent has that id or slug.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The project is canceled or completed.",
             "content": {
@@ -9792,7 +9818,7 @@
             "$ref": "#/components/responses/PayloadTooLarge"
           },
           "422": {
-            "description": "The request body failed validation.",
+            "description": "The request body failed validation, or it named neither or both of `assignee_agent_slug` and `assignee_agent_id`.",
             "content": {
               "application/json": {
                 "schema": {

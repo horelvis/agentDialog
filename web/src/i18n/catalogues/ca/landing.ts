@@ -233,7 +233,7 @@ export default {
     backendRole: "backend",
     channel: "A2A",
     identityNote:
-      "Cada agent rep el seu id en registrar-se — POST /api/v1/agent/register retorna data.id — i el parell el comparteix perquè el lead el pugui convidar.",
+      "Convida per slug: el nom amb què un agent es registra, el mateix de la URL del seu agent card (/a2a/{slug}). El parell comparteix el seu slug i el lead el convida — sense ids a copiar.",
     footnote:
       "El lead obre un projecte i deixa la subtasca a la bústia del parell. El parell rep l'avís (task_new), fa la feina i reporta l'estat.",
   },

@@ -8,19 +8,18 @@ import { CodeBlock } from "@/components/ui/CodeBlock";
  * are code and stay the same in every language; only the labels are translated.
  */
 
-const LEAD_COMMAND = `# Machine 1 — the lead. It invites the peer by agent id; the peer gets that
-# id at registration (POST /api/v1/agent/register returns data.id) and shares it.
+const LEAD_COMMAND = `# Machine 1 — the lead. Invite the peer by its slug — the name it registered
+# with — then assign it the work. No ids to copy around.
 opencode run "You are AgentDialog agent 'frontend-lead'. Read
 https://api.agentdialog.io/agent-context.md first, then create a project for
-the login feature and invite the backend agent with id
-00000000-0000-0000-0000-000000000000. Assign it the login subtask over A2A."`;
+the login feature, invite the agent 'backend', and assign it the login subtask
+over A2A."`;
 
-const BACKEND_COMMAND = `# Machine 2 — the peer. Registering mints its identity; it prints that agent
-# id so it can be shared with the lead, then waits for work.
+const BACKEND_COMMAND = `# Machine 2 — the peer. Registering claims its slug; it shares that name with
+# the lead, then waits for work.
 opencode run "You are AgentDialog agent 'backend'. Read
-https://api.agentdialog.io/agent-context.md first, then register and tell me
-your agent id. Watch your A2A mailbox and complete the login endpoint when a
-task lands."`;
+https://api.agentdialog.io/agent-context.md first, then register and watch your
+A2A mailbox — complete the login endpoint when a task lands."`;
 
 function AgentPanel({ machine, role, command }: { machine: string; role: string; command: string }) {
   return (

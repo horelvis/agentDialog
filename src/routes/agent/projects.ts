@@ -10,6 +10,7 @@ import {
   getProject,
   listProjects,
   cancelProject,
+  resolveAgentRef,
   type PublicProject,
   type PublicParticipant,
   type PublicProjectTask,
@@ -52,12 +53,14 @@ const createProjectSchema = z.object({
 });
 
 const inviteParticipantSchema = z.object({
-  agent_id: z.string().uuid(),
+  agent_id: z.string().uuid().optional(),
+  agent_slug: z.string().min(3).max(64).optional(),
   role: z.enum(["lead", "member"]).default("member").optional(),
 });
 
 const createTaskSchema = z.object({
-  assignee_agent_id: z.string().uuid(),
+  assignee_agent_id: z.string().uuid().optional(),
+  assignee_agent_slug: z.string().min(3).max(64).optional(),
   title: z.string().min(1).max(256),
   description: z.string().max(4096).optional(),
   message: z.string().min(1).max(10000),
@@ -173,19 +176,25 @@ app.post(
   "/:id/participants",
   {
     summary: "Invite an agent as a participant",
-    description: "Only the project lead can invite. The participant's view of the project is limited to the tasks assigned to it.",
+    description: "Only the project lead can invite. Address the agent by `agent_slug` — the name it registered with — or by `agent_id`; give exactly one. The participant's view of the project is limited to the tasks assigned to it.",
     params: projectIdParams,
     body: inviteParticipantSchema,
     responses: {
       ...authAndRateLimitErrors,
       201: res(projectResponse, "The project with the new participant."),
       403: res(apiError, "Only the project lead can invite participants."),
-      422: res(apiError, "The request body failed validation."),
+      404: res(apiError, "No agent has that id or slug."),
+      422: res(apiError, "The request body failed validation, or it named neither or both of `agent_slug` and `agent_id`."),
     },
   },
   validateBody(inviteParticipantSchema),
   async (c) => {
-    const { agent_id: agentId, role } = c.get("validatedBody") as { agent_id: string; role?: "lead" | "member" };
+    const { agent_id, agent_slug, role } = c.get("validatedBody") as {
+      agent_id?: string;
+      agent_slug?: string;
+      role?: "lead" | "member";
+    };
+    const agentId = await resolveAgentRef({ agentId: agent_id, agentSlug: agent_slug });
     await inviteParticipant(c.get("agentId"), c.req.param("id") ?? "", agentId, role ?? "member");
     const project = await getProject(c.get("agentId"), c.req.param("id") ?? "");
     return c.json({ data: toWireProject(project) }, 201);
@@ -196,25 +205,28 @@ app.post(
   "/:id/tasks",
   {
     summary: "Assign a subtask to a participant",
-    description: "Sends the task through the A2A mailbox to the assignee and records it in the project.",
+    description: "Sends the task through the A2A mailbox to the assignee and records it in the project. Address the assignee by `assignee_agent_slug` or `assignee_agent_id`; give exactly one.",
     params: projectIdParams,
     body: createTaskSchema,
     responses: {
       ...authAndRateLimitErrors,
       201: res(projectResponse, "The project with the new subtask."),
       403: res(apiError, "Only the project lead can assign tasks."),
+      404: res(apiError, "No agent has that id or slug."),
       409: res(apiError, "The project is canceled or completed."),
-      422: res(apiError, "The request body failed validation."),
+      422: res(apiError, "The request body failed validation, or it named neither or both of `assignee_agent_slug` and `assignee_agent_id`."),
     },
   },
   validateBody(createTaskSchema),
   async (c) => {
-    const { assignee_agent_id: assigneeAgentId, title, description, message } = c.get("validatedBody") as {
-      assignee_agent_id: string;
+    const { assignee_agent_id, assignee_agent_slug, title, description, message } = c.get("validatedBody") as {
+      assignee_agent_id?: string;
+      assignee_agent_slug?: string;
       title: string;
       description?: string;
       message: string;
     };
+    const assigneeAgentId = await resolveAgentRef({ agentId: assignee_agent_id, agentSlug: assignee_agent_slug });
     await createTask(c.get("agentId"), c.req.param("id") ?? "", assigneeAgentId, title, description, message);
     const project = await getProject(c.get("agentId"), c.req.param("id") ?? "");
     return c.json({ data: toWireProject(project) }, 201);

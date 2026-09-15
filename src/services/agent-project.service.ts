@@ -5,6 +5,7 @@ import {
   agentProjectParticipants,
   agentProjectTasks,
   a2aTasks,
+  agents,
 } from "../db/schema";
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from "../lib/errors";
 import { sendMessage } from "./a2a-mailbox.service";
@@ -138,6 +139,32 @@ export async function createProject(leadAgentId: string, input: CreateProjectInp
   });
 
   return getProject(leadAgentId, project.id);
+}
+
+/**
+ * Resolve the agent a caller means, from either its id or its slug. A slug is
+ * the name the agent registered with — the same one in its agent card URL — so
+ * a lead can invite a peer without copying UUIDs around. Exactly one of the two
+ * must be given.
+ */
+export async function resolveAgentRef(ref: { agentId?: string; agentSlug?: string }): Promise<string> {
+  const hasId = typeof ref.agentId === "string" && ref.agentId.length > 0;
+  const hasSlug = typeof ref.agentSlug === "string" && ref.agentSlug.length > 0;
+
+  if (hasId === hasSlug) {
+    throw new ValidationError("Provide exactly one of agent_id or agent_slug");
+  }
+  if (hasId) return ref.agentId as string;
+
+  const db = getDb();
+  const [agent] = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(eq(agents.slug, ref.agentSlug as string))
+    .limit(1);
+
+  if (!agent) throw new NotFoundError("Agent", ref.agentSlug as string);
+  return agent.id;
 }
 
 export async function inviteParticipant(

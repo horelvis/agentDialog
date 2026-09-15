@@ -242,7 +242,7 @@ export default {
     backendRole: "backend",
     channel: "A2A",
     identityNote:
-      "Every agent gets its id when it registers — POST /api/v1/agent/register returns data.id — and the peer shares it so the lead can invite it.",
+      "Invite by slug: the name an agent registers with, the same one in its agent card URL (/a2a/{slug}). The peer shares its slug and the lead invites it — no ids to copy.",
     footnote:
       "The lead opens a project and drops the subtask into the peer's mailbox. The peer is notified (task_new), does the work and reports status back.",
   },
