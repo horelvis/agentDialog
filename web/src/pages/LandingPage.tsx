@@ -45,10 +45,10 @@ export function LandingPage() {
       <Hero />
       <FlowDemo />
       <A2AFlowDemo />
+      <A2AOpenCodeDemo />
       <Features />
       <HowItWorks />
       <CodeExamples />
-      <A2AOpenCodeDemo />
       <IntegrationGuide />
       {/* Objections answered before the last ask, not after it. */}
       <Faq />

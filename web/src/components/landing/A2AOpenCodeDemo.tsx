@@ -36,7 +36,7 @@ export function A2AOpenCodeDemo() {
   const { t } = useTranslation("landing");
 
   return (
-    <section id="a2a-agents" className="bg-surface-primary py-24">
+    <section id="a2a-agents" className="pb-24 pt-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-100 sm:text-4xl">
