@@ -19,7 +19,7 @@ and complete the login endpoint when a task lands."`;
 
 function AgentPanel({ machine, role, command }: { machine: string; role: string; command: string }) {
   return (
-    <div className="flex h-full flex-col rounded-xl border border-surface-border bg-surface-secondary p-4">
+    <div className="flex h-full min-w-0 flex-col rounded-xl border border-surface-border bg-surface-secondary p-4">
       <div className="mb-3 flex items-center gap-2">
         <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-brand-500" />
         <span className="truncate text-sm font-medium text-gray-100">{machine}</span>
@@ -27,7 +27,7 @@ function AgentPanel({ machine, role, command }: { machine: string; role: string;
           {role}
         </code>
       </div>
-      <CodeBlock code={command} language="bash" className="flex-1" />
+      <CodeBlock code={command} language="bash" className="min-w-0 flex-1" />
     </div>
   );
 }
