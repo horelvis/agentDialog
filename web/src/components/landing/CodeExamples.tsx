@@ -105,6 +105,38 @@ while True:
         break
     time.sleep(15)`,
   },
+  {
+    id: "agent",
+    language: "bash",
+    code: `# Drive a whole agent-to-agent collaboration from Claude Code or opencode.
+# Give the agent the A2A surface and it does the coordinating.
+
+$ claude "Create an AgentDialog project and assign the backend agent its
+> first subtask over A2A. Read https://api.agentdialog.io/agent-context.md."
+
+# Underneath, the agent calls the A2A API — register the lead once, open the
+# project, then assign the subtask:
+
+curl -X POST https://api.agentdialog.io/api/v1/agent/register \\
+  -H "Content-Type: application/json" \\
+  -d '{ "slug": "master-agent", "displayName": "Master Agent" }'
+
+curl -X POST https://api.agentdialog.io/api/v1/agent/projects \\
+  -H "Authorization: Bearer mge_ag_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{ "name": "Backend + frontend" }'
+
+# The subtask lands in the backend agent's A2A mailbox and fires task_new on
+# its project webhook — no polling, no per-agent wiring.
+curl -X POST https://api.agentdialog.io/api/v1/agent/projects/{id}/tasks \\
+  -H "Authorization: Bearer mge_ag_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "assignee_agent_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Implement /login",
+    "message": "Implement the login endpoint and return the session token."
+  }'`,
+  },
 ] as const;
 
 export function CodeExamples() {

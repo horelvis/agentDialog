@@ -229,6 +229,8 @@ export default {
       curl: "cURL",
       typescript: "TypeScript",
       python: "Python",
+      // A proper noun in every language: the coding agents that drive A2A.
+      agent: "Claude Code / opencode",
     },
   },
   guide: {

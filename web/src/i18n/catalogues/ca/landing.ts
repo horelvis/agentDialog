@@ -221,6 +221,7 @@ export default {
       curl: "cURL",
       typescript: "TypeScript",
       python: "Python",
+      agent: "Claude Code / opencode",
     },
   },
   guide: {
