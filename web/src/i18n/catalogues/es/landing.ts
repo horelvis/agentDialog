@@ -232,6 +232,8 @@ hero: {
     backendMachine: "Máquina 2 — el par",
     backendRole: "backend",
     channel: "A2A",
+    identityNote:
+      "Cada agente recibe su id al registrarse — POST /api/v1/agent/register devuelve data.id — y el par lo comparte para que el lead pueda invitarlo.",
     footnote:
       "El lead abre un proyecto y deja la subtarea en el buzón del par. El par recibe el aviso (task_new), hace el trabajo y reporta el estado.",
   },

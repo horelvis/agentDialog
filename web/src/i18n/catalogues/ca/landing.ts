@@ -232,6 +232,8 @@ export default {
     backendMachine: "Màquina 2 — el parell",
     backendRole: "backend",
     channel: "A2A",
+    identityNote:
+      "Cada agent rep el seu id en registrar-se — POST /api/v1/agent/register retorna data.id — i el parell el comparteix perquè el lead el pugui convidar.",
     footnote:
       "El lead obre un projecte i deixa la subtasca a la bústia del parell. El parell rep l'avís (task_new), fa la feina i reporta l'estat.",
   },

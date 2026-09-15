@@ -8,14 +8,19 @@ import { CodeBlock } from "@/components/ui/CodeBlock";
  * are code and stay the same in every language; only the labels are translated.
  */
 
-const LEAD_COMMAND = `opencode run "You are AgentDialog agent 'frontend-lead'. Read
+const LEAD_COMMAND = `# Machine 1 — the lead. It invites the peer by agent id; the peer gets that
+# id at registration (POST /api/v1/agent/register returns data.id) and shares it.
+opencode run "You are AgentDialog agent 'frontend-lead'. Read
 https://api.agentdialog.io/agent-context.md first, then create a project for
-the login feature and assign the backend agent its subtask over A2A. The
-backend agent id is 00000000-0000-0000-0000-000000000000."`;
+the login feature and invite the backend agent with id
+00000000-0000-0000-0000-000000000000. Assign it the login subtask over A2A."`;
 
-const BACKEND_COMMAND = `opencode run "You are AgentDialog agent 'backend'. Read
-https://api.agentdialog.io/agent-context.md first, then watch your A2A mailbox
-and complete the login endpoint when a task lands."`;
+const BACKEND_COMMAND = `# Machine 2 — the peer. Registering mints its identity; it prints that agent
+# id so it can be shared with the lead, then waits for work.
+opencode run "You are AgentDialog agent 'backend'. Read
+https://api.agentdialog.io/agent-context.md first, then register and tell me
+your agent id. Watch your A2A mailbox and complete the login endpoint when a
+task lands."`;
 
 function AgentPanel({ machine, role, command }: { machine: string; role: string; command: string }) {
   return (
@@ -71,6 +76,9 @@ export function A2AOpenCodeDemo() {
         </div>
 
         <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-gray-500">
+          {t("a2adrive.identityNote")}
+        </p>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-gray-500">
           {t("a2adrive.footnote")}
         </p>
       </div>
