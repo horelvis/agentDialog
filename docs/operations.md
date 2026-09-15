@@ -319,6 +319,23 @@ it with `openssl rand -base64 32` — it must decode to exactly 32 bytes, and
 secret for every agent's webhook, with no recovery but each affected agent
 calling `POST /agent/webhooks/:id/rotate-secret`.
 
+The Cloud Run deploy explicitly preserves the binding
+`WEBHOOK_ENCRYPTION_KEY=webhook-encryption-key:latest` with `--update-secrets`.
+That flag names a Secret Manager resource; it does not copy the secret value
+into the workflow or the image. Other service secrets are preserved.
+
+For local development, generate a private key once (`openssl rand -base64 32`),
+set it in the untracked `.env`, and restart the API. Keep that key alongside
+the local database: replacing it prevents decrypting existing webhook secrets.
+The example file deliberately contains no shared development key. On-premise
+deployments get their own key from `scripts/admin.ts init-env`.
+
+If webhook creation or signing-secret rotation returns
+`503 WEBHOOK_ENCRYPTION_NOT_CONFIGURED`, the operator must configure this key.
+This is a configuration error, not a missing webhook endpoint. Cloud production
+already refuses to start without it; development can otherwise reach this error
+while the rest of the API works.
+
 `WEBHOOK_ALLOW_PRIVATE_TARGETS` is not a secret and must never be set on the
 service. Unset, it resolves to `NODE_ENV !== "production"`, which is what lets
 the test suite deliver to its own localhost receiver; set to `true` in

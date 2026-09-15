@@ -53,6 +53,7 @@ app.post(
     responses: {
       201: res(webhookCreateResponse, "The webhook, registered. `secret` is returned in clear this one time — only its sealed form is stored."),
       403: res(apiError, "This agent already has the maximum number of webhooks registered."),
+      503: res(apiError, "Webhook secret storage is not configured. The operator must supply WEBHOOK_ENCRYPTION_KEY."),
       422: res(apiError, "The request body failed validation, or `url` resolves to loopback, a private range, or a cloud metadata address."),
     },
     idempotent: true,
@@ -123,6 +124,7 @@ app.post(
     params: uuidParam,
     responses: {
       200: res(webhookRotateSecretResponse, "The new secret, returned in clear this one time."),
+      503: res(apiError, "Webhook secret storage is not configured. The operator must supply WEBHOOK_ENCRYPTION_KEY."),
       404: res(apiError, "No such webhook, or it wasn't registered by the authenticated agent."),
       // idempotency() calls assertValidIdempotencyKey before this route has a
       // body to blame it on — the other 422 on this surface with no doc.body.

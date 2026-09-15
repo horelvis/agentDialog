@@ -3175,6 +3175,16 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "description": "Webhook secret storage is not configured. The operator must supply WEBHOOK_ENCRYPTION_KEY.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -3658,6 +3668,16 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "description": "Webhook secret storage is not configured. The operator must supply WEBHOOK_ENCRYPTION_KEY.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }

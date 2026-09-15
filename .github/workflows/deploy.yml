@@ -74,6 +74,7 @@ jobs:
             --timeout=300
             --concurrency=80
             --session-affinity
+            --update-secrets=WEBHOOK_ENCRYPTION_KEY=webhook-encryption-key:latest
 
       # /health reports the database and Redis. It does not report whether an
       # agent can use the product: it said healthy for the four days every MCP

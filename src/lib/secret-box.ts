@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { env } from "../env";
+import { AppError } from "./errors";
 
 /**
  * Reversible encryption for secrets we must be able to hand back out.
@@ -22,7 +23,14 @@ const KEY_BYTES = 32;
 function encryptionKey(): Buffer {
   const configured = env().WEBHOOK_ENCRYPTION_KEY;
   if (!configured) {
-    throw new Error("WEBHOOK_ENCRYPTION_KEY is not set");
+    throw new AppError(
+      503,
+      "Webhook secret storage is not configured. The operator must supply " +
+        "WEBHOOK_ENCRYPTION_KEY and restart the API. On Cloud Run, use the " +
+        "webhook-encryption-key secret in GCP Secret Manager; for local " +
+        "development, generate a private key with openssl rand -base64 32.",
+      "WEBHOOK_ENCRYPTION_NOT_CONFIGURED",
+    );
   }
 
   const key = Buffer.from(configured, "base64");
