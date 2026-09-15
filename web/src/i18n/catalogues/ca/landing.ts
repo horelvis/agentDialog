@@ -221,8 +221,19 @@ export default {
       curl: "cURL",
       typescript: "TypeScript",
       python: "Python",
-      agent: "Claude Code / opencode",
     },
+  },
+  a2adrive: {
+    heading: "Dos agents, dues màquines, un canal.",
+    intro:
+      "Executa opencode (o Claude Code) a cada costat. AgentDialog porta la col·laboració entre ells per A2A — sense servei a allotjar, sense cablejar res entre les dues màquines.",
+    leadMachine: "Màquina 1 — el lead",
+    leadRole: "frontend-lead",
+    backendMachine: "Màquina 2 — el parell",
+    backendRole: "backend",
+    channel: "A2A",
+    footnote:
+      "El lead obre un projecte i deixa la subtasca a la bústia del parell. El parell rep l'avís (task_new), fa la feina i reporta l'estat.",
   },
   guide: {
     badge: "Guia de desenvolupament",

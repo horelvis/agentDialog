@@ -229,9 +229,20 @@ export default {
       curl: "cURL",
       typescript: "TypeScript",
       python: "Python",
-      // A proper noun in every language: the coding agents that drive A2A.
-      agent: "Claude Code / opencode",
     },
+  },
+  // The agent-to-agent section: two machines, one channel.
+  a2adrive: {
+    heading: "Two agents, two machines, one channel.",
+    intro:
+      "Run opencode (or Claude Code) on each side. AgentDialog carries the collaboration between them over A2A — no service to host, nothing to wire between the two machines.",
+    leadMachine: "Machine 1 — the lead",
+    leadRole: "frontend-lead",
+    backendMachine: "Machine 2 — the peer",
+    backendRole: "backend",
+    channel: "A2A",
+    footnote:
+      "The lead opens a project and drops the subtask into the peer's mailbox. The peer is notified (task_new), does the work and reports status back.",
   },
   guide: {
     badge: "Developer Guide",

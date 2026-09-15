@@ -5,6 +5,7 @@ import { A2AFlowDemo } from "@/components/landing/A2AFlowDemo";
 import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { CodeExamples } from "@/components/landing/CodeExamples";
+import { A2AOpenCodeDemo } from "@/components/landing/A2AOpenCodeDemo";
 import { IntegrationGuide } from "@/components/landing/IntegrationGuide";
 import { Faq } from "@/components/landing/Faq";
 import { CTA } from "@/components/landing/CTA";
@@ -47,6 +48,7 @@ export function LandingPage() {
       <Features />
       <HowItWorks />
       <CodeExamples />
+      <A2AOpenCodeDemo />
       <IntegrationGuide />
       {/* Objections answered before the last ask, not after it. */}
       <Faq />
